@@ -4,12 +4,12 @@ import plotly.express as px
 
 # === Page config ===
 st.set_page_config(
-    page_title="Dashboard Realisasi Belanja KL",
+    page_title="Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("📊 Dashboard Realisasi Belanja KL 2023–2025")
+st.title("📊 Dashboard")
 
 # === Load data ===
 @st.cache_data
@@ -130,4 +130,5 @@ for tab, col in zip(tabs, cat_cols):
 # === Footer ===
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id | Dashboard dibuat dengan Streamlit dan Plotly")
+
 
