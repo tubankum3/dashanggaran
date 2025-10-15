@@ -98,7 +98,7 @@ def make_line_chart(df, group_col, base_height=600, extra_height_per_line=10):
     fig.update_layout(
         height=height,
         hovermode="closest",
-        title_x=0.5,
+        title_x=0,
         legend_title_text=group_col.replace("_", " ").title(),
         margin=dict(l=40, r=40, t=80, b=40)
     )
@@ -130,5 +130,6 @@ for tab, col in zip(tabs, cat_cols):
 # === Footer ===
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id | Dashboard dibuat dengan Streamlit dan Plotly")
+
 
 
