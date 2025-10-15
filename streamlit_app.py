@@ -142,7 +142,7 @@ p {
 """, unsafe_allow_html=True)
 
 # Title with icon
-st.markdown("<h1 style='color: #1e293b; font-weight: 700;'>📊 Dashboard Analisis Keuangan</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #1e293b; font-weight: 700;'>📊 Dashboard Analisis Anggaran Belanja Negara</h1>", unsafe_allow_html=True)
 
 # Load data function
 @st.cache_data
@@ -187,10 +187,6 @@ with st.sidebar:
     
     # Additional filter options could be added here
     
-    # Footer in sidebar
-    st.markdown("---")
-    st.caption("Data: bidja.kemenkeu.go.id | Dibuat dengan Streamlit")
-
 # Filter and prepare data
 df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
 df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
@@ -206,46 +202,57 @@ def format_rupiah(value):
         return f"{value/1_000_000:.2f} Jt"
     else:
         return f"{value:,.0f}"
+import streamlit as st
+import pandas as pd
 
 def create_summary_cards(df):
     """Create summary cards for key metrics"""
-    total_value = df["Nilai"].sum()
-    avg_value = df["Nilai"].mean()
-    max_value = df["Nilai"].max()
+    # Ensure Tahun is string but can sort numerically
+    df["Tahun"] = df["Tahun"].astype(str)
+    df = df.sort_values("Tahun")
     
-    # Calculate year-over-year growth
-    yearly_sums = df.groupby("Tahun")["Nilai"].sum()
+    # === Total per year ===
+    yearly_sums = df.groupby("Tahun", as_index=False)["Nilai"].sum()
+    
+    # === AAGR and CAGR ===
     if len(yearly_sums) > 1:
-        latest_year = yearly_sums.index[-1]
-        previous_year = yearly_sums.index[-2]
-        growth_rate = ((yearly_sums[latest_year] - yearly_sums[previous_year]) / yearly_sums[previous_year]) * 100
+        first_value = yearly_sums["Nilai"].iloc[0]
+        last_value = yearly_sums["Nilai"].iloc[-1]
+        n_years = len(yearly_sums) - 1
+
+        # AAGR = average of year-over-year growth rates
+        yearly_sums["YoY_Growth"] = yearly_sums["Nilai"].pct_change()
+        aagr = yearly_sums["YoY_Growth"].mean(skipna=True) * 100
+
+        # CAGR = (Ending / Beginning)^(1 / n_years) - 1
+        cagr = ((last_value / first_value) ** (1 / n_years) - 1) * 100
     else:
-        growth_rate = 0
-    
-    # Create cards
-    cols = st.columns(4)
+        aagr = cagr = 0
+
+    # === Display cards ===
+    cols = st.columns(3)
     
     with cols[0]:
         st.markdown(f"""
         <div class='metric-card'>
             <h3>Total Nilai</h3>
-            <p style='font-size: 24px; font-weight: 700; color: #1e293b;'>Rp {format_rupiah(total_value)}</p>
+            <p style='font-size: 24px; font-weight: 700; color: #1e293b;'>Rp {format_rupiah([f"{row['Tahun']}: Rp{row['Nilai']:,.0f}" for _, row in yearly_sums.iterrows()])}</p>
         </div>
         """, unsafe_allow_html=True)
     
     with cols[1]:
         st.markdown(f"""
         <div class='metric-card'>
-            <h3>Rata-rata Nilai</h3>
-            <p style='font-size: 24px; font-weight: 700; color: #1e293b;'>Rp {format_rupiah(avg_value)}</p>
+            <h3>Average Annual Growth Rate (AAGR)</h3>
+            <p style='font-size: 24px; font-weight: 700; color: {'#22c55e' if growth_rate >= 0 else '#ef4444'};'>{cagr:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
     
     with cols[2]:
         st.markdown(f"""
         <div class='metric-card'>
-            <h3>Maksimum Nilai</h3>
-            <p style='font-size: 24px; font-weight: 700; color: #1e293b;'>Rp {format_rupiah(max_value)}</p>
+            <h3>Compound Annual Growth Rate (CAGR)</h3>
+            <p style='font-size: 24px; font-weight: 700; color: {'#22c55e' if growth_rate >= 0 else '#ef4444'};'>{cagr:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -348,3 +355,4 @@ else:
 # Footer
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id")
+
