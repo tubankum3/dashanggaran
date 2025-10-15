@@ -202,65 +202,55 @@ def format_rupiah(value):
         return f"{value/1_000_000:.2f} Jt"
     else:
         return f"{value:,.0f}"
-import streamlit as st
-import pandas as pd
 
 def create_summary_cards(df):
-    """Create summary cards for key metrics"""
-    # Ensure Tahun is string but can sort numerically
+    """Create summary cards for key metrics with totals, AAGR, CAGR, and YoY growth."""
     df["Tahun"] = df["Tahun"].astype(str)
     df = df.sort_values("Tahun")
-    
-    # === Total per year ===
     yearly_sums = df.groupby("Tahun", as_index=False)["Nilai"].sum()
-    
-    # === AAGR and CAGR ===
+
+    # Calculate metrics
     if len(yearly_sums) > 1:
         first_value = yearly_sums["Nilai"].iloc[0]
         last_value = yearly_sums["Nilai"].iloc[-1]
         n_years = len(yearly_sums) - 1
 
-        # AAGR = average of year-over-year growth rates
-        yearly_sums["YoY_Growth"] = yearly_sums["Nilai"].pct_change()
-        aagr = yearly_sums["YoY_Growth"].mean(skipna=True) * 100
-
-        # CAGR = (Ending / Beginning)^(1 / n_years) - 1
+        yearly_sums["YoY_Growth"] = yearly_sums["Nilai"].pct_change() * 100
+        aagr = yearly_sums["YoY_Growth"].mean(skipna=True)
         cagr = ((last_value / first_value) ** (1 / n_years) - 1) * 100
+        growth_rate = yearly_sums["YoY_Growth"].iloc[-1]
     else:
-        aagr = cagr = 0
+        aagr = cagr = growth_rate = 0
 
-    # === Display cards ===
-    cols = st.columns(3)
-    
+    # Build readable total string
+    total_per_year = "<br>".join([
+        f"{row['Tahun']}: Rp {format_rupiah(row['Nilai'])}"
+        for _, row in yearly_sums.iterrows()
+    ])
+
+    # Display
+    cols = st.columns(4)
     with cols[0]:
         st.markdown(f"""
         <div class='metric-card'>
-            <h3>Total Nilai</h3>
-            <p style='font-size: 24px; font-weight: 700; color: #1e293b;'>Rp {format_rupiah([f"{row['Tahun']}: Rp{row['Nilai']:,.0f}" for _, row in yearly_sums.iterrows()])}</p>
+            <h3>Total Nilai per Tahun</h3>
+            <p style='font-size: 22px; font-weight: 600; color: #1e293b;'>{total_per_year}</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     with cols[1]:
         st.markdown(f"""
         <div class='metric-card'>
             <h3>Average Annual Growth Rate (AAGR)</h3>
-            <p style='font-size: 24px; font-weight: 700; color: {'#22c55e' if growth_rate >= 0 else '#ef4444'};'>{cagr:+.1f}%</p>
+            <p style='font-size: 28px; font-weight: 700; color: {'#22c55e' if aagr >= 0 else '#ef4444'};'>{aagr:+.2f}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     with cols[2]:
         st.markdown(f"""
         <div class='metric-card'>
             <h3>Compound Annual Growth Rate (CAGR)</h3>
-            <p style='font-size: 24px; font-weight: 700; color: {'#22c55e' if growth_rate >= 0 else '#ef4444'};'>{cagr:+.1f}%</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with cols[3]:
-        st.markdown(f"""
-        <div class='metric-card'>
-            <h3>Pertumbuhan YoY</h3>
-            <p style='font-size: 24px; font-weight: 700; color: {'#22c55e' if growth_rate >= 0 else '#ef4444'};'>{growth_rate:+.1f}%</p>
+            <p style='font-size: 28px; font-weight: 700; color: {'#22c55e' if cagr >= 0 else '#ef4444'};'>{cagr:+.2f}%</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -355,4 +345,5 @@ else:
 # Footer
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id")
+
 
