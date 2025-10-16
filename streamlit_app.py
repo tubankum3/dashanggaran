@@ -64,24 +64,24 @@ st.markdown("""
 }
 
 /* Card System */
-.material-card {
-    background: var(--surface);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-1);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    transition: var(--transition);
-    border: 1px solid #e8eaed;
-}
+# .material-card {
+#     background: var(--surface);
+#     border-radius: var(--border-radius);
+#     box-shadow: var(--shadow-1);
+#     padding: 1.5rem;
+#     margin-bottom: 1.5rem;
+#     transition: var(--transition);
+#     border: 1px solid #e8eaed;
+# }
 
 # .material-card:hover {
 #     box-shadow: var(--shadow-2);
 #     transform: translateY(-2px);
 # }
 
-.material-card-elevated {
-    box-shadow: var(--shadow-3) !important;
-}
+# .material-card-elevated {
+#     box-shadow: var(--shadow-3) !important;
+# }
 
 /* Typography Scale */
 .dashboard-title {
@@ -440,7 +440,7 @@ def cards(metrics: dict):
         latest_total = metrics['yearly_totals']["Nilai"].iloc[-1]
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Total Anggaran {metrics['last_tahun']}</div>
+            <div class="metric-label">Total Tahun {metrics['last_tahun']}</div>
             <div class="metric-value">{format_rupiah(latest_total)}</div>
             <div class="metric-trend {'trend-positive' if metrics['latest_growth'] >= 0 else 'trend-negative'}">
                 {'↗' if metrics['latest_growth'] >= 0 else '↘'} {metrics['latest_growth']:+.1f}% YoY
@@ -669,6 +669,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
