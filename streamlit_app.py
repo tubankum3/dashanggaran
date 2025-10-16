@@ -64,24 +64,24 @@ st.markdown("""
 }
 
 /* Card System */
-# .material-card {
-#     background: var(--surface);
-#     border-radius: var(--border-radius);
-#     box-shadow: var(--shadow-1);
-#     padding: 1.5rem;
-#     margin-bottom: 1.5rem;
-#     transition: var(--transition);
-#     border: 1px solid #e8eaed;
-# }
+.material-card {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: var(--transition);
+    border: 1px solid #e8eaed;
+}
 
-# .material-card:hover {
-#     box-shadow: var(--shadow-2);
-#     transform: translateY(-2px);
-# }
+.material-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+}
 
-# .material-card-elevated {
-#     box-shadow: var(--shadow-3) !important;
-# }
+.material-card-elevated {
+    box-shadow: var(--shadow-3) !important;
+}
 
 /* Typography Scale */
 .dashboard-title {
@@ -593,13 +593,13 @@ def main():
     metrics = calculate_financial_metrics(df_filtered)
     
     # Display metrics in cards
-    st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='section-title'>📈 Ringkasan Kinerja Anggaran</div>", unsafe_allow_html=True)
+    # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>📈 {selected_kl}: Ringkasan Kinerja {selected_metric}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # Visualization section
-    st.markdown("<div class='material-card'>", unsafe_allow_html=True)
+    # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
     
     # Get categorical columns for visualization
@@ -669,6 +669,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
