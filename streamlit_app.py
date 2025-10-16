@@ -542,7 +542,7 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         legend_title_text=category_col.replace("_", " ").title(),
         legend=dict(
             orientation="v",
-            yanchor="right",
+            yanchor="top",
             y=1.02,
             xanchor="right",
             x=1
@@ -668,6 +668,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
