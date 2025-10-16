@@ -9,7 +9,7 @@ import numpy as np
 # =============================================================================
 st.set_page_config(
     page_title="Dashboard Analisis Anggaran dan Belanja Negara",
-    page_icon="analytics",
+    page_icon=":analytics:",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -307,14 +307,12 @@ st.markdown("""
 @st.cache_data(show_spinner="Memuat dataset anggaran...")
 def load_data():
     """
-    Load and preprocess budget data with comprehensive error handling
-    and data validation.
+    Load and preprocess budget data with error handling and data validation.
     
     Returns:
         pd.DataFrame: Preprocessed budget data
     """
     try:
-        # Simulate data loading - replace with actual CSV path
         df = pd.read_csv("df23-25.csv")
         
         # Data validation and cleaning
@@ -337,7 +335,7 @@ def load_data():
             st.error(f"Kolom yang diperlukan tidak ditemukan: {missing_columns}")
             return pd.DataFrame()
             
-        st.success("✅ Data berhasil dimuat dan divalidasi")
+        # st.success("✅ Data berhasil dimuat dan divalidasi")
         return df
         
     except FileNotFoundError:
@@ -507,14 +505,18 @@ def sidebar():
         
         st.markdown("</div>", unsafe_allow_html=True)
            
-    return selected_kl, selected_metric
+    return selected_kl, selected_metric, selected_years
 
-def chart(df: pd.DataFrame, category_col: str):
+def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
     )
-    
+
+    # Adjust height for large category lists
+    n_groups = df_grouped[category_col].nunique()
+    height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
+
     # Create figure
     fig = px.line(
         df_grouped,
@@ -525,7 +527,7 @@ def chart(df: pd.DataFrame, category_col: str):
         title=f"📈 {selected_metric} per {category_col} — {selected_kl}",
         labels={
             "Tahun": "Tahun",
-            "Nilai": "Jumlah Anggaran",
+            "Nilai": "Jumlah",
             category_col: category_col.replace("_", " ").title(),
         },
         template="plotly_white",
@@ -534,11 +536,13 @@ def chart(df: pd.DataFrame, category_col: str):
     
     # styling
     fig.update_layout(
+        height=height,
         hovermode="closest",
         title_x=0,
+        legend_title_text=group_col.replace("_", " ").title(),
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
+            orientation="v",
+            yanchor="right",
             y=1.02,
             xanchor="right",
             x=1
@@ -551,9 +555,9 @@ def chart(df: pd.DataFrame, category_col: str):
     
     # hover information
     fig.update_traces(
-        hovertemplate="<b>%{fullData.name}</b><br>" +
-                     "Tahun: %{x}<br>" +
-                     "Anggaran: %{y:,.0f} Rupiah<extra></extra>",
+        hovertemplate="<b>Tahun: %{x}</b><br>" +
+                     "%{fullData.name}<br>" +
+                     "Rp %{y:,.0f}<extra></extra>",
         line=dict(width=3),
         marker=dict(size=8)
     )
@@ -577,8 +581,8 @@ def main():
     header()
     
     # Sidebar with filters
-    global selected_kl, selected_metric
-    selected_kl, selected_metric = sidebar()
+    global selected_kl, selected_metric, selected_years
+    selected_kl, selected_metric, selected_years = sidebar()
     
     # Filter data based on selections
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
@@ -587,7 +591,7 @@ def main():
     # Calculate metrics
     metrics = calculate_financial_metrics(df_filtered)
     
-    # Display metrics in enhanced cards
+    # Display metrics in cards
     st.markdown("<div class='material-card'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>📈 Ringkasan Kinerja Anggaran</div>", unsafe_allow_html=True)
     cards(metrics)
@@ -600,11 +604,11 @@ def main():
     # Get categorical columns for visualization
     cat_cols = [
         col for col in df_filtered.select_dtypes(include=["object"]).columns
-        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"] and df_filtered[col].nunique() <= 20
+        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
     ]
     
     if cat_cols:
-        # Create interactive tabs
+        # Create tabs
         tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
         
         for tab, col in zip(tabs, cat_cols):
@@ -649,7 +653,7 @@ def main():
     st.markdown("---")
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        st.caption("📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara - Sumber Data: bidja.kemenkeu.go.id")
+        st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
     with col2:
         st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
     with col3:
@@ -664,5 +668,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
