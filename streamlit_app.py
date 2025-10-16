@@ -563,6 +563,13 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         marker=dict(size=8)
     )
     
+    # Format y-axis as Rupiah (Jt, M, T)
+    y_ticks = sorted(df_grouped["Nilai"].unique())
+    fig.update_yaxes(
+        ticktext=[format_rupiah(v) for v in y_ticks],
+        tickvals=y_ticks
+    )
+    
     return fig, df_grouped
 
 # =============================================================================
@@ -669,6 +676,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
