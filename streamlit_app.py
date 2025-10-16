@@ -404,7 +404,7 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
         metrics['aagr'] = yearly_sums["YoY_Growth"].mean(skipna=True)
         metrics['cagr'] = ((last_value / first_value) ** (1 / n_years) - 1) * 100
         metrics['latest_growth'] = yearly_sums["YoY_Growth"].iloc[-1]
-        metrics['last_tahun'] = df.max('Tahun')
+        metrics['last_tahun'] = yearly_sums.max('Tahun')
     else:
         metrics.update({
             'aagr': 0, 'cagr': 0, 'latest_growth': 0, 'last_tahun': 0
@@ -669,6 +669,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
