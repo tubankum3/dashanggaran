@@ -5,26 +5,25 @@ from datetime import datetime
 import numpy as np
 
 # =============================================================================
-# IMPROVEMENT 1: Enhanced Page Configuration & Global Settings
+# Page Configuration & Global Settings
 # =============================================================================
 st.set_page_config(
-    page_title="National Budget Analytics Dashboard",
-    page_icon="📊",
+    page_title="Dashboard Analisis Anggaran dan Belanja Negara",
+    page_icon="analytics",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
         'Get Help': 'https://www.kemenkeu.go.id',
-        'Report a bug': 'https://github.com/your-repo/issues',
-        'About': "Official National Budget Analysis Dashboard"
+        'Report a bug': 'https://github.com/tubankum3/dashpmk/issues',
+        'About': "Dashboard Anggaran Bidang PMK"
     }
 )
 
 # =============================================================================
-# IMPROVEMENT 2: Advanced Material Design Styled CSS
+# Material Design Styled CSS
 # =============================================================================
 st.markdown("""
 <style>
-/* === GOOGLE MATERIAL DESIGN THEME === */
 :root {
     --primary: #1a73e8;
     --primary-dark: #0d47a1;
@@ -48,7 +47,6 @@ st.markdown("""
     font-family: 'Google Sans', 'Roboto', 'Inter', sans-serif;
 }
 
-/* === IMPROVEMENT 3: Enhanced Information Architecture === */
 /* Header with Breadcrumb Navigation */
 .dashboard-header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
@@ -65,7 +63,7 @@ st.markdown("""
     margin-bottom: 0.5rem;
 }
 
-/* Enhanced Card System */
+/* Card System */
 .material-card {
     background: var(--surface);
     border-radius: var(--border-radius);
@@ -85,7 +83,6 @@ st.markdown("""
     box-shadow: var(--shadow-3) !important;
 }
 
-/* === IMPROVEMENT 4: Advanced Visual Hierarchy === */
 /* Typography Scale */
 .dashboard-title {
     font-family: 'Google Sans', sans-serif;
@@ -113,7 +110,7 @@ st.markdown("""
     border-bottom: 2px solid var(--primary);
 }
 
-/* Metric Cards with Enhanced Visual Design */
+/* Metric Cards */
 .metric-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -183,7 +180,6 @@ st.markdown("""
     color: var(--error);
 }
 
-/* === IMPROVEMENT 5: Enhanced Interactivity === */
 /* Interactive Elements */
 .stButton>button {
     background: var(--primary);
@@ -203,7 +199,7 @@ st.markdown("""
     transform: translateY(-1px);
 }
 
-/* Enhanced Sidebar */
+/* Sidebar */
 .stSidebar {
     background: var(--surface);
     border-right: 1px solid #e8eaed;
@@ -217,7 +213,7 @@ st.markdown("""
     box-shadow: var(--shadow-1);
 }
 
-/* Tab Enhancements */
+/* Tab */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0.5rem;
 }
@@ -235,7 +231,6 @@ st.markdown("""
     color: var(--on-primary);
 }
 
-/* === IMPROVEMENT 6: Advanced Accessibility === */
 /* Focus indicators */
 .stButton>button:focus, .stSelectbox:focus, .stSlider:focus {
     outline: 2px solid var(--primary);
@@ -256,8 +251,8 @@ st.markdown("""
     }
 }
 
-/* === IMPROVEMENT 7: Performance Optimized Layout === */
-/* Responsive design improvements */
+
+/* Responsive design */
 @media (max-width: 768px) {
     .metric-grid {
         grid-template-columns: 1fr;
@@ -285,7 +280,7 @@ st.markdown("""
     100% { background-position: -200% 0; }
 }
 
-/* Chart container enhancements */
+/* Chart container */
 .chart-container {
     background: var(--surface);
     border-radius: var(--border-radius);
@@ -295,7 +290,7 @@ st.markdown("""
     border: 1px solid #e8eaed;
 }
 
-/* Data table enhancements */
+/* Data table */
 .data-table {
     background: var(--surface);
     border-radius: var(--border-radius);
@@ -307,7 +302,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# IMPROVEMENT 8: Enhanced Data Loading with Error Handling & Performance
+# Data Loading
 # =============================================================================
 @st.cache_data(show_spinner="Memuat dataset anggaran...")
 def load_data():
@@ -353,7 +348,7 @@ def load_data():
         return pd.DataFrame()
 
 # =============================================================================
-# IMPROVEMENT 9: Enhanced Utility Functions with Documentation
+# Utility Functions
 # =============================================================================
 def format_rupiah(value: float) -> str:
     """
@@ -411,28 +406,27 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
         metrics['aagr'] = yearly_sums["YoY_Growth"].mean(skipna=True)
         metrics['cagr'] = ((last_value / first_value) ** (1 / n_years) - 1) * 100
         metrics['latest_growth'] = yearly_sums["YoY_Growth"].iloc[-1]
-        metrics['total_growth'] = ((last_value - first_value) / first_value) * 100
     else:
         metrics.update({
-            'aagr': 0, 'cagr': 0, 'latest_growth': 0, 'total_growth': 0
+            'aagr': 0, 'cagr': 0, 'latest_growth': 0
         })
     
     return metrics
 
 # =============================================================================
-# IMPROVEMENT 10: Enhanced Component Architecture
+# Component Architecture
 # =============================================================================
-def create_enhanced_header():
+def header():
     """Create comprehensive dashboard header with breadcrumb and key info"""
     st.markdown(f"""
     <div class="dashboard-header">
         <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in locals() else 'Overview'}</div>
-        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran Belanja Negara</h1>
-        <p class="dashboard-subtitle">Visualisasi dan analisis komprehensif anggaran kementerian/lembaga</p>
+        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
+        <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
     """, unsafe_allow_html=True)
 
-def create_metric_cards(metrics: dict):
+def cards(metrics: dict):
     """
     Create enhanced metric cards with improved visual hierarchy
     and interactive elements.
@@ -459,9 +453,9 @@ def create_metric_cards(metrics: dict):
         # CAGR Card
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Pertumbuhan Tahunan (CAGR)</div>
+            <div class="metric-label">Tingkat Pertumbuhan Tahunan Majemuk (CAGR)</div>
             <div class="metric-value">{metrics['cagr']:+.1f}%</div>
-            <div class="metric-label">Rata-rata pertumbuhan tahunan</div>
+            <div class="metric-label">Pertumbuhan tahunan rata-rata selama rentang periode waktu tertentu</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -469,24 +463,13 @@ def create_metric_cards(metrics: dict):
         # AAGR Card
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Pertumbuhan Rata-rata (AAGR)</div>
+            <div class="metric-label">Tingkat Pertumbuhan Tahunan Rata-rata (AAGR)</div>
             <div class="metric-value">{metrics['aagr']:+.1f}%</div>
-            <div class="metric-label">Pertumbuhan tahunan rata-rata</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        # Total Growth Card
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Total Pertumbuhan Periode</div>
-            <div class="metric-value">{metrics['total_growth']:+.1f}%</div>
-            <div class="metric-label">Pertumbuhan sejak tahun awal</div>
+            <div class="metric-label">Rata-rata tingkat pertumbuhan tahunan</div>
         </div>
         """, unsafe_allow_html=True)
 
-def create_enhanced_sidebar():
-    """Create organized sidebar with clear information architecture"""
+def sidebar():
     with st.sidebar:
         st.markdown("""
         <div class="sidebar-section">
@@ -523,31 +506,16 @@ def create_enhanced_sidebar():
             )
         
         st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Information panel
-        st.markdown("""
-        <div class="sidebar-section">
-            <h4 style='margin: 0 0 0.5rem 0;'>ℹ️ Informasi</h4>
-            <p style='font-size: 0.8rem; margin: 0; color: #5f6368;'>
-                Data sumber: bidja.kemenkeu.go.id<br>
-                Terakhir diperbarui: {update_date}
-            </p>
-        </div>
-        """.format(update_date=datetime.now().strftime("%d %b %Y")), unsafe_allow_html=True)
-    
+           
     return selected_kl, selected_metric
 
-def create_interactive_chart(df: pd.DataFrame, category_col: str):
-    """
-    Create enhanced interactive chart with improved visual design
-    and interactivity features.
-    """
+def chart(df: pd.DataFrame, category_col: str):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
     )
     
-    # Create interactive figure
+    # Create figure
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -564,9 +532,9 @@ def create_interactive_chart(df: pd.DataFrame, category_col: str):
         height=500
     )
     
-    # Enhanced styling
+    # styling
     fig.update_layout(
-        hovermode="x unified",
+        hovermode="closest",
         title_x=0,
         legend=dict(
             orientation="h",
@@ -581,7 +549,7 @@ def create_interactive_chart(df: pd.DataFrame, category_col: str):
         font=dict(family="Google Sans, Roboto, Arial")
     )
     
-    # Enhanced hover information
+    # hover information
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>" +
                      "Tahun: %{x}<br>" +
@@ -593,11 +561,9 @@ def create_interactive_chart(df: pd.DataFrame, category_col: str):
     return fig, df_grouped
 
 # =============================================================================
-# IMPROVEMENT 11: Main Application with Enhanced Architecture
+# Main Application
 # =============================================================================
-def main():
-    """Main application function with improved error handling and user flow"""
-    
+def main():  
     # Load data with loading state
     with st.spinner("Memuat data anggaran..."):
         global df
@@ -608,11 +574,11 @@ def main():
         return
     
     # Create enhanced UI components
-    create_enhanced_header()
+    header()
     
     # Sidebar with filters
     global selected_kl, selected_metric
-    selected_kl, selected_metric = create_enhanced_sidebar()
+    selected_kl, selected_metric = sidebar()
     
     # Filter data based on selections
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
@@ -624,7 +590,7 @@ def main():
     # Display metrics in enhanced cards
     st.markdown("<div class='material-card'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>📈 Ringkasan Kinerja Anggaran</div>", unsafe_allow_html=True)
-    create_metric_cards(metrics)
+    metric_cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # Visualization section
@@ -645,12 +611,12 @@ def main():
             with tab:
                 # Chart container
                 st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-                fig, grouped_df = create_interactive_chart(df_filtered, col)
+                fig, grouped_df = chart(df_filtered, col)
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Data table with enhanced presentation
-                with st.expander("📋 Lihat Data Tabel", expanded=False):
+                with st.expander("📋 Data Tabel", expanded=True):
                     display_col = col
                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
                     
@@ -683,14 +649,14 @@ def main():
     st.markdown("---")
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        st.caption("📊 Dashboard Analisis Anggaran Belanja Negara - Sumber Data: bidja.kemenkeu.go.id")
+        st.caption("📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara - Sumber Data: bidja.kemenkeu.go.id")
     with col2:
         st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
     with col3:
         st.caption("👨‍💻 Built with Streamlit")
 
 # =============================================================================
-# IMPROVEMENT 12: Enhanced Error Handling & Entry Point
+# Error Handling & Entry Point
 # =============================================================================
 if __name__ == "__main__":
     try:
@@ -698,3 +664,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
