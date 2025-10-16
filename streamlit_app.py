@@ -255,19 +255,19 @@ def create_summary_cards(df):
         """, unsafe_allow_html=True)
 
 def make_line_chart(df, group_col, base_height=600, extra_height_per_line=10):
-    """Create line chart with improved formatting"""
+    """Create line chart and return both the figure and grouped data."""
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", group_col], as_index=False)["Nilai"]
           .sum()
     )
-    
+
     # Ensure Tahun is string
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
-    
-    # Adjust height based on number of groups
+
+    # Adjust height for large category lists
     n_groups = df_grouped[group_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
-    
+
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -282,22 +282,13 @@ def make_line_chart(df, group_col, base_height=600, extra_height_per_line=10):
         },
         template="plotly_white"
     )
-    
-    # Update y-axis with Indonesian currency format
-    fig.update_yaxes(
-        tickprefix="Rp ",
-        tickformat=",",
-        tickvals=None,
-        ticktext=None,
-    )
-    
-    # Update hover template
+
+    # Update hover and formatting
     fig.update_traces(
         hovertemplate="<b>Tahun: %{x}</b><br>" +
-                     "%{fullData.name}: Rp %{y:,.0f}<extra></extra>"
+                      "%{fullData.name}: Rp %{y:,.0f}<extra></extra>"
     )
-    
-    # Update layout
+
     fig.update_layout(
         height=height,
         hovermode="closest",
@@ -307,25 +298,24 @@ def make_line_chart(df, group_col, base_height=600, extra_height_per_line=10):
         paper_bgcolor="white",
         plot_bgcolor="white"
     )
-    
-    # Format y-axis labels
-    y_ticks = fig.data[0].y
+
+    # Format y-axis as Rupiah (Jt, M, T)
+    y_ticks = sorted(df_grouped["Nilai"].unique())
     fig.update_yaxes(
-        ticktext=[format_rupiah(v) for v in sorted(set(y_ticks))],
-        tickvals=sorted(set(y_ticks))
+        ticktext=[format_rupiah(v) for v in y_ticks],
+        tickvals=y_ticks
     )
-    
-    return fig
+
+    return fig, df_grouped
 
 # Main content area
 st.markdown("<div class='card'>", unsafe_allow_html=True)
 create_summary_cards(df_filtered)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Display charts
+# Display charts and corresponding data tables
 st.markdown("<h2 style='color: #334155; font-weight: 600; margin-top: 32px;'>Visualisasi Data</h2>", unsafe_allow_html=True)
 
-# Get categorical columns
 cat_cols = [
     col for col in df_filtered.select_dtypes(include=["object"]).columns
     if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
@@ -337,13 +327,23 @@ if cat_cols:
     for tab, col in zip(tabs, cat_cols):
         with tab:
             st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-            st.plotly_chart(make_line_chart(df_filtered, col), use_container_width=True)
+            fig, grouped_df = make_line_chart(df_filtered, col)
+            st.plotly_chart(fig, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
+
+            # === Add data table below chart ===
+            st.markdown("**📋 Data Tabel**")
+            st.dataframe(
+                grouped_df.style.format({"Nilai": lambda x: f"Rp {x:,.0f}"}),
+                use_container_width=True,
+                hide_index=True
+            )
 else:
     st.warning("Tidak ada kolom kategorikal yang tersedia untuk divisualisasikan.")
 
 # Footer
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id")
+
 
 
