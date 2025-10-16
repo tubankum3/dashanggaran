@@ -343,7 +343,7 @@ if cat_cols:
             
             # Loop through each year and display a separate table
             for year in years_sorted:
-                wtih st.expander(f"#### 🗓️ Tahun {year}", True):
+                with st.expander(f"##### 🗓️ Tahun {year}", True):
                     year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
                     year_df = year_df.sort_values("Nilai", ascending=False).reset_index(drop=True)
                     
@@ -361,6 +361,7 @@ else:
 # Footer
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id")
+
 
 
 
