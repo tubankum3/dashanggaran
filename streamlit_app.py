@@ -590,7 +590,7 @@ def main():
     # Display metrics in enhanced cards
     st.markdown("<div class='material-card'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'>📈 Ringkasan Kinerja Anggaran</div>", unsafe_allow_html=True)
-    metric_cards(metrics)
+    cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # Visualization section
@@ -664,4 +664,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
