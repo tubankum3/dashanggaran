@@ -540,13 +540,13 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         hovermode="closest",
         title_x=0,
         legend_title_text=category_col.replace("_", " ").title(),
-        legend=dict(
-            orientation="v",
-            yanchor="top",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
+        # legend=dict(
+        #     orientation="v",
+        #     yanchor="top",
+        #     y=1.02,
+        #     xanchor="right",
+        #     x=1
+        # ),
         margin=dict(l=40, r=40, t=80, b=40),
         paper_bgcolor="white",
         plot_bgcolor="white",
@@ -668,6 +668,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
