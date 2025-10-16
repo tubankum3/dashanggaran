@@ -330,6 +330,7 @@ if cat_cols:
             fig, grouped_df = make_line_chart(df_filtered, col)
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
+            
             # === Add data table below chart ===
             st.markdown("**📋 Data Tabel**")
             
@@ -342,18 +343,16 @@ if cat_cols:
             
             # Loop through each year and display a separate table
             for year in years_sorted:
-                st.markdown(f"#### 🗓️ Tahun {year}")
-                year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
-                year_df = year_df.sort_values("Nilai", ascending=False).reset_index(drop=True)
-                
-                # Format currency and show as interactive table
-                st.dataframe(
-                    year_df.style.format({"Nilai": lambda x: f"Rp {x:,.0f}"}),
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
-                st.markdown("---")
+                wtih st.expander(f"#### 🗓️ Tahun {year}", True):
+                    year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
+                    year_df = year_df.sort_values("Nilai", ascending=False).reset_index(drop=True)
+                    
+                    # Format currency and show as interactive table
+                    st.dataframe(
+                        year_df.style.format({"Nilai": lambda x: f"Rp {x:,.0f}"}),
+                        use_container_width=True,
+                        hide_index=True
+                    )
 else:
     st.warning("Tidak ada kolom kategorikal yang tersedia untuk divisualisasikan.")
 
@@ -362,6 +361,7 @@ else:
 # Footer
 st.markdown("---")
 st.caption("Data: bidja.kemenkeu.go.id")
+
 
 
 
