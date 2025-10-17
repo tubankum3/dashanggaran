@@ -415,11 +415,12 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 # =============================================================================
 # Component Architecture
 # =============================================================================
-def header():
+def header(selected_kl=None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
+    kl_text = selected_kl if selected_kl else "Overview"
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl}</div>
+        <div class="breadcrumb">Dashboard / Analisis Anggaran / {kl_text}</div>
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
         <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
@@ -642,12 +643,11 @@ def main():
         st.error("Tidak dapat memuat data. Silakan periksa file dataset.")
         return
     
-    # Create enhanced UI components
-    header()
-    
     # Sidebar with filters
-    global selected_kl, selected_metric, selected_years, filters
     df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
+
+    # Create header now that selected_kl exists
+    header(selected_kl)
     
     # === Ensure Tahun numeric before filtering ===
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
@@ -766,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
