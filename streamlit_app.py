@@ -419,7 +419,7 @@ def header():
     """Create comprehensive dashboard header with breadcrumb and key info"""
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in locals() else 'Overview'}</div>
+        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in global() else 'Overview'}</div>
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
         <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
@@ -476,7 +476,7 @@ def sidebar(df):
         """, unsafe_allow_html=True)
 
         # === Ensure Tahun is numeric ===
-        df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
+        df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("int64")
 
         # === Select K/L ===
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
@@ -490,7 +490,8 @@ def sidebar(df):
         df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
 
         # === Detect numeric columns for metric choices ===
-        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
+        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        numeric_cols.remove('Tahun')
         metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
@@ -765,3 +766,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
