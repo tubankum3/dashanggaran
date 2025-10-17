@@ -552,7 +552,7 @@ def sidebar(df):
 
     return df_filtered, selected_kl, selected_metric, selected_years
 
-def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
@@ -703,7 +703,7 @@ def main():
         
         for tab, col in zip(tabs, cat_cols):
             with tab:
-                fig, grouped_df = chart(df_filtered, col)
+                fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # --- Data table (wide format: metric x year) ---
@@ -764,6 +764,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
