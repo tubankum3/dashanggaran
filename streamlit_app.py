@@ -419,7 +419,7 @@ def header():
     """Create comprehensive dashboard header with breadcrumb and key info"""
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in global() else 'Overview'}</div>
+        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in local() else 'Overview'}</div>
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
         <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
@@ -766,4 +766,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
