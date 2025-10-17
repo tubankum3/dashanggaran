@@ -507,18 +507,34 @@ def sidebar(df):
         with st.expander("⚙️ Filter Lanjutan"):
             # --- Year range ---
             year_options = sorted(df_filtered["Tahun"].dropna().unique())
-            if len(year_options) > 0:
+            if len(year_options) == 0:
+                selected_years = (None, None)
+            elif len(year_options) == 1:
+                # only one year available — show it and set selected_years to that single year
+                single_year = int(year_options[0])
+                st.markdown(f"**Tahun tersedia:** {single_year}")
+                # store in session_state to keep key consistent if needed
+                st.session_state["filter__year_range"] = (single_year, single_year)
+                selected_years = (single_year, single_year)
+            else:
+                # normal slider for multiple years — use a unique key per K/L if you prefer
                 min_year, max_year = int(min(year_options)), int(max(year_options))
+                # prefill from session_state if exists
+                default_range = st.session_state.get("filter__year_range", (min_year, max_year))
+                # ensure default_range is within min/max bounds
+                default_range = (
+                    max(min_year, default_range[0]),
+                    min(max_year, default_range[1])
+                )
                 selected_years = st.slider(
                     "Rentang Tahun",
                     min_value=min_year,
                     max_value=max_year,
-                    value=(min_year, max_year),
+                    value=default_range,
                     step=1,
                     key="filter__year_range"
                 )
-            else:
-                selected_years = (None, None)
+
 
             # --- Categorical filters ---
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
@@ -762,6 +778,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
