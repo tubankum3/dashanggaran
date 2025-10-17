@@ -535,7 +535,7 @@ def sidebar(df):
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    return selected_kl, selected_metric, selected_years
+    return selected_kl, selected_metric, selected_years, _ = sidebar(df)
 
 def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
@@ -722,6 +722,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
