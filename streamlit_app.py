@@ -468,14 +468,14 @@ def cards(metrics: dict):
         </div>
         """, unsafe_allow_html=True)
 
-def sidebar():
+def sidebar(df):
     with st.sidebar:
         st.markdown("""
         <div class="sidebar-section">
             <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
         """, unsafe_allow_html=True)
-        
-        # Ministry selection with search
+
+        # --- Select K/L ---
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
         selected_kl = st.selectbox(
             "Pilih Kementerian/Lembaga",
@@ -483,9 +483,12 @@ def sidebar():
             key="ministry_select",
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
-        
-        # Metric selection with descriptions
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+
+        # Filter dataframe by selected K/L
+        df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+
+        # --- Detect numeric columns dynamically ---
+        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
         metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
@@ -493,39 +496,46 @@ def sidebar():
             key="metric_select",
             help="Pilih jenis anggaran yang akan dianalisis"
         )
-        
-        # Additional filters
+
+        # Filter again based on selected metric (if needed)
+        df_filtered_metric = df_filtered[["KEMENTERIAN/LEMBAGA", "Tahun", selected_metric] + 
+                                         [col for col in df_filtered.columns if df_filtered[col].dtype == "object"]]
+
+        # --- Filter tambahan ---
         with st.expander("⚙️ Filter Lanjutan"):
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
-        
-            # dynamically detect categorical columns (except Tahun & KL)
+
+            # Dynamically detect categorical columns (after selecting K/L and metric)
             cat_cols = [
-                col for col in df.select_dtypes(include=["object"]).columns
+                col for col in df_filtered_metric.select_dtypes(include=["object"]).columns
                 if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
             ]
-        
+
             filters = {}
             for cat_col in cat_cols:
-                unique_vals = sorted(df[cat_col].dropna().unique())
+                unique_vals = sorted(df_filtered_metric[cat_col].dropna().unique())
                 filters[cat_col] = st.multiselect(
                     f"Pilih {cat_col.replace('_', ' ').title()}",
                     options=unique_vals,
                     default=unique_vals
                 )
-        
-            # year filter
-            year_options = sorted(df["Tahun"].unique())
-            selected_years = st.slider(
-                "Rentang Tahun",
-                min_value=int(min(year_options)),
-                max_value=int(max(year_options)),
-                value=(int(min(year_options)), int(max(year_options))),
-                step=1
-            )
+
+            # --- Year filter ---
+            year_options = sorted(df_filtered_metric["Tahun"].dropna().unique())
+            if len(year_options) > 1:
+                selected_years = st.slider(
+                    "Rentang Tahun",
+                    min_value=int(min(year_options)),
+                    max_value=int(max(year_options)),
+                    value=(int(min(year_options)), int(max(year_options))),
+                    step=1
+                )
+            else:
+                selected_years = (int(year_options[0]), int(year_options[0]))
 
         st.markdown("</div>", unsafe_allow_html=True)
-           
-    return selected_kl, selected_metric, selected_years, filters
+
+    return selected_kl, selected_metric, selected_years
 
 def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
@@ -712,6 +722,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
