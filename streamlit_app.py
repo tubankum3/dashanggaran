@@ -550,15 +550,15 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
           .sum()
     )
 
-    # Sort and ensure Tahun is string
+    # Ensure Tahun is sorted and string
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
     df_grouped = df_grouped.sort_values("Tahun")
 
-    # Adjust chart height for large categories
+    # Adjust height dynamically
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Create interactive line chart with year slider
+    # Create the line chart
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -573,8 +573,11 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         },
         template="plotly_white",
         height=height,
-        animation_frame="Tahun",  # 🎯 adds the year slider
     )
+
+    # Add 2-point year range slider + Play/Pause buttons
+    years = sorted(df_grouped["Tahun"].unique())
+    min_year, max_year = years[0], years[-1]
 
     fig.update_layout(
         hovermode="closest",
@@ -584,19 +587,33 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         paper_bgcolor="white",
         plot_bgcolor="white",
         font=dict(family="Google Sans, Roboto, Arial"),
+
+        sliders=[{
+            "active": 0,
+            "currentvalue": {"prefix": "Tahun: ", "font": {"size": 14}},
+            "pad": {"t": 50},
+            "x": 0.15,
+            "len": 0.7,
+            "y": -0.05,
+            "steps": [
+                {"method": "update", "label": str(y), "args": [{"xaxis.range": [y, y]}]}
+                for y in years
+            ],
+        }],
+
         updatemenus=[{
             "buttons": [
                 {"args": [None, {"frame": {"duration": 1000, "redraw": True},
                                  "fromcurrent": True, "mode": "immediate"}],
-                 "label": "▶️ Play",
+                 "label": "▶️",
                  "method": "animate"},
                 {"args": [[None], {"frame": {"duration": 0, "redraw": True},
                                    "mode": "immediate"}],
-                 "label": "⏸️ Pause",
+                 "label": "⏸️",
                  "method": "animate"}
             ],
             "direction": "left",
-            "pad": {"r": 10, "t": 70},
+            "pad": {"r": 10, "t": 10},
             "showactive": True,
             "type": "buttons",
             "x": 0.05,
@@ -749,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
