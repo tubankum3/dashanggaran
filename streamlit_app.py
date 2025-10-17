@@ -421,9 +421,8 @@ def header(selected_kl: str | None = None, selected_metric: str | None = None):
     metric_text = f" {selected_metric}" if selected_metric else ""
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis{metric_text} / {kl_text}</div>
+        <div class="breadcrumb">DASHBOARD / ANALISIS {metric_text} / {kl_text}</div>
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
-        # <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -634,58 +633,54 @@ def apply_advanced_filters(df_filtered):
     return df_filtered
 
 # =============================================================================
-# Main Application
-# =============================================================================
 def main():  
     # Load data with loading state
     with st.spinner("Memuat data anggaran..."):
-        global df
         df = load_data()
     
     if df.empty:
         st.error("Tidak dapat memuat data. Silakan periksa file dataset.")
         return
     
-    # Sidebar with filters
+    # --- Sidebar ---
     df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
     
-    # header
+    # --- Header ---
     header(selected_kl=selected_kl, selected_metric=selected_metric)
 
-    # === Ensure Tahun numeric before filtering ===
-    df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
-    df_filtered["Tahun"] = pd.to_numeric(df_filtered["Tahun"], errors="coerce").astype("Int64")
+    # --- Ensure Tahun numeric (convert once) ---
+    df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
+    df_filtered["Tahun"] = pd.to_numeric(df_filtered["Tahun"], errors="coerce")
 
-    # === Apply core filters ===
-    df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
-
-    # Filter by year range
-    if selected_years != (None, None):
+    # --- Apply year range filter ---
+    if selected_years and selected_years != (None, None):
         start_year, end_year = selected_years
         df_filtered = df_filtered[
             (df_filtered["Tahun"] >= start_year) &
             (df_filtered["Tahun"] <= end_year)
         ]
 
-    # --- Apply categorical filters stored in session_state ---
+    # --- Apply categorical filters (from session_state) ---
     filters = {}
     for key, value in st.session_state.items():
-        if key.startswith("filter__") and key not in ["filter__year_range"]:
+        if key.startswith("filter__") and key != "filter__year_range":
             col_name = key.replace("filter__", "")
             filters[col_name] = value
 
     for col, allowed_vals in filters.items():
         if allowed_vals:
             df_filtered = df_filtered[df_filtered[col].isin(allowed_vals)]
-    
-    # === Ensure selected_metric column exists ===
+
+    # --- Apply advanced filters (Filter Lanjutan) ---
+    df_filtered = apply_advanced_filters(df_filtered)
+
+    # --- Validate selected metric ---
     if selected_metric not in df_filtered.columns:
         st.warning("Kolom metrik tidak ditemukan di dataset untuk K/L ini.")
         return
-    else:
-        df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
+    df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
 
-    # --- Calculate financial metrics ---
+    # --- Calculate summary metrics ---
     metrics = calculate_financial_metrics(df_filtered)
     
     # --- Display summary cards ---
@@ -697,7 +692,7 @@ def main():
     # --- Visualization Section ---
     st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
     
-    # Get categorical columns for visualization
+    # Categorical columns for visualization
     cat_cols = [
         col for col in df_filtered.select_dtypes(include=["object"]).columns
         if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
@@ -769,6 +764,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
