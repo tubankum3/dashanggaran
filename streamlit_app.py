@@ -588,39 +588,39 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         plot_bgcolor="white",
         font=dict(family="Google Sans, Roboto, Arial"),
 
-        sliders=[{
-            "active": 0,
-            "currentvalue": {"prefix": "Tahun: ", "font": {"size": 14}},
-            "pad": {"t": 50},
-            "x": 0.15,
-            "len": 0.7,
-            "y": -0.05,
-            "steps": [
-                {"method": "update", "label": str(y), "args": [{"xaxis.range": [y, y]}]}
-                for y in years
-            ],
-        }],
+        # sliders=[{
+        #     "active": 0,
+        #     "currentvalue": {"prefix": "Tahun: ", "font": {"size": 14}},
+        #     "pad": {"t": 50},
+        #     "x": 0.15,
+        #     "len": 0.7,
+        #     "y": -0.05,
+        #     "steps": [
+        #         {"method": "update", "label": str(y), "args": [{"xaxis.range": [y, y]}]}
+        #         for y in years
+        #     ],
+        # }],
 
-        updatemenus=[{
-            "buttons": [
-                {"args": [None, {"frame": {"duration": 1000, "redraw": True},
-                                 "fromcurrent": True, "mode": "immediate"}],
-                 "label": "▶️",
-                 "method": "animate"},
-                {"args": [[None], {"frame": {"duration": 0, "redraw": True},
-                                   "mode": "immediate"}],
-                 "label": "⏸️",
-                 "method": "animate"}
-            ],
-            "direction": "left",
-            "pad": {"r": 10, "t": 10},
-            "showactive": True,
-            "type": "buttons",
-            "x": 0.05,
-            "xanchor": "right",
-            "y": -0.05,
-            "yanchor": "top"
-        }]
+        # updatemenus=[{
+        #     "buttons": [
+        #         {"args": [None, {"frame": {"duration": 1000, "redraw": True},
+        #                          "fromcurrent": True, "mode": "immediate"}],
+        #          "label": "▶️",
+        #          "method": "animate"},
+        #         {"args": [[None], {"frame": {"duration": 0, "redraw": True},
+        #                            "mode": "immediate"}],
+        #          "label": "⏸️",
+        #          "method": "animate"}
+        #     ],
+        #     "direction": "left",
+        #     "pad": {"r": 10, "t": 10},
+        #     "showactive": True,
+        #     "type": "buttons",
+        #     "x": 0.05,
+        #     "xanchor": "right",
+        #     "y": -0.05,
+        #     "yanchor": "top"
+        # }]
     )
 
     fig.update_traces(
@@ -766,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
