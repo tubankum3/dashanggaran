@@ -648,43 +648,49 @@ def main():
     global selected_kl, selected_metric, selected_years, filters
     df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
     
-    # === Apply all filters to dataframe ===
+    # === Ensure Tahun numeric before filtering ===
+    df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
+    df_filtered["Tahun"] = pd.to_numeric(df_filtered["Tahun"], errors="coerce").astype("Int64")
+
+    # === Apply core filters ===
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
-    
+
     # Filter by year range
     if selected_years != (None, None):
+        start_year, end_year = selected_years
         df_filtered = df_filtered[
-            (df_filtered["Tahun"] >= selected_years[0]) &
-            (df_filtered["Tahun"] <= selected_years[1])
+            (df_filtered["Tahun"] >= start_year) &
+            (df_filtered["Tahun"] <= end_year)
         ]
-    
-    # Apply each categorical filter
+
+    # --- Apply categorical filters stored in session_state ---
+    filters = {}
+    for key, value in st.session_state.items():
+        if key.startswith("filter__") and key not in ["filter__year_range"]:
+            col_name = key.replace("filter__", "")
+            filters[col_name] = value
+
     for col, allowed_vals in filters.items():
-        if allowed_vals:  # only filter if user selected something
+        if allowed_vals:
             df_filtered = df_filtered[df_filtered[col].isin(allowed_vals)]
     
     # === Ensure selected_metric column exists ===
     if selected_metric not in df_filtered.columns:
         st.warning("Kolom metrik tidak ditemukan di dataset untuk K/L ini.")
+        return
     else:
-        # Rename for consistency with your functions
         df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
 
-    
-    # Now apply advanced filters (reads from session_state)
-    df_filtered = apply_advanced_filters(df_filtered)
-
-    # Calculate metrics
+    # --- Calculate financial metrics ---
     metrics = calculate_financial_metrics(df_filtered)
     
-    # Display metrics in cards
+    # --- Display summary cards ---
     st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='material-card'>{selected_kl}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Visualization section
-    # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
+    # --- Visualization Section ---
     st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
     
     # Get categorical columns for visualization
@@ -694,23 +700,19 @@ def main():
     ]
     
     if cat_cols:
-        # Create tabs
         tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
         
         for tab, col in zip(tabs, cat_cols):
             with tab:
-                # Chart container
-                # st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
                 fig, grouped_df = chart(df_filtered, col)
                 st.plotly_chart(fig, use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
                 
-                # Data table
+                # --- Data table (wide format: metric x year) ---
                 with st.expander("📋 Data Tabel", expanded=True):
-                    display_col = col 
-                
-                    # Prepare data in wide format: rows = category, columns = year
+                    display_col = col
                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
+
+                    # Pivot to wide format: rows=metric, cols=years
                     df_pivot = (
                         df_display
                         .pivot_table(
@@ -722,19 +724,18 @@ def main():
                         .fillna(0)
                         .reset_index()
                     )
-                
+
                     # Sort columns: Tahun ascending
                     tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
                     df_pivot = df_pivot[[display_col] + tahun_cols]
-                
+
                     # Format numeric values as currency
                     for c in tahun_cols:
                         df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
-                
-                    # Rename the first column to match the selected metric
+
+                    # Rename first column to show selected metric
                     df_pivot = df_pivot.rename(columns={display_col: selected_metric})
-                
-                    # Display in Streamlit
+
                     st.dataframe(
                         df_pivot,
                         use_container_width=True,
@@ -745,7 +746,7 @@ def main():
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Footer with enhanced information
+    # --- Footer ---
     st.markdown("---")
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -764,32 +765,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
