@@ -649,7 +649,7 @@ def main():
     
     # Display metrics in cards
     # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-title'>{selected_kl}}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>{selected_kl}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -735,6 +735,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
