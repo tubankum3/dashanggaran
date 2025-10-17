@@ -621,7 +621,7 @@ def main():
     
     # Sidebar with filters
     global selected_kl, selected_metric, selected_years
-    selected_kl, selected_metric, selected_years = sidebar()
+    selected_kl, selected_metric, selected_years = sidebar(df)
     
     # Filter data based on selections
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
@@ -718,6 +718,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
