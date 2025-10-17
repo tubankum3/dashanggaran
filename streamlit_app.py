@@ -741,7 +741,7 @@ def main():
                 #                 use_container_width=True,
                 #                 hide_index=True
                 #             )
-                            st.markdown("---")
+                            # st.markdown("---")
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
     
@@ -766,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
