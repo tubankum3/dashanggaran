@@ -484,59 +484,53 @@ def sidebar(df):
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
 
-        # Filter dataframe by selected K/L for context
+        # Filter dataframe by selected K/L
         df_filtered_for_sidebar = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
 
-        # === Detect numeric columns for metric choices (based on selected K/L) ===
+        # === Metric selection (reset when K/L changes)
         numeric_cols = df_filtered_for_sidebar.select_dtypes(include=["int64", "float64"]).columns.tolist()
         metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
             metric_options,
-            key="metric_select",
+            key=f"metric_select_{selected_kl}",  # 👈 resets when K/L changes
             help="Pilih jenis anggaran yang akan dianalisis"
         )
 
-        # === Advanced filters: create multiselects with explicit session_state keys ===
-        with st.expander("⚙️ Filter Lanjutan"):           
-            # Year range filter
+        # === Advanced filters ===
+        with st.expander("⚙️ Filter Lanjutan", expanded=False):           
+            # === Year range filter (resets when K/L changes)
             year_options = sorted(df_filtered_for_sidebar["Tahun"].dropna().unique())
-            if year_options:
+            if len(year_options) > 0:
                 min_year = int(min(year_options))
                 max_year = int(max(year_options))
-                # use a named key so the selection persists in session_state
-                if "filter__year_range" not in st.session_state:
-                    st.session_state["filter__year_range"] = (min_year, max_year)
                 selected_years = st.slider(
                     "Rentang Tahun",
                     min_value=min_year,
                     max_value=max_year,
-                    value=st.session_state.get("filter__year_range", (min_year, max_year)),
+                    value=(min_year, max_year),
                     step=1,
-                    key="filter__year_range"
+                    key=f"filter_year_range_{selected_kl}",  # 👈 unique per K/L
                 )
             else:
                 selected_years = (None, None)
-                
+
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
-            # detect categorical columns after selecting K/L and metric
+
+            # === Detect categorical columns dynamically (based on K/L & metric)
             cat_cols = [
                 col for col in df_filtered_for_sidebar.select_dtypes(include=["object"]).columns
                 if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
             ]
 
-            # create a multiselect for each categorical column
             for cat_col in cat_cols:
-                key_name = f"filter__{cat_col}"  # unique key saved to session_state
+                key_name = f"filter_{cat_col}_{selected_kl}"  # 👈 unique per K/L
                 default_options = sorted(df_filtered_for_sidebar[cat_col].dropna().unique())
-                # set a default in session_state so it exists even if the widget isn't touched
-                if key_name not in st.session_state:
-                    st.session_state[key_name] = default_options
                 st.multiselect(
                     f"Pilih {cat_col.replace('_', ' ').title()}",
                     options=default_options,
-                    default=st.session_state.get(key_name, default_options),
-                    key=key_name
+                    default=default_options,
+                    key=key_name,
                 )
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -655,7 +649,8 @@ def main():
     
     # Display metrics in cards
     # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-title'>📈 {selected_kl}: RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>{selected_kl}}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -676,7 +671,7 @@ def main():
         for tab, col in zip(tabs, cat_cols):
             with tab:
                 # Chart container
-                st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
+                # st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
                 fig, grouped_df = chart(df_filtered, col)
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -716,32 +711,6 @@ def main():
                         use_container_width=True,
                         hide_index=True
                     )
-
-                
-                # with st.expander("📋 Data Tabel", expanded=True):
-                #     display_col = col
-                #     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
-                    
-                #     # Year-wise tables
-                #     years_sorted = sorted(df_display["Tahun"].unique(), reverse=True)
-                #     for year in years_sorted:
-                #         with st.container():
-                #             st.markdown(f"**Tahun {year}**")
-                #             year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
-                #             year_df = year_df.sort_values("Nilai", ascending=False)
-                            
-                #             # Format and display
-                #             display_df = year_df.copy()
-                #             display_df["Nilai"] = display_df["Nilai"].apply(
-                #                 lambda x: f"Rp {x:,.0f}"
-                #             )
-                            
-                #             st.dataframe(
-                #                 display_df,
-                #                 use_container_width=True,
-                #                 hide_index=True
-                #             )
-                            # st.markdown("---")
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
     
@@ -766,6 +735,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
