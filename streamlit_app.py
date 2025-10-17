@@ -436,7 +436,7 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
     if not metrics:
         return
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(1,2,2)
     
     with col1:
         # Total Budget Card
@@ -747,13 +747,11 @@ def main():
     
     # --- Footer ---
     st.markdown("---")
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns([3, 1])
     with col1:
         st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
     with col2:
         st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
-    with col3:
-        st.caption("👨‍💻 Built with Streamlit")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -764,6 +762,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
