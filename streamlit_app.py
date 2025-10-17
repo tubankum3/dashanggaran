@@ -498,9 +498,27 @@ def sidebar(df):
         )
 
         # === Advanced filters: create multiselects with explicit session_state keys ===
-        with st.expander("⚙️ Filter Lanjutan"):
+        with st.expander("⚙️ Filter Lanjutan"):           
+            # Year range filter
+            year_options = sorted(df_filtered_for_sidebar["Tahun"].dropna().unique())
+            if year_options:
+                min_year = int(min(year_options))
+                max_year = int(max(year_options))
+                # use a named key so the selection persists in session_state
+                if "filter__year_range" not in st.session_state:
+                    st.session_state["filter__year_range"] = (min_year, max_year)
+                selected_years = st.slider(
+                    "Rentang Tahun",
+                    min_value=min_year,
+                    max_value=max_year,
+                    value=st.session_state.get("filter__year_range", (min_year, max_year)),
+                    step=1,
+                    key="filter__year_range"
+                )
+            else:
+                selected_years = (None, None)
+                
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
-
             # detect categorical columns after selecting K/L and metric
             cat_cols = [
                 col for col in df_filtered_for_sidebar.select_dtypes(include=["object"]).columns
@@ -520,25 +538,6 @@ def sidebar(df):
                     default=st.session_state.get(key_name, default_options),
                     key=key_name
                 )
-
-            # Year range filter
-            year_options = sorted(df_filtered_for_sidebar["Tahun"].dropna().unique())
-            if year_options:
-                min_year = int(min(year_options))
-                max_year = int(max(year_options))
-                # use a named key so the selection persists in session_state
-                if "filter__year_range" not in st.session_state:
-                    st.session_state["filter__year_range"] = (min_year, max_year)
-                selected_years = st.slider(
-                    "Rentang Tahun",
-                    min_value=min_year,
-                    max_value=max_year,
-                    value=st.session_state.get("filter__year_range", (min_year, max_year)),
-                    step=1,
-                    key="filter__year_range"
-                )
-            else:
-                selected_years = (None, None)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -565,7 +564,7 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         y="Nilai",
         color=category_col,
         markers=True,
-        title=f"📈 {selected_metric} per {category_col} — {selected_kl}",
+        title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
         labels={
             "Tahun": "Tahun",
             "Nilai": "Jumlah (Rp)",
@@ -575,7 +574,6 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         height=height,
     )
 
-    # Add 2-point year range slider + Play/Pause buttons
     years = sorted(df_grouped["Tahun"].unique())
     min_year, max_year = years[0], years[-1]
 
@@ -587,40 +585,6 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         paper_bgcolor="white",
         plot_bgcolor="white",
         font=dict(family="Google Sans, Roboto, Arial"),
-
-        # sliders=[{
-        #     "active": 0,
-        #     "currentvalue": {"prefix": "Tahun: ", "font": {"size": 14}},
-        #     "pad": {"t": 50},
-        #     "x": 0.15,
-        #     "len": 0.7,
-        #     "y": -0.05,
-        #     "steps": [
-        #         {"method": "update", "label": str(y), "args": [{"xaxis.range": [y, y]}]}
-        #         for y in years
-        #     ],
-        # }],
-
-        # updatemenus=[{
-        #     "buttons": [
-        #         {"args": [None, {"frame": {"duration": 1000, "redraw": True},
-        #                          "fromcurrent": True, "mode": "immediate"}],
-        #          "label": "▶️",
-        #          "method": "animate"},
-        #         {"args": [[None], {"frame": {"duration": 0, "redraw": True},
-        #                            "mode": "immediate"}],
-        #          "label": "⏸️",
-        #          "method": "animate"}
-        #     ],
-        #     "direction": "left",
-        #     "pad": {"r": 10, "t": 10},
-        #     "showactive": True,
-        #     "type": "buttons",
-        #     "x": 0.05,
-        #     "xanchor": "right",
-        #     "y": -0.05,
-        #     "yanchor": "top"
-        # }]
     )
 
     fig.update_traces(
@@ -691,7 +655,7 @@ def main():
     
     # Display metrics in cards
     # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-title'>📈 {selected_kl}: Ringkasan Kinerja {selected_metric}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>📈 {selected_kl}: RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -717,30 +681,66 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
-                # Data table with enhanced presentation
+                # Data table
                 with st.expander("📋 Data Tabel", expanded=True):
-                    display_col = col
+                    display_col = col 
+                
+                    # Prepare data in wide format: rows = category, columns = year
                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
+                    df_pivot = (
+                        df_display
+                        .pivot_table(
+                            index=display_col,
+                            columns="Tahun",
+                            values="Nilai",
+                            aggfunc="sum"
+                        )
+                        .fillna(0)
+                        .reset_index()
+                    )
+                
+                    # Sort columns: Tahun ascending
+                    tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
+                    df_pivot = df_pivot[[display_col] + tahun_cols]
+                
+                    # Format numeric values as currency
+                    for c in tahun_cols:
+                        df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
+                
+                    # Rename the first column to match the selected metric
+                    df_pivot = df_pivot.rename(columns={display_col: selected_metric})
+                
+                    # Display in Streamlit
+                    st.dataframe(
+                        df_pivot,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                
+                # with st.expander("📋 Data Tabel", expanded=True):
+                #     display_col = col
+                #     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
                     
-                    # Year-wise tables
-                    years_sorted = sorted(df_display["Tahun"].unique(), reverse=True)
-                    for year in years_sorted:
-                        with st.container():
-                            st.markdown(f"**Tahun {year}**")
-                            year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
-                            year_df = year_df.sort_values("Nilai", ascending=False)
+                #     # Year-wise tables
+                #     years_sorted = sorted(df_display["Tahun"].unique(), reverse=True)
+                #     for year in years_sorted:
+                #         with st.container():
+                #             st.markdown(f"**Tahun {year}**")
+                #             year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
+                #             year_df = year_df.sort_values("Nilai", ascending=False)
                             
-                            # Format and display
-                            display_df = year_df.copy()
-                            display_df["Nilai"] = display_df["Nilai"].apply(
-                                lambda x: f"Rp {x:,.0f}"
-                            )
+                #             # Format and display
+                #             display_df = year_df.copy()
+                #             display_df["Nilai"] = display_df["Nilai"].apply(
+                #                 lambda x: f"Rp {x:,.0f}"
+                #             )
                             
-                            st.dataframe(
-                                display_df,
-                                use_container_width=True,
-                                hide_index=True
-                            )
+                #             st.dataframe(
+                #                 display_df,
+                #                 use_container_width=True,
+                #                 hide_index=True
+                #             )
                             st.markdown("---")
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
@@ -766,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
