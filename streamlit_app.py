@@ -436,7 +436,7 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
     if not metrics:
         return
     
-    col1, col2, col3 = st.columns(1,2,2)
+    col1, col2, col3 = st.columns([1,2,2])
     
     with col1:
         # Total Budget Card
@@ -762,6 +762,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
