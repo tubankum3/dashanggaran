@@ -503,7 +503,34 @@ def sidebar():
                 default=year_options,
                 help="Pilih tahun yang akan ditampilkan"
             )
+        with st.expander("⚙️ Filter Lanjutan"):
+            st.markdown("### Filter Berdasarkan Nilai Kategorikal")
         
+            # dynamically detect categorical columns (except Tahun & KL)
+            cat_cols = [
+                col for col in df.select_dtypes(include=["object"]).columns
+                if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
+            ]
+        
+            filters = {}
+            for cat_col in cat_cols:
+                unique_vals = sorted(df[cat_col].dropna().unique())
+                filters[cat_col] = st.multiselect(
+                    f"Pilih {cat_col.replace('_', ' ').title()}",
+                    options=unique_vals,
+                    default=unique_vals
+                )
+        
+            # year filter
+            year_options = sorted(df["Tahun"].unique())
+            selected_years = st.slider(
+                "Rentang Tahun",
+                min_value=int(min(year_options)),
+                max_value=int(max(year_options)),
+                value=(int(min(year_options)), int(max(year_options))),
+                step=1
+            )
+
         st.markdown("</div>", unsafe_allow_html=True)
            
     return selected_kl, selected_metric, selected_years
@@ -514,11 +541,15 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
           .sum()
     )
 
-    # Adjust height for large category lists
+    # Sort and ensure Tahun is string
+    df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
+    df_grouped = df_grouped.sort_values("Tahun")
+
+    # Adjust chart height for large categories
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Create figure
+    # Create interactive line chart with year slider
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -528,48 +559,50 @@ def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per
         title=f"📈 {selected_metric} per {category_col} — {selected_kl}",
         labels={
             "Tahun": "Tahun",
-            "Nilai": "Jumlah",
+            "Nilai": "Jumlah (Rp)",
             category_col: category_col.replace("_", " ").title(),
         },
         template="plotly_white",
-        height=500
-    )
-    
-    # styling
-    fig.update_layout(
         height=height,
+        animation_frame="Tahun",  # 🎯 adds the year slider
+    )
+
+    fig.update_layout(
         hovermode="closest",
         title_x=0,
         legend_title_text=category_col.replace("_", " ").title(),
-        # legend=dict(
-        #     orientation="v",
-        #     yanchor="top",
-        #     y=1.02,
-        #     xanchor="right",
-        #     x=1
-        # ),
         margin=dict(l=40, r=40, t=80, b=40),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(family="Google Sans, Roboto, Arial")
+        font=dict(family="Google Sans, Roboto, Arial"),
+        updatemenus=[{
+            "buttons": [
+                {"args": [None, {"frame": {"duration": 1000, "redraw": True},
+                                 "fromcurrent": True, "mode": "immediate"}],
+                 "label": "▶️ Play",
+                 "method": "animate"},
+                {"args": [[None], {"frame": {"duration": 0, "redraw": True},
+                                   "mode": "immediate"}],
+                 "label": "⏸️ Pause",
+                 "method": "animate"}
+            ],
+            "direction": "left",
+            "pad": {"r": 10, "t": 70},
+            "showactive": True,
+            "type": "buttons",
+            "x": 0.05,
+            "xanchor": "right",
+            "y": -0.05,
+            "yanchor": "top"
+        }]
     )
-    
-    # hover information
+
     fig.update_traces(
-        hovertemplate="<b>Tahun: %{x}</b><br>" +
-                     "%{fullData.name}<br>" +
-                     "Rp %{y:,.0f}<extra></extra>",
-        line=dict(width=3),
-        marker=dict(size=8)
+        hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
+        line=dict(width=2.5),
+        marker=dict(size=7)
     )
-    
-    # Format y-axis as Rupiah (Jt, M, T)
-    y_ticks = sorted(df_grouped["Nilai"].unique())
-    fig.update_yaxes(
-        ticktext=[format_rupiah(v) for v in y_ticks],
-        tickvals=y_ticks
-    )
-    
+
     return fig, df_grouped
 
 # =============================================================================
@@ -594,6 +627,17 @@ def main():
     
     # Filter data based on selections
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
+    
+    # Apply advanced filters
+    for col, selected_values in filters.items():
+        if selected_values:
+            df_filtered = df_filtered[df_filtered[col].isin(selected_values)]
+    
+    # Filter by selected year range
+    df_filtered = df_filtered[
+        df_filtered["Tahun"].astype(int).between(selected_years[0], selected_years[1])
+    ]
+
     df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
     
     # Calculate metrics
@@ -601,7 +645,7 @@ def main():
     
     # Display metrics in cards
     # st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='section-title'>📈 {selected_kl}: Ringkasan Kinerja {selected_metric}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>📈 {selected_kl}: Ringkasan Kinerja {selected_metric}</div>", unsafe_allow_html=True)
     cards(metrics)
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -676,6 +720,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
