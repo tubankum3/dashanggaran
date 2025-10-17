@@ -415,22 +415,25 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 # =============================================================================
 # Component Architecture
 # =============================================================================
-def header(selected_kl=None):
+def header(selected_kl: str | None = None, selected_metric: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
     kl_text = selected_kl if selected_kl else "Overview"
+    metric_text = f" — {selected_metric}" if selected_metric else ""
     st.markdown(f"""
     <div class="dashboard-header">
         <div class="breadcrumb">Dashboard / Analisis Anggaran / {kl_text}</div>
-        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
+        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara{metric_text}</h1>
         <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
     """, unsafe_allow_html=True)
+    
+def cards(metrics: dict, selected_kl=None, selected_metric=None):
+    """
+    Create metric cards with visual hierarchy and interactive elements.
+    """
+    kl_text = selected_kl or "—"
+    metric_text = selected_metric or "—"
 
-def cards(metrics: dict):
-    """
-    Create enhanced metric cards with improved visual hierarchy
-    and interactive elements.
-    """
     if not metrics:
         return
     
@@ -645,10 +648,10 @@ def main():
     
     # Sidebar with filters
     df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
-
-    # Create header now that selected_kl exists
-    header(selected_kl)
     
+    # header
+    header(selected_kl=selected_kl, selected_metric=selected_metric)
+
     # === Ensure Tahun numeric before filtering ===
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
     df_filtered["Tahun"] = pd.to_numeric(df_filtered["Tahun"], errors="coerce").astype("Int64")
@@ -688,7 +691,7 @@ def main():
     # --- Display summary cards ---
     st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='material-card'>{selected_kl}</div>", unsafe_allow_html=True)
-    cards(metrics)
+    cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # --- Visualization Section ---
@@ -766,6 +769,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
