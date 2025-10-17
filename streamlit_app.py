@@ -496,14 +496,6 @@ def sidebar():
         
         # Additional filters
         with st.expander("⚙️ Filter Lanjutan"):
-            year_options = sorted(df["Tahun"].unique())
-            selected_years = st.multiselect(
-                "Filter Tahun",
-                options=year_options,
-                default=year_options,
-                help="Pilih tahun yang akan ditampilkan"
-            )
-        with st.expander("⚙️ Filter Lanjutan"):
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
         
             # dynamically detect categorical columns (except Tahun & KL)
@@ -533,7 +525,7 @@ def sidebar():
 
         st.markdown("</div>", unsafe_allow_html=True)
            
-    return selected_kl, selected_metric, selected_years
+    return selected_kl, selected_metric, selected_years, filters
 
 def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
@@ -720,6 +712,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
