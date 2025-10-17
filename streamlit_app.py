@@ -475,6 +475,9 @@ def sidebar(df):
             <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
         """, unsafe_allow_html=True)
 
+        # === Ensure Tahun is numeric ===
+        df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
+
         # === Select K/L ===
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
         selected_kl = st.selectbox(
@@ -484,24 +487,22 @@ def sidebar(df):
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
 
-        # Filter base data for this K/L
-        df_filtered_for_sidebar = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+        df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
 
-        # === Metric selection (auto resets per K/L)
-        numeric_cols = df_filtered_for_sidebar.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        # === Detect numeric columns for metric choices ===
+        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
         metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
             metric_options,
-            key=f"metric_select_{selected_kl}",
+            key="metric_select",
             help="Pilih jenis anggaran yang akan dianalisis"
         )
 
         # === Advanced filters ===
-        filters = {}
-        with st.expander("⚙️ Filter Lanjutan", expanded=False):
-            # Year filter
-            year_options = sorted(df_filtered_for_sidebar["Tahun"].dropna().unique())
+        with st.expander("⚙️ Filter Lanjutan"):
+            # --- Year range ---
+            year_options = sorted(df_filtered["Tahun"].dropna().unique())
             if len(year_options) > 0:
                 min_year, max_year = int(min(year_options)), int(max(year_options))
                 selected_years = st.slider(
@@ -510,31 +511,42 @@ def sidebar(df):
                     max_value=max_year,
                     value=(min_year, max_year),
                     step=1,
-                    key=f"filter_year_range_{selected_kl}"
+                    key="filter__year_range"
                 )
             else:
                 selected_years = (None, None)
 
+            # --- Categorical filters ---
             st.markdown("### Filter Berdasarkan Nilai Kategorikal")
-
             cat_cols = [
-                col for col in df_filtered_for_sidebar.select_dtypes(include=["object"]).columns
+                col for col in df_filtered.select_dtypes(include=["object"]).columns
                 if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
             ]
 
+            active_filters = {}
             for cat_col in cat_cols:
-                unique_vals = sorted(df_filtered_for_sidebar[cat_col].dropna().unique())
-                selected_vals = st.multiselect(
+                options = sorted(df_filtered[cat_col].dropna().unique())
+                selected_values = st.multiselect(
                     f"Pilih {cat_col.replace('_', ' ').title()}",
-                    options=unique_vals,
-                    default=unique_vals,
-                    key=f"filter_{cat_col}_{selected_kl}"
+                    options=options,
+                    default=options,
+                    key=f"filter__{cat_col}"
                 )
-                filters[cat_col] = selected_vals
+                active_filters[cat_col] = selected_values
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    return selected_kl, selected_metric, selected_years, filters
+    # === Apply filters to dataframe ===
+    df_filtered = df_filtered[
+        (df_filtered["Tahun"] >= selected_years[0]) &
+        (df_filtered["Tahun"] <= selected_years[1])
+    ]
+
+    for cat_col, values in active_filters.items():
+        if values:
+            df_filtered = df_filtered[df_filtered[cat_col].isin(values)]
+
+    return df_filtered, selected_kl, selected_metric, selected_years
 
 def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
@@ -634,7 +646,7 @@ def main():
     
     # Sidebar with filters
     global selected_kl, selected_metric, selected_years, filters
-    selected_kl, selected_metric, selected_years, filters = sidebar(df)
+    df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
     
     # === Apply all filters to dataframe ===
     df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
@@ -752,6 +764,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
