@@ -418,12 +418,12 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 def header(selected_kl: str | None = None, selected_metric: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
     kl_text = selected_kl if selected_kl else "Overview"
-    metric_text = f" — {selected_metric}" if selected_metric else ""
+    metric_text = f" {selected_metric}" if selected_metric else ""
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis Anggaran / {kl_text}</div>
-        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara{metric_text}</h1>
-        <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
+        <div class="breadcrumb">Dashboard / Analisis{metric_text} / {kl_text}</div>
+        <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
+        # <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -769,6 +769,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
