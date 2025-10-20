@@ -311,25 +311,21 @@ st.markdown("""
 @st.cache_data(show_spinner="Memuat dataset anggaran...")
 def load_data():
     """
-    Load and preprocess budget data with error handling and data validation.
+    Load and preprocess budget data from GitHub with error handling and validation.
     
     Returns:
         pd.DataFrame: Preprocessed budget data
     """
+    url = "https://raw.githubusercontent.com/tubankum3/dashpmk/main/df.csv.zip"
+    
     try:
-        filepath = "df.csv"
-        if str(filepath).endswith(".zip"):
-            with zipfile.ZipFile(filepath, "r") as z:
-                csv_files = [f for f in z.namelist() if f.endswith(".csv")]
-                if not csv_files:
-                    st.error("❌ Tidak ada file CSV di dalam ZIP!")
-                    st.stop()
-                csv_name = csv_files[0]
-                st.info(f"📦 Membaca {csv_name} dari ZIP...")
-                with z.open(csv_name) as file:
-                    df = pd.read_csv(file, low_memory=False)
-        else:
-            df = pd.read_csv(filepath, low_memory=False)
+        response = requests.get(url)
+        response.raise_for_status()  # raise error if download failed
+        
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            # adjust if filename inside zip is different
+            with z.open(csv_name) as file:
+                df = pd.read_csv(file, low_memory=False)
         
         # Data validation and cleaning
         if df.empty:
@@ -794,6 +790,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
