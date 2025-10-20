@@ -220,18 +220,25 @@ st.markdown("""
 }
 
 /* Tab */
+/* Tab container: allow wrapping */
 .stTabs [data-baseweb="tab-list"] {
+    flex-wrap: wrap !important;
     gap: 0.5rem;
 }
 
+/* Each tab */
 .stTabs [data-baseweb="tab"] {
     background: var(--surface);
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     padding: 0.75rem 1.5rem;
     border: 1px solid #e8eaed;
     transition: var(--transition);
+    flex: initial !important; /* Prevent tabs from shrinking */
+    white-space: nowrap !important; /* Keep text on one line */
+    margin-bottom: 6px; /* Add vertical spacing between rows */
 }
 
+/* Active (selected) tab */
 .stTabs [aria-selected="true"] {
     background: var(--primary);
     color: var(--on-primary);
@@ -731,6 +738,10 @@ def main():
     if cat_cols:
         tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
         
+        for i, tab in enumerate(tabs):
+            with tab:
+                st.write(f"Content for {cat_cols[i]}")
+        
         for tab, col in zip(tabs, cat_cols):
             with tab:
                 fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
@@ -792,6 +803,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
