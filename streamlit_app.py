@@ -8,7 +8,7 @@ import numpy as np
 # Page Configuration & Global Settings
 # =============================================================================
 st.set_page_config(
-    page_title="Dashboard Analisis Anggaran dan Belanja Negara",
+    page_title="Dashboard Analisis Anggaran dan Realisasi Belanja Negara",
     page_icon=":analytics:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -439,7 +439,7 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
     col1, col2, col3 = st.columns([1,2,2])
     
     with col1:
-        # Total Budget Card
+        # Total Metric Card
         latest_total = metrics['yearly_totals']["Nilai"].iloc[-1]
         st.markdown(f"""
         <div class="metric-card">
@@ -778,15 +778,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
