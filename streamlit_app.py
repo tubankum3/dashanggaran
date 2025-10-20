@@ -323,6 +323,7 @@ def load_data():
                 gdown.download(DRIVE_URL, LOCAL_FILE, quiet=False)
                 
         chunks = []
+        chunksize=100000
         total_rows = 0
     
         # Try counting total lines for progress bar (safe fallback)
@@ -812,6 +813,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
