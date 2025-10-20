@@ -316,7 +316,19 @@ def load_data():
         pd.DataFrame: Preprocessed budget data
     """
     try:
-        df = pd.read_csv("df.csv.zip")
+        filepath = "df.csv"
+        if str(filepath).endswith(".zip"):
+            with zipfile.ZipFile(filepath, "r") as z:
+                csv_files = [f for f in z.namelist() if f.endswith(".csv")]
+                if not csv_files:
+                    st.error("❌ Tidak ada file CSV di dalam ZIP!")
+                    st.stop()
+                csv_name = csv_files[0]
+                st.info(f"📦 Membaca {csv_name} dari ZIP...")
+                with z.open(csv_name) as file:
+                    df = pd.read_csv(file, low_memory=False)
+        else:
+            df = pd.read_csv(filepath, low_memory=False)
         
         # Data validation and cleaning
         if df.empty:
@@ -342,7 +354,7 @@ def load_data():
         return df
         
     except FileNotFoundError:
-        st.error("❌ File dataset tidak ditemukan. Pastikan 'df23-25.csv' tersedia.")
+        st.error("❌ File dataset tidak ditemukan. Pastikan 'df.csv' tersedia.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ Gagal memuat data: {str(e)}")
@@ -781,6 +793,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
