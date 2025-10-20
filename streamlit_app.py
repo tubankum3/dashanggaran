@@ -18,6 +18,8 @@ st.set_page_config(
         'About': "Dashboard Anggaran Bidang PMK"
     }
 )
+DRIVE_URL = "https://drive.google.com/uc?id=1EFvTD7MOv_8NHuNhKm9NEC9l8ehkbOHX"
+LOCAL_FILE = "df.csv"
 
 # =============================================================================
 # Material Design Styled CSS
@@ -304,7 +306,7 @@ st.markdown("""
 # =============================================================================
 # Data Loading
 # =============================================================================
-@st.cache_data(show_spinner="Memuat dataset anggaran...")
+@st.cache_data(show_spinner=True)
 def load_data():
     """
     Load and preprocess budget data with error handling and data validation.
@@ -313,7 +315,13 @@ def load_data():
         pd.DataFrame: Preprocessed budget data
     """
     try:
-        df = pd.read_csv("df.csv")
+        if not os.path.exists(LOCAL_FILE):
+            with st.spinner("Downloading data from Google Drive..."):
+                gdown.download(DRIVE_URL, LOCAL_FILE, quiet=False)
+        # Chunked reading for large files
+        df_iter = pd.read_csv(LOCAL_FILE, chunksize=500000)
+        df = pd.concat(df_iter, ignore_index=True)
+        return df
         
         # Data validation and cleaning
         if df.empty:
@@ -778,3 +786,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
