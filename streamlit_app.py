@@ -321,11 +321,34 @@ def load_data():
         if not os.path.exists(LOCAL_FILE):
             with st.spinner("Downloading data from Google Drive..."):
                 gdown.download(DRIVE_URL, LOCAL_FILE, quiet=False)
-        # Chunked reading for large files
-        df_iter = pd.read_csv(LOCAL_FILE, chunksize=500000)
-        df = pd.concat(df_iter, ignore_index=True)
-        return df
-        
+                
+        chunks = []
+        total_rows = 0
+    
+        # Try counting total lines for progress bar (safe fallback)
+        try:
+            total_lines = sum(1 for _ in open(LOCAL_FILE, "r", encoding="utf-8"))
+            total_chunks = max(total_lines // chunksize, 1)
+        except Exception:
+            total_chunks = None
+    
+        progress_text = "📥 Memuat data besar, harap tunggu..."
+        progress_bar = st.progress(0, text=progress_text)
+    
+        for i, chunk in enumerate(pd.read_csv(LOCAL_FILE, chunksize=chunksize, low_memory=False)):
+            chunks.append(chunk)
+            total_rows += len(chunk)
+            if total_chunks:
+                progress_bar.progress(
+                    min((i + 1) / total_chunks, 1.0),
+                    text=f"📊 Memuat... ({i+1}/{total_chunks})"
+                )
+    
+        progress_bar.empty()
+    
+        # Combine all chunks safely
+        df = pd.concat(chunks, ignore_index=True)
+    
         # Data validation and cleaning
         if df.empty:
             st.error("Dataset kosong atau tidak valid")
@@ -350,7 +373,7 @@ def load_data():
         return df
         
     except FileNotFoundError:
-        st.error("❌ File dataset tidak ditemukan. Pastikan 'df23-25.csv' tersedia.")
+        st.error("❌ File dataset tidak ditemukan. Pastikan 'df.csv' tersedia.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ Gagal memuat data: {str(e)}")
@@ -789,6 +812,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
