@@ -313,7 +313,7 @@ def load_data():
         pd.DataFrame: Preprocessed budget data
     """
     try:
-        df = pd.read_csv("df23-25.csv")
+        df = pd.read_csv("df.csv")
         
         # Data validation and cleaning
         if df.empty:
@@ -778,6 +778,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
