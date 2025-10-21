@@ -22,7 +22,6 @@ st.set_page_config(
         'About': "Dashboard Anggaran Bidang PMK"
     }
 )
-st.sidebar.title("Home")
 # =============================================================================
 # Material Design Styled CSS
 # =============================================================================
@@ -801,6 +800,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
