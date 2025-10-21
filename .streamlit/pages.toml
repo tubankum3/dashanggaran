@@ -1,7 +1,0 @@
-[[pages]]
-path = "pages/1_Home.py"
-name = "Home"
-
-[[pages]]
-path = "pages/2_Komparatif Analisis.py"
-name = "Komparatif Analisis"

@@ -1,7 +1,0 @@
-[server]
-headless = true
-fileWatcherType = "auto"
-enableStaticServing = false
-
-[theme]
-base = "light"
