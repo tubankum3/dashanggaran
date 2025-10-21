@@ -1,0 +1,12 @@
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+fileWatcherType = "auto"
+
+[theme]
+base = "light"
+
+[general]
+# Tell Streamlit which file to run as the main entry
+mainScriptPath = "Home.py"
