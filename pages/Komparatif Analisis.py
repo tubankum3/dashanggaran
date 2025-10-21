@@ -14,7 +14,7 @@ from datetime import datetime
 # =============================================================================
 st.set_page_config(
     page_title="Dashboard Komparasi Realisasi vs Pagu DIPA",
-    page_icon=":bar_chart:",
+    page_icon=":analytics:",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -24,7 +24,6 @@ st.set_page_config(
     }
 )
 
-st.title("Dashboard Komparasi Realisasi vs Pagu DIPA")
 # =============================================================================
 # Material Design Styled CSS
 # =============================================================================
@@ -214,7 +213,7 @@ st.markdown("""
 .sidebar-section {
     background: var(--surface);
     border-radius: var(--border-radius);
-    padding: 1.5rem;
+    padding: 0.5rem;
     margin-bottom: 1rem;
     box-shadow: var(--shadow-1);
 }
@@ -348,32 +347,37 @@ def format_rupiah(value):
 # =============================================================================
 # Component Architecture
 # =============================================================================
-def header(selected_kl: str | None = None, selected_metric: str | None = None):
+def header(selected_year: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
-    kl_text = selected_kl if selected_kl else "Overview"
-    metric_text = f" {selected_metric}" if selected_metric else ""
+    year_text = selected_year if selected_year else "Overview"
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">DASHBOARD / KOMPARASI {metric_text} / {kl_text}</div>
-        <h1 class="dashboard-title">📊 Dashboard Komparasi Realisasi vs Pagu DIPA</h1>
+        <div class="breadcrumb">DASHBOARD / KOMPARASI / TAHUN {year_text}</div>
+        <h1 class="dashboard-title">Dashboard Komparasi Realisasi vs Pagu DIPA</h1>
     </div>
     """, unsafe_allow_html=True)
     
 def sidebar(df):
     with st.sidebar:
-        st.title("Komparasi Anggaran & Realisasi Belanja Negara")
-        st.markdown("---")
-
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
-        selected_kl = st.selectbox("Pilih Kementerian/Lembaga (opsional)", ["Semua"] + kl_list)
+        selected_kls = st.multiselect(
+            "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
+            options=kl_list,
+            default=[]
+        )
 
-        years = sorted(df["Tahun"].astype(int).unique())
-        selected_year = st.select_slider("Pilih Tahun", options=years, value=max(years))
+        top_n = st.number_input(
+            "Tampilkan Top K/L berdasarkan Pagu DIPA Revisi",
+            min_value=1,
+            max_value=50,
+            value=10,
+            step=1,
+            help="Jumlah Kementerian/Lembaga yang ditampilkan pada grafik."
+        )
 
-    return selected_kl, selected_year
+    return selected_kls, top_n
 
-
-def chart(df: pd.DataFrame, year: int):
+def chart(df: pd.DataFrame, year: int, top_n: int = 10):
     """
     Create horizontal bar + scatter chart comparing Realisasi vs Pagu Awal & Revisi for the selected year.
     """
@@ -390,8 +394,8 @@ def chart(df: pd.DataFrame, year: int):
         ].sum()
     )
 
-    # Top 15 K/L
-    agg = agg.sort_values("PAGU DIPA REVISI EFEKTIF", ascending=True).tail(15)
+    # Sort and take top_n
+    agg = agg.sort_values("PAGU DIPA REVISI EFEKTIF", ascending=True).tail(top_n)
 
     # Range bar colors
     colors = [
@@ -457,13 +461,18 @@ def main():
         st.error("Data gagal dimuat.")
         return
 
-    selected_kl, selected_year = sidebar(df)
+    selected_kls, top_n = sidebar(df)
 
-    if selected_kl != "Semua":
-        df = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+    # Move year selection to main section
+    years = sorted(df["Tahun"].astype(int).unique())
+    selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
+
+    # Filter based on selected K/Ls
+    if selected_kls:
+        df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
     st.markdown(f"### 📘 Tahun {selected_year}")
-    st.plotly_chart(chart(df, selected_year), use_container_width=True)
+    st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
 
     # Footer
     st.markdown("---")
@@ -482,6 +491,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
