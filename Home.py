@@ -211,8 +211,8 @@ st.markdown("""
 .sidebar-section {
     background: var(--surface);
     border-radius: var(--border-radius);
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
+    padding: 0.2rem;
+    margin-bottom: 0.1rem;
     box-shadow: var(--shadow-1);
 }
 
@@ -804,6 +804,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
