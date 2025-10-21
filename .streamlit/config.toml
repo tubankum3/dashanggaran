@@ -1,16 +1,7 @@
 [server]
 headless = true
-enableCORS = false
-enableXsrfProtection = false
 fileWatcherType = "auto"
+enableStaticServing = false
 
 [theme]
 base = "light"
-primaryColor = "#2c7be5"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f5f7fa"
-textColor = "#262730"
-
-[general]
-# Tell Streamlit Cloud to use Home.py as the main file
-mainScriptPath = "Home.py"
