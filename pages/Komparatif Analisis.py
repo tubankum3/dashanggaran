@@ -365,87 +365,87 @@ def sidebar(df):
         st.markdown("---")
 
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
-        selected_kl = st.selectbox("Pilih Kementerian/Lembaga", kl_list)
+        selected_kl = st.selectbox("Pilih Kementerian/Lembaga (opsional)", ["Semua"] + kl_list)
 
-        df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
-        numeric_cols = [
-            c for c in df_filtered.select_dtypes(include=["int64", "float64"]).columns if c != "Tahun"
-        ]
+        years = sorted(df["Tahun"].astype(int).unique())
+        selected_year = st.select_slider("Pilih Tahun", options=years, value=max(years))
 
-        if not numeric_cols:
-            st.warning("Tidak ada kolom numerik yang dapat ditampilkan.")
-            return df_filtered, selected_kl, None, (None, None)
+    return selected_kl, selected_year
 
-        selected_metric = st.selectbox("Metrik Anggaran", numeric_cols)
 
-        years = sorted(df_filtered["Tahun"].astype(int).unique())
-        selected_years = st.slider(
-            "Rentang Tahun",
-            min_value=int(min(years)),
-            max_value=int(max(years)),
-            value=(int(min(years)), int(max(years))),
-        )
-    return df_filtered, selected_kl, selected_metric, selected_years
-
-def chart(df, selected_metric, selected_years, top_n=10):
-    """Create a dynamic line chart of top N K/L based on selected metric"""
-    if selected_metric not in df.columns:
-        st.warning(f"Kolom '{selected_metric}' tidak ditemukan.")
-        return go.Figure()
-
+def chart(df: pd.DataFrame, year: int):
+    """
+    Create horizontal bar + scatter chart comparing Realisasi vs Pagu Awal & Revisi for the selected year.
+    """
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
-    df = df.dropna(subset=["Tahun", "KEMENTERIAN/LEMBAGA", selected_metric])
+    df_year = df[df["Tahun"] == year].copy()
 
-    if selected_years != (None, None):
-        start_year, end_year = selected_years
-        df = df[(df["Tahun"] >= start_year) & (df["Tahun"] <= end_year)]
+    # Remove placeholder KL
+    df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
-    df_grouped = df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun"], as_index=False)[selected_metric].sum()
-
-    if df_grouped.empty:
-        st.warning("Data tidak tersedia untuk rentang tahun tersebut.")
-        return px.line()
-
-    latest_year = df_grouped["Tahun"].max()
-    top_ministries = (
-        df_grouped[df_grouped["Tahun"] == latest_year]
-        .nlargest(top_n, selected_metric)["KEMENTERIAN/LEMBAGA"]
-        .tolist()
+    # Aggregate
+    agg = (
+        df_year.groupby("KEMENTERIAN/LEMBAGA", as_index=False)[
+            ["REALISASI BELANJA KL (SAKTI)", "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF"]
+        ].sum()
     )
 
-    fig = px.line(
-        df_grouped,
-        x="Tahun",
-        y=selected_metric,
-        color="KEMENTERIAN/LEMBAGA",
-        markers=True,
-        title=f"📊 Tren {selected_metric} — Top {top_n} K/L berdasarkan tahun {latest_year}",
-        labels={selected_metric: "Nilai (Rp)", "Tahun": "Tahun"},
-        template="plotly_white",
-        height=600,
-    )
+    # Top 15 K/L
+    agg = agg.sort_values("PAGU DIPA REVISI EFEKTIF", ascending=True).tail(15)
 
-    # Fade-out non-top ministries
-    for trace in fig.data:
-        if trace.name not in top_ministries:
-            trace.line.color = "lightgray"
-            trace.line.width = 1.5
-            trace.opacity = 0.4
-        else:
-            trace.line.width = 3.5
+    # Range bar colors
+    colors = [
+        "#b2dfdb" if row["PAGU DIPA REVISI EFEKTIF"] >= row["PAGU DIPA AWAL EFEKTIF"] else "#d0d0d0"
+        for _, row in agg.iterrows()
+    ]
 
+    # Marker colors
+    marker_colors = [
+        "#e53935" if row["REALISASI BELANJA KL (SAKTI)"] < min(row["PAGU DIPA AWAL EFEKTIF"], row["PAGU DIPA REVISI EFEKTIF"]) else "#00897b"
+        for _, row in agg.iterrows()
+    ]
+
+    # --- Figure ---
+    fig = go.Figure()
+
+    # Range bars
+    fig.add_trace(go.Bar(
+        y=agg["KEMENTERIAN/LEMBAGA"],
+        x=(agg["PAGU DIPA REVISI EFEKTIF"] - agg["PAGU DIPA AWAL EFEKTIF"]).abs(),
+        base=agg[["PAGU DIPA REVISI EFEKTIF", "PAGU DIPA AWAL EFEKTIF"]].min(axis=1),
+        orientation="h",
+        marker=dict(color=colors),
+        name="Rentang Pagu DIPA Efektif (Awal–Revisi)",
+        hovertemplate=(
+            "Pagu Awal: %{base:,.0f}<br>"
+            "Pagu Revisi: %{customdata:,.0f}<extra></extra>"
+        ),
+        customdata=agg["PAGU DIPA REVISI EFEKTIF"]
+    ))
+
+    # Realisasi markers
+    fig.add_trace(go.Scatter(
+        y=agg["KEMENTERIAN/LEMBAGA"],
+        x=agg["REALISASI BELANJA KL (SAKTI)"],
+        mode="markers",
+        marker=dict(color=marker_colors, size=12, line=dict(color="white", width=1.5)),
+        name="Realisasi Belanja (SAKTI)",
+        hovertemplate="Realisasi: %{x:,.0f}<extra></extra>"
+    ))
+
+    # Layout
     fig.update_layout(
-        hovermode="x unified",
-        legend_title_text="Kementerian/Lembaga",
-        title_x=0,
-        margin=dict(l=40, r=40, t=80, b=40),
-        font=dict(family="Google Sans, Roboto, Arial", size=12),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        title=f"Perbandingan Realisasi Belanja dengan Rentang Pagu DIPA Awal dan Revisi (Efektif)<br>Tahun {year}",
+        xaxis_title="Jumlah (Rupiah)",
+        yaxis_title="Kementerian / Lembaga",
+        barmode="overlay",
+        template="plotly_white",
+        height=800,
+        xaxis=dict(showgrid=True, zeroline=False, tickformat=","),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=40, r=40, t=100, b=40)
     )
-    fig.update_traces(
-        hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>"
-    )
+
     return fig
 
 # =============================================================================
@@ -482,4 +482,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
