@@ -25,7 +25,7 @@ st.set_page_config(
         'About': "Dashboard Anggaran Bidang PMK"
     }
 )
-
+st.title("Dashboard Komparasi Realisasi vs Pagu DIPA")
 # =============================================================================
 # Material Design Styled CSS
 # =============================================================================
