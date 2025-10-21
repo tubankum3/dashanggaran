@@ -368,7 +368,14 @@ def sidebar(df):
         selected_kl = st.selectbox("Pilih Kementerian/Lembaga", kl_list)
 
         df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
-        numeric_cols = [c for c in df_filtered.select_dtypes(include=["int64", "float64"]).columns if c != "Tahun"]
+        numeric_cols = [
+            c for c in df_filtered.select_dtypes(include=["int64", "float64"]).columns if c != "Tahun"
+        ]
+
+        if not numeric_cols:
+            st.warning("Tidak ada kolom numerik yang dapat ditampilkan.")
+            return df_filtered, selected_kl, None, (None, None)
+
         selected_metric = st.selectbox("Metrik Anggaran", numeric_cols)
 
         years = sorted(df_filtered["Tahun"].astype(int).unique())
@@ -376,61 +383,49 @@ def sidebar(df):
             "Rentang Tahun",
             min_value=int(min(years)),
             max_value=int(max(years)),
-            value=(int(min(years)), int(max(years)))
+            value=(int(min(years)), int(max(years))),
         )
     return df_filtered, selected_kl, selected_metric, selected_years
 
-def chart(df: pd.DataFrame, selected_metric: str, selected_years: tuple, top_n: int = 10):
-    """
-    Create an auto-scaled line chart highlighting top N ministries by budget.
-    """
-    # Ensure Tahun numeric and valid
+def chart(df, selected_metric, selected_years, top_n=10):
+    """Create a dynamic line chart of top N K/L based on selected metric"""
+    if selected_metric not in df.columns:
+        st.warning(f"Kolom '{selected_metric}' tidak ditemukan.")
+        return go.Figure()
+
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
-    df = df.dropna(subset=["Tahun", "KEMENTERIAN/LEMBAGA", "Nilai"])
-    
-    # Filter year range
-    if selected_years and selected_years != (None, None):
+    df = df.dropna(subset=["Tahun", "KEMENTERIAN/LEMBAGA", selected_metric])
+
+    if selected_years != (None, None):
         start_year, end_year = selected_years
         df = df[(df["Tahun"] >= start_year) & (df["Tahun"] <= end_year)]
 
-    # Aggregate total per K/L per year
-    df_grouped = (
-        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun"], as_index=False)["Nilai"]
-          .sum()
-    )
+    df_grouped = df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun"], as_index=False)[selected_metric].sum()
 
-    # Find top N ministries by the latest year's total
+    if df_grouped.empty:
+        st.warning("Data tidak tersedia untuk rentang tahun tersebut.")
+        return px.line()
+
     latest_year = df_grouped["Tahun"].max()
     top_ministries = (
         df_grouped[df_grouped["Tahun"] == latest_year]
-        .nlargest(top_n, "Nilai")["KEMENTERIAN/LEMBAGA"]
+        .nlargest(top_n, selected_metric)["KEMENTERIAN/LEMBAGA"]
         .tolist()
     )
 
-    # Assign colors — highlight top N, fade others
-    df_grouped["Highlight"] = df_grouped["KEMENTERIAN/LEMBAGA"].apply(
-        lambda x: "Top" if x in top_ministries else "Others"
-    )
-
-    # Calculate height dynamically
-    n_kl = df_grouped["KEMENTERIAN/LEMBAGA"].nunique()
-    height = 500 + (n_kl * 12 if n_kl > 15 else 0)
-
-    # Plot
     fig = px.line(
         df_grouped,
         x="Tahun",
-        y="Nilai",
+        y=selected_metric,
         color="KEMENTERIAN/LEMBAGA",
-        line_group="KEMENTERIAN/LEMBAGA",
         markers=True,
-        title=f"📊 Tren {selected_metric} — Top {top_n} K/L berdasarkan Anggaran {latest_year}",
-        labels={"Nilai": "Nilai (Rp)", "Tahun": "Tahun"},
+        title=f"📊 Tren {selected_metric} — Top {top_n} K/L berdasarkan tahun {latest_year}",
+        labels={selected_metric: "Nilai (Rp)", "Tahun": "Tahun"},
         template="plotly_white",
-        height=height,
+        height=600,
     )
 
-    # Adjust color opacity
+    # Fade-out non-top ministries
     for trace in fig.data:
         if trace.name not in top_ministries:
             trace.line.color = "lightgray"
@@ -448,11 +443,9 @@ def chart(df: pd.DataFrame, selected_metric: str, selected_years: tuple, top_n: 
         plot_bgcolor="white",
         paper_bgcolor="white",
     )
-
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>"
     )
-
     return fig
 
 # =============================================================================
@@ -465,10 +458,14 @@ def main():
         return
 
     df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
+    if not selected_metric:
+        return
+
     st.markdown(f"### 📘 {selected_kl}")
-    st.plotly_chart(chart(df_filtered, selected_metric, selected_years), use_container_width=True)
-    
-    # --- Footer ---
+    fig = chart(df_filtered, selected_metric, selected_years)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Footer
     st.markdown("---")
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -485,3 +482,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
