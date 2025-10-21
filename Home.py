@@ -1,13 +1,11 @@
 import streamlit as st
 import os
-os.system("pip install gdown --upgrade")
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import zipfile
 import io
 import requests
-import gdown
 from datetime import datetime
 
 # =============================================================================
@@ -803,6 +801,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
