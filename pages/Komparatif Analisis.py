@@ -378,9 +378,6 @@ def sidebar(df):
     return selected_kls, top_n
 
 def chart(df: pd.DataFrame, year: int, top_n: int = 10):
-    """
-    Create horizontal bar + scatter chart comparing Realisasi vs Pagu Awal & Revisi for the selected year.
-    """
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
     df_year = df[df["Tahun"] == year].copy()
 
@@ -394,7 +391,7 @@ def chart(df: pd.DataFrame, year: int, top_n: int = 10):
         ].sum()
     )
 
-    # Sort and take top_n
+    # Sort and select top_n
     agg = agg.sort_values("PAGU DIPA REVISI EFEKTIF", ascending=True).tail(top_n)
 
     # Range bar colors
@@ -437,6 +434,10 @@ def chart(df: pd.DataFrame, year: int, top_n: int = 10):
         hovertemplate="Realisasi: %{x:,.0f}<extra></extra>"
     ))
 
+    # Format x-axis with rupiah labels
+    tickvals = np.linspace(0, agg["PAGU DIPA REVISI EFEKTIF"].max(), num=6)
+    ticktext = [format_rupiah(val) for val in tickvals]
+
     # Layout
     fig.update_layout(
         title=f"Perbandingan Realisasi Belanja dengan Rentang Pagu DIPA Awal dan Revisi (Efektif)<br>Tahun {year}",
@@ -445,7 +446,12 @@ def chart(df: pd.DataFrame, year: int, top_n: int = 10):
         barmode="overlay",
         template="plotly_white",
         height=800,
-        xaxis=dict(showgrid=True, zeroline=False, tickformat=","),
+        xaxis=dict(
+            showgrid=True,
+            zeroline=False,
+            tickvals=tickvals,
+            ticktext=ticktext
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(l=40, r=40, t=100, b=40)
     )
@@ -461,16 +467,21 @@ def main():
         st.error("Data gagal dimuat.")
         return
 
+    # Sidebar
     selected_kls, top_n = sidebar(df)
 
-    # Move year selection to main section
+    # Move year selection to main
     years = sorted(df["Tahun"].astype(int).unique())
     selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
 
-    # Filter based on selected K/Ls
+    # Show header at the top
+    header(str(selected_year))
+
+    # Filter K/L if selected
     if selected_kls:
         df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
+    # Chart
     st.markdown(f"### 📘 Tahun {selected_year}")
     st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
 
@@ -491,6 +502,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
