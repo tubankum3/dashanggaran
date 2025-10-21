@@ -470,17 +470,17 @@ def main():
         st.error("Data gagal dimuat.")
         return
 
-    # Sidebar
-    selected_kls, top_n = sidebar(df)
+    # Sidebar selections
+    selected_year, selected_kls, top_n = sidebar(df)
 
-    # Show header at the top
+    # Header displayed at the top
     header(str(selected_year))
 
-    # Filter K/L if selected
+    # Filter by selected K/Ls (if any)
     if selected_kls:
         df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
-    
-    # Chart
+
+    # Chart section
     st.markdown(f"### 📘 Tahun {selected_year}")
     st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
 
@@ -501,6 +501,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
