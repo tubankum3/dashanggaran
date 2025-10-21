@@ -457,13 +457,13 @@ def main():
         st.error("Data gagal dimuat.")
         return
 
-    df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
-    if not selected_metric:
-        return
+    selected_kl, selected_year = sidebar(df)
 
-    st.markdown(f"### 📘 {selected_kl}")
-    fig = chart(df_filtered, selected_metric, selected_years)
-    st.plotly_chart(fig, use_container_width=True)
+    if selected_kl != "Semua":
+        df = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+
+    st.markdown(f"### 📘 Tahun {selected_year}")
+    st.plotly_chart(chart(df, selected_year), use_container_width=True)
 
     # Footer
     st.markdown("---")
@@ -482,5 +482,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
