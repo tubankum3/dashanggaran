@@ -481,7 +481,6 @@ def main():
         df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
     # Chart section
-    st.markdown(f"### 📘 Tahun {selected_year}")
     st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
 
     # Footer
@@ -501,6 +500,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
