@@ -494,6 +494,8 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
 
 def sidebar(df):
     with st.sidebar:
+        st.title("Analisis Anggaran & Realisasi Belanja Negara")
+        st.markdown("---")
         st.markdown("""
         <div class="sidebar-section">
             <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
@@ -670,6 +672,8 @@ def apply_advanced_filters(df_filtered):
     return df_filtered
 
 # =============================================================================
+# Main
+# =============================================================================
 def main():  
     # Load data with loading state
     with st.spinner("Memuat data anggaran..."):
@@ -799,6 +803,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
