@@ -211,8 +211,8 @@ st.markdown("""
 .sidebar-section {
     background: var(--surface);
     border-radius: var(--border-radius);
-    padding: 0.2rem;
-    margin-bottom: 0.1rem;
+    padding: 0.1rem;
+    margin-bottom: 1rem;
     box-shadow: var(--shadow-1);
 }
 
@@ -497,7 +497,7 @@ def sidebar(df):
     with st.sidebar:
         st.markdown("""
         <div class="sidebar-section">
-            <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
+            <h3 style='margin: 0.1rem 0.1rem 0.1rem 0.1rem; color: var(--on-surface);'>🔍 Filter Data</h3>
         """, unsafe_allow_html=True)
 
         # === Ensure Tahun is numeric ===
@@ -804,6 +804,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
