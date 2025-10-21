@@ -1,14 +1,18 @@
 import streamlit as st
+import os
 import pandas as pd
-import plotly.express as px
-from datetime import datetime
 import numpy as np
+import plotly.express as px
+import zipfile
+import io
+import requests
+from datetime import datetime
 
 # =============================================================================
 # Page Configuration & Global Settings
 # =============================================================================
 st.set_page_config(
-    page_title="Dashboard Analisis Anggaran dan Belanja Negara",
+    page_title="Dashboard Analisis Anggaran dan Realisasi Belanja Negara",
     page_icon=":analytics:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -64,24 +68,24 @@ st.markdown("""
 }
 
 /* Card System */
-# .material-card {
-#     background: var(--surface);
-#     border-radius: var(--border-radius);
-#     box-shadow: var(--shadow-1);
-#     padding: 1.5rem;
-#     margin-bottom: 1.5rem;
-#     transition: var(--transition);
-#     border: 1px solid #e8eaed;
-# }
+.material-card {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: var(--transition);
+    border: 1px solid #e8eaed;
+}
 
-# .material-card:hover {
-#     box-shadow: var(--shadow-2);
-#     transform: translateY(-2px);
-# }
+.material-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+}
 
-# .material-card-elevated {
-#     box-shadow: var(--shadow-3) !important;
-# }
+.material-card-elevated {
+    box-shadow: var(--shadow-3) !important;
+}
 
 /* Typography Scale */
 .dashboard-title {
@@ -214,18 +218,25 @@ st.markdown("""
 }
 
 /* Tab */
+/* Tab container: allow wrapping */
 .stTabs [data-baseweb="tab-list"] {
+    flex-wrap: wrap !important;
     gap: 0.5rem;
 }
 
+/* Each tab */
 .stTabs [data-baseweb="tab"] {
     background: var(--surface);
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     padding: 0.75rem 1.5rem;
     border: 1px solid #e8eaed;
     transition: var(--transition);
+    flex: initial !important; /* Prevent tabs from shrinking */
+    white-space: nowrap !important; /* Keep text on one line */
+    margin-bottom: 6px; /* Add vertical spacing between rows */
 }
 
+/* Active (selected) tab */
 .stTabs [aria-selected="true"] {
     background: var(--primary);
     color: var(--on-primary);
@@ -307,13 +318,21 @@ st.markdown("""
 @st.cache_data(show_spinner="Memuat dataset anggaran...")
 def load_data():
     """
-    Load and preprocess budget data with error handling and data validation.
+    Load and preprocess budget data from GitHub with error handling and validation.
     
     Returns:
         pd.DataFrame: Preprocessed budget data
     """
+    url = "https://raw.githubusercontent.com/tubankum3/dashpmk/main/df.csv.zip"
+    
     try:
-        df = pd.read_csv("df23-25.csv")
+        response = requests.get(url)
+        response.raise_for_status()  # raise error if download failed
+        
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            # adjust if filename inside zip is different
+            with z.open("df.csv") as file:
+                df = pd.read_csv(file, low_memory=False)
         
         # Data validation and cleaning
         if df.empty:
@@ -339,7 +358,7 @@ def load_data():
         return df
         
     except FileNotFoundError:
-        st.error("❌ File dataset tidak ditemukan. Pastikan 'df23-25.csv' tersedia.")
+        st.error("❌ File dataset tidak ditemukan. Pastikan 'df.csv' tersedia.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ Gagal memuat data: {str(e)}")
@@ -415,28 +434,31 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 # =============================================================================
 # Component Architecture
 # =============================================================================
-def header():
+def header(selected_kl: str | None = None, selected_metric: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
+    kl_text = selected_kl if selected_kl else "Overview"
+    metric_text = f" {selected_metric}" if selected_metric else ""
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">Dashboard / Analisis Anggaran / {selected_kl if 'selected_kl' in locals() else 'Overview'}</div>
+        <div class="breadcrumb">DASHBOARD / ANALISIS {metric_text} / {kl_text}</div>
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
-        <p class="dashboard-subtitle">Visualisasi dan analisis anggaran Kementerian/Lembaga</p>
     </div>
     """, unsafe_allow_html=True)
+    
+def cards(metrics: dict, selected_kl=None, selected_metric=None):
+    """
+    Create metric cards with visual hierarchy and interactive elements.
+    """
+    kl_text = selected_kl or "—"
+    metric_text = selected_metric or "—"
 
-def cards(metrics: dict):
-    """
-    Create enhanced metric cards with improved visual hierarchy
-    and interactive elements.
-    """
     if not metrics:
         return
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns([1,2,2])
     
     with col1:
-        # Total Budget Card
+        # Total Metric Card
         latest_total = metrics['yearly_totals']["Nilai"].iloc[-1]
         st.markdown(f"""
         <div class="metric-card">
@@ -468,14 +490,19 @@ def cards(metrics: dict):
         </div>
         """, unsafe_allow_html=True)
 
-def sidebar():
+def sidebar(df):
     with st.sidebar:
+        st.title("Analisis Anggaran & Realisasi Belanja Negara")
+        st.markdown("---")
         st.markdown("""
         <div class="sidebar-section">
             <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
         """, unsafe_allow_html=True)
-        
-        # Ministry selection with search
+
+        # === Ensure Tahun is numeric ===
+        df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("int64")
+
+        # === Select K/L ===
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
         selected_kl = st.selectbox(
             "Pilih Kementerian/Lembaga",
@@ -483,9 +510,12 @@ def sidebar():
             key="ministry_select",
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
-        
-        # Metric selection with descriptions
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+
+        df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+
+        # === Detect numeric columns for metric choices ===
+        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        numeric_cols.remove('Tahun')
         metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
@@ -493,172 +523,274 @@ def sidebar():
             key="metric_select",
             help="Pilih jenis anggaran yang akan dianalisis"
         )
-        
-        # Additional filters
-        with st.expander("⚙️ Filter Lanjutan"):
-            year_options = sorted(df["Tahun"].unique())
-            selected_years = st.multiselect(
-                "Filter Tahun",
-                options=year_options,
-                default=year_options,
-                help="Pilih tahun yang akan ditampilkan"
-            )
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-           
-    return selected_kl, selected_metric, selected_years
 
-def chart(df: pd.DataFrame, category_col: str, base_height=600, extra_height_per_line=10):
+        # === Advanced filters ===
+        with st.expander("⚙️ Filter Lanjutan"):
+            # --- Year range ---
+            year_options = sorted(df_filtered["Tahun"].dropna().unique())
+            if len(year_options) == 0:
+                selected_years = (None, None)
+            elif len(year_options) == 1:
+                # only one year available — show it and set selected_years to that single year
+                single_year = int(year_options[0])
+                st.markdown(f"**Tahun tersedia:** {single_year}")
+                # store in session_state to keep key consistent if needed
+                st.session_state["filter__year_range"] = (single_year, single_year)
+                selected_years = (single_year, single_year)
+            else:
+                # normal slider for multiple years — use a unique key per K/L if you prefer
+                min_year, max_year = int(min(year_options)), int(max(year_options))
+                # prefill from session_state if exists
+                default_range = st.session_state.get("filter__year_range", (min_year, max_year))
+                # ensure default_range is within min/max bounds
+                default_range = (
+                    max(min_year, default_range[0]),
+                    min(max_year, default_range[1])
+                )
+                selected_years = st.slider(
+                    "Rentang Tahun",
+                    min_value=min_year,
+                    max_value=max_year,
+                    value=default_range,
+                    step=1,
+                    key="filter__year_range"
+                )
+
+
+            # --- Categorical filters ---
+            st.markdown("### Filter Berdasarkan Nilai Kategorikal")
+            cat_cols = [
+                col for col in df_filtered.select_dtypes(include=["object"]).columns
+                if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
+            ]
+
+            active_filters = {}
+            for cat_col in cat_cols:
+                options = sorted(df_filtered[cat_col].dropna().unique())
+                selected_values = st.multiselect(
+                    f"Pilih {cat_col.replace('_', ' ').title()}",
+                    options=options,
+                    default=options,
+                    key=f"filter__{cat_col}"
+                )
+                active_filters[cat_col] = selected_values
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # === Apply filters to dataframe ===
+    df_filtered = df_filtered[
+        (df_filtered["Tahun"] >= selected_years[0]) &
+        (df_filtered["Tahun"] <= selected_years[1])
+    ]
+
+    for cat_col, values in active_filters.items():
+        if values:
+            df_filtered = df_filtered[df_filtered[cat_col].isin(values)]
+
+    return df_filtered, selected_kl, selected_metric, selected_years
+
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
     )
 
-    # Adjust height for large category lists
+    # Ensure Tahun is sorted and string
+    df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
+    df_grouped = df_grouped.sort_values("Tahun")
+
+    # Adjust height dynamically
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Create figure
+    # Create the line chart
     fig = px.line(
         df_grouped,
         x="Tahun",
         y="Nilai",
         color=category_col,
         markers=True,
-        title=f"📈 {selected_metric} per {category_col} — {selected_kl}",
+        title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
         labels={
             "Tahun": "Tahun",
-            "Nilai": "Jumlah",
+            "Nilai": "Jumlah (Rp)",
             category_col: category_col.replace("_", " ").title(),
         },
         template="plotly_white",
-        height=500
-    )
-    
-    # styling
-    fig.update_layout(
         height=height,
+    )
+
+    years = sorted(df_grouped["Tahun"].unique())
+    min_year, max_year = years[0], years[-1]
+
+    fig.update_layout(
         hovermode="closest",
         title_x=0,
         legend_title_text=category_col.replace("_", " ").title(),
-        # legend=dict(
-        #     orientation="v",
-        #     yanchor="top",
-        #     y=1.02,
-        #     xanchor="right",
-        #     x=1
-        # ),
         margin=dict(l=40, r=40, t=80, b=40),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(family="Google Sans, Roboto, Arial")
+        font=dict(family="Google Sans, Roboto, Arial"),
     )
-    
-    # hover information
+
     fig.update_traces(
-        hovertemplate="<b>Tahun: %{x}</b><br>" +
-                     "%{fullData.name}<br>" +
-                     "Rp %{y:,.0f}<extra></extra>",
-        line=dict(width=3),
-        marker=dict(size=8)
+        hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
+        line=dict(width=2.5),
+        marker=dict(size=7)
     )
-    
+
     return fig, df_grouped
 
+def apply_advanced_filters(df_filtered):
+    """
+    Apply multiselect filters created in the sidebar (stored in st.session_state).
+    Returns the filtered dataframe.
+    """
+    # Apply categorical filters that were created with keys 'filter__<colname>'
+    # Find relevant keys:
+    filter_keys = [k for k in st.session_state.keys() if k.startswith("filter__") and k != "filter__year_range"]
+    for key in filter_keys:
+        col_name = key.replace("filter__", "")
+        selected_vals = st.session_state.get(key)
+        if selected_vals:  # if user selected some values (or default exists)
+            # only apply column filter if column exists in df_filtered (safety)
+            if col_name in df_filtered.columns:
+                df_filtered = df_filtered[df_filtered[col_name].isin(selected_vals)]
+
+    # Apply year range filter
+    year_range = st.session_state.get("filter__year_range")
+    if year_range and year_range[0] is not None:
+        # ensure Tahun is int-compatible
+        try:
+            df_filtered = df_filtered[df_filtered["Tahun"].astype(int).between(year_range[0], year_range[1])]
+        except Exception:
+            # fallback: if Tahun already string but numerically sortable
+            df_filtered = df_filtered[df_filtered["Tahun"].astype(str).between(str(year_range[0]), str(year_range[1]))]
+
+    return df_filtered
+
 # =============================================================================
-# Main Application
+# Main
 # =============================================================================
 def main():  
     # Load data with loading state
     with st.spinner("Memuat data anggaran..."):
-        global df
         df = load_data()
     
     if df.empty:
         st.error("Tidak dapat memuat data. Silakan periksa file dataset.")
         return
     
-    # Create enhanced UI components
-    header()
+    # --- Sidebar ---
+    df_filtered, selected_kl, selected_metric, selected_years = sidebar(df)
     
-    # Sidebar with filters
-    global selected_kl, selected_metric, selected_years
-    selected_kl, selected_metric, selected_years = sidebar()
-    
-    # Filter data based on selections
-    df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
+    # --- Header ---
+    header(selected_kl=selected_kl, selected_metric=selected_metric)
+
+    # --- Ensure Tahun numeric (convert once) ---
+    df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
+    df_filtered["Tahun"] = pd.to_numeric(df_filtered["Tahun"], errors="coerce")
+
+    # --- Apply year range filter ---
+    if selected_years and selected_years != (None, None):
+        start_year, end_year = selected_years
+        df_filtered = df_filtered[
+            (df_filtered["Tahun"] >= start_year) &
+            (df_filtered["Tahun"] <= end_year)
+        ]
+
+    # --- Apply categorical filters (from session_state) ---
+    filters = {}
+    for key, value in st.session_state.items():
+        if key.startswith("filter__") and key != "filter__year_range":
+            col_name = key.replace("filter__", "")
+            filters[col_name] = value
+
+    for col, allowed_vals in filters.items():
+        if allowed_vals:
+            df_filtered = df_filtered[df_filtered[col].isin(allowed_vals)]
+
+    # --- Apply advanced filters (Filter Lanjutan) ---
+    df_filtered = apply_advanced_filters(df_filtered)
+
+    # --- Validate selected metric ---
+    if selected_metric not in df_filtered.columns:
+        st.warning("Kolom metrik tidak ditemukan di dataset untuk K/L ini.")
+        return
     df_filtered = df_filtered.rename(columns={selected_metric: "Nilai"})
-    
-    # Calculate metrics
+
+    # --- Calculate summary metrics ---
     metrics = calculate_financial_metrics(df_filtered)
     
-    # Display metrics in cards
-    st.markdown("<div class='material-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='section-title'>📈 Ringkasan Kinerja Anggaran</div>", unsafe_allow_html=True)
-    cards(metrics)
+    # --- Display summary cards ---
+    st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='material-card'>{selected_kl}</div>", unsafe_allow_html=True)
+    cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Visualization section
-    st.markdown("<div class='material-card'>", unsafe_allow_html=True)
+    # --- Visualization Section ---
     st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
     
-    # Get categorical columns for visualization
+    # Categorical columns for visualization
     cat_cols = [
         col for col in df_filtered.select_dtypes(include=["object"]).columns
         if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
     ]
     
     if cat_cols:
-        # Create tabs
         tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
         
         for tab, col in zip(tabs, cat_cols):
             with tab:
-                # Chart container
-                st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-                fig, grouped_df = chart(df_filtered, col)
+                fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
                 st.plotly_chart(fig, use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
                 
-                # Data table with enhanced presentation
+                # --- Data table (wide format: metric x year) ---
                 with st.expander("📋 Data Tabel", expanded=True):
                     display_col = col
                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
-                    
-                    # Year-wise tables
-                    years_sorted = sorted(df_display["Tahun"].unique(), reverse=True)
-                    for year in years_sorted:
-                        with st.container():
-                            st.markdown(f"**Tahun {year}**")
-                            year_df = df_display[df_display["Tahun"] == year][[display_col, "Nilai"]]
-                            year_df = year_df.sort_values("Nilai", ascending=False)
-                            
-                            # Format and display
-                            display_df = year_df.copy()
-                            display_df["Nilai"] = display_df["Nilai"].apply(
-                                lambda x: f"Rp {x:,.0f}"
-                            )
-                            
-                            st.dataframe(
-                                display_df,
-                                use_container_width=True,
-                                hide_index=True
-                            )
-                            st.markdown("---")
+
+                    # Pivot to wide format: rows=metric, cols=years
+                    df_pivot = (
+                        df_display
+                        .pivot_table(
+                            index=display_col,
+                            columns="Tahun",
+                            values="Nilai",
+                            aggfunc="sum"
+                        )
+                        .fillna(0)
+                        .reset_index()
+                    )
+
+                    # Sort columns: Tahun ascending
+                    tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
+                    df_pivot = df_pivot[[display_col] + tahun_cols]
+
+                    # Format numeric values as currency
+                    for c in tahun_cols:
+                        df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
+
+                    # Rename first column to show selected metric
+                    df_pivot = df_pivot.rename(columns={display_col: selected_metric})
+
+                    st.dataframe(
+                        df_pivot,
+                        use_container_width=True,
+                        hide_index=True
+                    )
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Footer with enhanced information
+    # --- Footer ---
     st.markdown("---")
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns([3, 1])
     with col1:
         st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
     with col2:
         st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
-    with col3:
-        st.caption("👨‍💻 Built with Streamlit")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -669,6 +801,11 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
+
+
+
+
 
 
 
