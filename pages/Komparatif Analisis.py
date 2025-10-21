@@ -448,7 +448,7 @@ def chart(df: pd.DataFrame, year: int, top_n: int = 10):
         yaxis_title="Kementerian / Lembaga",
         barmode="overlay",
         template="plotly_white",
-        height=800,
+        height=600,
         xaxis=dict(
             showgrid=True,
             zeroline=False,
@@ -500,6 +500,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
