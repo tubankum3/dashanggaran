@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 
-# Immediately redirect to the Home page
-switch_page("Home")
+# Hide this default "streamlit app" page by redirecting to Home
+st.switch_page("pages/1_Home.py")
+
