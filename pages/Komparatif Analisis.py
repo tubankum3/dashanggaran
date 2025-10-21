@@ -359,12 +359,8 @@ def header(selected_year: str | None = None):
     
 def sidebar(df):
     with st.sidebar:
-        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
-        selected_kls = st.multiselect(
-            "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
-            options=kl_list,
-            default=[]
-        )
+        years = sorted(df["Tahun"].astype(int).unique())
+        selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
 
         top_n = st.number_input(
             "Tampilkan Top K/L berdasarkan Pagu DIPA Revisi",
@@ -374,8 +370,15 @@ def sidebar(df):
             step=1,
             help="Jumlah Kementerian/Lembaga yang ditampilkan pada grafik."
         )
+        
+        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
+        selected_kls = st.multiselect(
+            "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
+            options=kl_list,
+            default=[]
+        )
 
-    return selected_kls, top_n
+    return selected_year, selected_kls, top_n
 
 def chart(df: pd.DataFrame, year: int, top_n: int = 10):
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
@@ -477,11 +480,8 @@ def main():
     if selected_kls:
         df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
     
-    # year selection to main
-    years = sorted(df["Tahun"].astype(int).unique())
-    selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
-    
     # Chart
+    st.markdown(f"### 📘 Tahun {selected_year}")
     st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
 
     # Footer
@@ -501,6 +501,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
