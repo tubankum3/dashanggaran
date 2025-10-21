@@ -380,32 +380,79 @@ def sidebar(df):
         )
     return df_filtered, selected_kl, selected_metric, selected_years
 
-def chart(df, selected_metric, selected_years, top_n=10):
+def chart(df: pd.DataFrame, selected_metric: str, selected_years: tuple, top_n: int = 10):
+    """
+    Create an auto-scaled line chart highlighting top N ministries by budget.
+    """
+    # Ensure Tahun numeric and valid
     df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
-    df = df[(df["Tahun"] >= selected_years[0]) & (df["Tahun"] <= selected_years[1])]
+    df = df.dropna(subset=["Tahun", "KEMENTERIAN/LEMBAGA", "Nilai"])
+    
+    # Filter year range
+    if selected_years and selected_years != (None, None):
+        start_year, end_year = selected_years
+        df = df[(df["Tahun"] >= start_year) & (df["Tahun"] <= end_year)]
 
-    grouped = df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun"], as_index=False)[selected_metric].sum()
-    latest_year = grouped["Tahun"].max()
-    top_kl = grouped[grouped["Tahun"] == latest_year].nlargest(top_n, selected_metric)["KEMENTERIAN/LEMBAGA"]
-
-    fig = px.line(
-        grouped,
-        x="Tahun", y=selected_metric,
-        color="KEMENTERIAN/LEMBAGA",
-        title=f"📊 Tren {selected_metric} — Top {top_n} K/L ({latest_year})",
-        markers=True,
-        template="plotly_white",
-        height=600
+    # Aggregate total per K/L per year
+    df_grouped = (
+        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun"], as_index=False)["Nilai"]
+          .sum()
     )
 
+    # Find top N ministries by the latest year's total
+    latest_year = df_grouped["Tahun"].max()
+    top_ministries = (
+        df_grouped[df_grouped["Tahun"] == latest_year]
+        .nlargest(top_n, "Nilai")["KEMENTERIAN/LEMBAGA"]
+        .tolist()
+    )
+
+    # Assign colors — highlight top N, fade others
+    df_grouped["Highlight"] = df_grouped["KEMENTERIAN/LEMBAGA"].apply(
+        lambda x: "Top" if x in top_ministries else "Others"
+    )
+
+    # Calculate height dynamically
+    n_kl = df_grouped["KEMENTERIAN/LEMBAGA"].nunique()
+    height = 500 + (n_kl * 12 if n_kl > 15 else 0)
+
+    # Plot
+    fig = px.line(
+        df_grouped,
+        x="Tahun",
+        y="Nilai",
+        color="KEMENTERIAN/LEMBAGA",
+        line_group="KEMENTERIAN/LEMBAGA",
+        markers=True,
+        title=f"📊 Tren {selected_metric} — Top {top_n} K/L berdasarkan Anggaran {latest_year}",
+        labels={"Nilai": "Nilai (Rp)", "Tahun": "Tahun"},
+        template="plotly_white",
+        height=height,
+    )
+
+    # Adjust color opacity
     for trace in fig.data:
-        if trace.name not in top_kl.values:
+        if trace.name not in top_ministries:
             trace.line.color = "lightgray"
-            trace.opacity = 0.4
             trace.line.width = 1.5
+            trace.opacity = 0.4
         else:
             trace.line.width = 3.5
-    fig.update_layout(hovermode="x unified", title_x=0)
+
+    fig.update_layout(
+        hovermode="x unified",
+        legend_title_text="Kementerian/Lembaga",
+        title_x=0,
+        margin=dict(l=40, r=40, t=80, b=40),
+        font=dict(family="Google Sans, Roboto, Arial", size=12),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+
+    fig.update_traces(
+        hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>"
+    )
+
     return fig
 
 # =============================================================================
