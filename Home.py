@@ -211,8 +211,8 @@ st.markdown("""
 .sidebar-section {
     background: var(--surface);
     border-radius: var(--border-radius);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
     box-shadow: var(--shadow-1);
 }
 
@@ -314,7 +314,7 @@ st.markdown("""
 # =============================================================================
 # Data Loading
 # =============================================================================
-@st.cache_data(show_spinner="Memuat dataset anggaran...")
+@st.cache_data(show_spinner=True)
 def load_data():
     """
     Load and preprocess budget data from GitHub with error handling and validation.
@@ -433,6 +433,8 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 # =============================================================================
 # Component Architecture
 # =============================================================================
+
+# Header =============================================================================
 def header(selected_kl: str | None = None, selected_metric: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
     kl_text = selected_kl if selected_kl else "Overview"
@@ -443,7 +445,8 @@ def header(selected_kl: str | None = None, selected_metric: str | None = None):
         <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
     </div>
     """, unsafe_allow_html=True)
-    
+
+# Cards =============================================================================
 def cards(metrics: dict, selected_kl=None, selected_metric=None):
     """
     Create metric cards with visual hierarchy and interactive elements.
@@ -488,11 +491,10 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
             <div class="metric-label">Rata-rata tingkat pertumbuhan tahunan</div>
         </div>
         """, unsafe_allow_html=True)
-
+        
+# Sidebar =============================================================================
 def sidebar(df):
     with st.sidebar:
-        st.title("Analisis Anggaran & Realisasi Belanja Negara")
-        st.markdown("---")
         st.markdown("""
         <div class="sidebar-section">
             <h3 style='margin: 0 0 1rem 0; color: var(--on-surface);'>🔍 Filter Data</h3>
@@ -588,6 +590,7 @@ def sidebar(df):
 
     return df_filtered, selected_kl, selected_metric, selected_years
 
+# Chart =============================================================================
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
@@ -640,6 +643,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
 
     return fig, df_grouped
 
+# advanced filter =============================================================================
 def apply_advanced_filters(df_filtered):
     """
     Apply multiselect filters created in the sidebar (stored in st.session_state).
@@ -800,6 +804,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
