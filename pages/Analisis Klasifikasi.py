@@ -511,26 +511,29 @@ def go_back():
 # Main
 # =============================================================================
 def main():
-    global selected_metric  # used by create_treemap; fine to reference here
+    global selected_metric  # used by create_treemap; allowed here
     df = load_data()
     if df.empty:
         st.warning("Data tidak tersedia.")
         return
 
+    # initialize session state for drill
     init_session_state()
+
+    # sidebar controls (year, K/L, metric, top_n)
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
     header(selected_year)
 
-    # top-level filter by year & KL
+    # top-level filter by year & K/L
     df_filtered = df[df["Tahun"] == str(selected_year)].copy()
     if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    # Sidebar show current path + back/reset
-    st.sidebar.markdown(f"**Path:**")
+    # sidebar: path display + Back / Reset
+    st.sidebar.markdown("**Path:**")
     path_display = []
-    for i, (_, col) in enumerate(HIERARCHY):
-        val = st.session_state.drill[col]
+    for _, col in HIERARCHY:
+        val = st.session_state.drill.get(col)
         if val:
             path_display.append(f"{col}: {val}")
     if path_display:
@@ -544,104 +547,175 @@ def main():
     if st.sidebar.button("Reset"):
         reset_drill()
 
-    # apply active selections to filter df progressively
+    # apply current drill path to filter df_active
     df_active = df_filtered.copy()
-    for level_name, col in HIERARCHY:
-        sel = st.session_state.drill[col]
+    for _, col in HIERARCHY:
+        sel = st.session_state.drill.get(col)
         if sel:
-            # filter by exact match
+            # use exact match (string)
             df_active = df_active[df_active[col] == sel]
 
-    # Layout: charts stacked vertically
-    st.markdown("## 📊 Visualisasi Hierarki dan Drill-down")
-    
-    # --- Treemap ---
-    if {"FUNGSI", "SUB FUNGSI"}.issubset(df_active.columns) and selected_metric in df_active.columns:
-        agg_fungsi = aggregate_level(df_active, ["FUNGSI", "SUB FUNGSI"], selected_metric)
-        if agg_fungsi.empty:
-            st.info("Tidak ada data untuk level ini.")
-        else:
-            total_value = agg_fungsi[selected_metric].sum()
-            if total_value == 0:
-                st.info("Semua nilai nol pada metric terpilih.")
+    # Build treemap using the full available hierarchy columns (in order)
+    available_levels = [col for _, col in HIERARCHY if col in df_filtered.columns]
+    if not available_levels:
+        st.error("Kolom hierarki tidak lengkap di dataset.")
+        return
+
+    # Aggregate at the deepest available level for robust treemap leaves
+    # Use only necessary columns for performance
+    agg_for_treemap = aggregate_level(df_filtered, available_levels, selected_metric)
+    if agg_for_treemap.empty:
+        st.info("Tidak ada data untuk treemap.")
+        return
+
+    # Add a custom data column that is the path list per row (so we can parse clicks reliably)
+    def make_custom(row):
+        return [row[l] if l in agg_for_treemap.columns else None for l in available_levels]
+    agg_for_treemap["__custom"] = agg_for_treemap.apply(make_custom, axis=1)
+
+    # Create treemap (clickable)
+    treemap_path = [px.Constant("All")] + available_levels
+    fig_treemap = px.treemap(
+        agg_for_treemap,
+        path=treemap_path,
+        values=selected_metric,
+        color=selected_metric,
+        custom_data=["__custom"],
+        color_continuous_scale="Tealgrn",
+        title=f"DISTRIBUSI {selected_metric} — {selected_year}"
+    )
+    fig_treemap.update_traces(
+        hovertemplate="%{label}<br>Jumlah: Rp%{value:,.0f}<br>Share parent: %{percentParent:.2%}<extra></extra>",
+        textinfo="label+percent parent"
+    )
+    fig_treemap.update_layout(margin=dict(t=70, l=25, r=25, b=25), height=650)
+
+    # Render treemap (top of page)
+    st.markdown("## Treemap — klik node untuk drill-down")
+    events = plotly_events(fig_treemap, click_event=True, key=f"treemap-{st.session_state.click_key}")
+
+    # If a click was captured, parse it and update session_state drill path
+    if events:
+        ev = events[0]
+        clicked_custom = None
+        # Try to extract customdata robustly
+        if ev.get("customdata"):
+            # sometimes customdata is nested like [[...]]
+            cd = ev.get("customdata")
+            if isinstance(cd, list) and len(cd) > 0 and isinstance(cd[0], list):
+                clicked_custom = cd[0]
             else:
-                agg_fungsi["Share (%)"] = 100 * agg_fungsi[selected_metric] / total_value
-                agg_fungsi["Label"] = (
-                    agg_fungsi["SUB FUNGSI"].astype(str) + "<br>" +
-                    agg_fungsi["Share (%)"].round(2).astype(str) + "%<br>" +
-                    agg_fungsi[selected_metric].apply(format_rupiah)
-                )
-                treemap_path = [px.Constant("All"), "FUNGSI", "SUB FUNGSI"]
-                fig_treemap = create_treemap(
-                    agg_fungsi, selected_metric,
-                    title=f"DISTRIBUSI {selected_metric} — FUNGSI / SUB FUNGSI — {selected_year}",
-                    path=treemap_path
-                )
-                events = plotly_events(fig_treemap, click_event=True, key=f"treemap-{st.session_state.click_key}")
-                if events:
-                    clicked = events[0].get("label")
-                    fungsi_names = agg_fungsi["FUNGSI"].unique().tolist()
-                    subfungsi_names = agg_fungsi["SUB FUNGSI"].unique().tolist()
-                    if clicked in fungsi_names:
-                        st.session_state.drill["FUNGSI"] = clicked
-                        for _, col in HIERARCHY[1:]:
-                            st.session_state.drill[col] = None
-                        st.session_state.level_index = 1
-                        st.session_state.click_key += 1
-                    elif clicked in subfungsi_names:
-                        st.session_state.drill["SUB FUNGSI"] = clicked
-                        parent_row = agg_fungsi[agg_fungsi["SUB FUNGSI"] == clicked]
-                        if not parent_row.empty:
-                            st.session_state.drill["FUNGSI"] = parent_row.iloc[0]["FUNGSI"]
-                        for _, col in HIERARCHY[2:]:
-                            st.session_state.drill[col] = None
-                        st.session_state.level_index = 2
-                        st.session_state.click_key += 1
-    
-    # --- Program level ---
-    if "PROGRAM" in df_active.columns and selected_metric in df_active.columns:
-        agg_prog = aggregate_level(df_active, ["PROGRAM"], selected_metric, top_n)
-        if not agg_prog.empty:
-            fig_prog = create_bar_chart(agg_prog, selected_metric, "PROGRAM",
-                                        title=f"{selected_metric} per Program (Top {top_n}) — {selected_year}")
-            plotly_events(fig_prog, click_event=True, key=f"prog-{st.session_state.click_key}")
-    
-    # --- Kegiatan level ---
-    if "KEGIATAN" in df_active.columns and selected_metric in df_active.columns:
-        agg_keg = aggregate_level(df_active, ["KEGIATAN"], selected_metric, top_n)
-        if not agg_keg.empty:
-            fig_keg = create_bar_chart(agg_keg, selected_metric, "KEGIATAN", 
-                                       title=f"{selected_metric} per Kegiatan (Top {top_n}) — {selected_year}", stacked=True)
-            plotly_events(fig_keg, click_event=True, key=f"keg-{st.session_state.click_key}")
-    
-    # --- KRO level ---
-    if "OUTPUT (KRO)" in df_active.columns and selected_metric in df_active.columns:
-        agg_kro = aggregate_level(df_active, ["OUTPUT (KRO)"], selected_metric, top_n)
-        if not agg_kro.empty:
-            fig_kro = create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)",
-                                       title=f"{selected_metric} per Output (KRO) (Top {top_n}) — {selected_year}")
-            plotly_events(fig_kro, click_event=True, key=f"kro-{st.session_state.click_key}")
-    
-    # --- RO level ---
-    if "SUB OUTPUT (RO)" in df_active.columns and selected_metric in df_active.columns:
-        agg_ro = aggregate_level(df_active, ["OUTPUT (KRO)", "SUB OUTPUT (RO)"], selected_metric, top_n)
-        if not agg_ro.empty:
-            fig_ro = create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)",
-                                      title=f"{selected_metric} per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True)
-            plotly_events(fig_ro, click_event=True, key=f"ro-{st.session_state.click_key}")
-    
-    # --- Sidebar info (moved to bottom) ---
-    st.markdown("## ⚙️ Current Filters")
-    st.write(f"**Tahun:** {selected_year}")
-    st.write(f"**Metrik:** {selected_metric}")
+                clicked_custom = cd
+        else:
+            # fallback: try 'points' key (older structure)
+            pts = ev.get("points")
+            if pts and isinstance(pts, list) and pts[0].get("customdata"):
+                cd = pts[0]["customdata"]
+                if isinstance(cd, list) and len(cd) > 0 and isinstance(cd[0], list):
+                    clicked_custom = cd[0]
+                else:
+                    clicked_custom = cd
+
+        if clicked_custom:
+            # Normalize clicked_custom: replace nan with None
+            clicked_list = [None if (pd.isna(x) if not isinstance(x, list) else False) else x for x in clicked_custom]
+            # Find deepest index in clicked_list that has a value
+            deepest_idx = None
+            for i in reversed(range(len(clicked_list))):
+                v = clicked_list[i]
+                if v is not None and (not (isinstance(v, float) and np.isnan(v))):
+                    deepest_idx = i
+                    break
+            if deepest_idx is not None:
+                # Update session_state.drill for levels up to deepest_idx
+                for j in range(deepest_idx + 1):
+                    level_col = available_levels[j]
+                    val = clicked_list[j]
+                    st.session_state.drill[level_col] = val
+                # Clear deeper levels beyond deepest_idx
+                for k in range(deepest_idx + 1, len(available_levels)):
+                    st.session_state.drill[available_levels[k]] = None
+                # Update level_index (index in full HIERARCHY)
+                # Map clicked deepest level to HIERARCHY index (if present)
+                mapped_idx = None
+                for idx_full, (_, col_full) in enumerate(HIERARCHY):
+                    if col_full == available_levels[deepest_idx]:
+                        mapped_idx = idx_full
+                        break
+                if mapped_idx is not None:
+                    st.session_state.level_index = mapped_idx
+                st.session_state.click_key += 1
+
+    # Decide which single bar chart to show based on current drill path
+    # Behavior: if user clicked level L, show L+1 breakdown (if exists), otherwise show L
+    # Find deepest selected level across full HIERARCHY
+    deepest_selected_idx = -1
+    for idx_full, (_, col_full) in enumerate(HIERARCHY):
+        if col_full in df_filtered.columns and st.session_state.drill.get(col_full):
+            deepest_selected_idx = idx_full
+
+    # Determine available columns in data (filtered by year/KL)
+    available_cols = [col for _, col in HIERARCHY if col in df_filtered.columns]
+
+    # Compute bar_level (the column to aggregate and show in the bar chart)
+    bar_level = None
+    if deepest_selected_idx == -1:
+        # no selection yet: if SUB FUNGSI exists show FUNGSI breakdown? 
+        # We'll show the first level after top: show SUB FUNGSI if FUNGSI exists, else first available
+        if "SUB FUNGSI" in available_cols and "FUNGSI" in available_cols:
+            bar_level = "FUNGSI"  # top-level summary (user hasn't selected anything yet)
+            # But user requested bar should show "current clicked level". At top, show FUNGSI summary.
+        else:
+            bar_level = available_cols[0]
+    else:
+        # try to show the next deeper level if available
+        next_idx = deepest_selected_idx + 1
+        # find next available in HIERARCHY after deepest_selected_idx
+        while next_idx < len(HIERARCHY):
+            next_col = HIERARCHY[next_idx][1]
+            if next_col in df_filtered.columns:
+                bar_level = next_col
+                break
+            next_idx += 1
+        if bar_level is None:
+            # no deeper level available -> show the currently selected level
+            bar_level = HIERARCHY[deepest_selected_idx][1]
+
+    # Filter df_active again according to updated session_state (important after clicks)
+    df_active = df_filtered.copy()
+    for _, col in HIERARCHY:
+        sel = st.session_state.drill.get(col)
+        if sel:
+            df_active = df_active[df_active[col] == sel]
+
+    # Aggregate and create single bar chart for bar_level
+    st.markdown("## Detail — bar chart untuk level saat ini")
+    if bar_level and bar_level in df_active.columns:
+        # if bar_level equals the currently selected level (no deeper level), aggregate by bar_level
+        agg_bar = aggregate_level(df_active, [bar_level], selected_metric, top_n)
+        if agg_bar.empty:
+            st.info("Tidak ada data untuk level yang dipilih.")
+        else:
+            fig_bar = create_bar_chart(agg_bar, selected_metric, bar_level,
+                                       title=f"{bar_level} — (Top {top_n}) — berdasarkan pilihan saat ini")
+            # Non-clickable bar chart (just show)
+            st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.info("Level bar chart tidak tersedia untuk data saat ini.")
+
+    # Put current filters + drill state in the sidebar (kept visible)
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Current filters")
+    st.sidebar.write(f"**Tahun:** {selected_year}")
+    st.sidebar.write(f"**Metrik:** {selected_metric}")
     if selected_kls:
-        st.write("**K/L:**")
+        st.sidebar.write("**K/L:**")
         for k in selected_kls:
-            st.write(f"- {k}")
-    st.markdown("---")
-    st.markdown("### Drill State")
-    for lvl_name, col in HIERARCHY:
-        st.write(f"{col}: {st.session_state.drill[col]}")
+            st.sidebar.write(f"- {k}")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Drill state")
+    for _, col in HIERARCHY:
+        st.sidebar.write(f"- {col}: {st.session_state.drill.get(col) if st.session_state.drill.get(col) else '-'}")
 
     # footer
     st.markdown("---")
@@ -660,6 +734,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
