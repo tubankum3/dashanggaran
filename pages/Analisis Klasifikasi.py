@@ -426,67 +426,71 @@ def sidebar(df):
     return selected_year, selected_kls, top_n, selected_metric
 
 # =============================================================================
-# Treemap
+# Hierarchical Drilldown Treemap
 # =============================================================================
 def treemap_chart(df, selected_year, selected_kls, top_n, selected_metric):
-    df_filtered = df[df["Tahun"].astype(str) == str(selected_year)]
+    hierarchy = ["FUNGSI", "SUB FUNGSI", "PROGRAM", "KEGIATAN", "OUTPUT (KRO)", "SUB OUTPUT (RO)"]
+
+    # Initialize session state for hierarchy navigation
+    if "level" not in st.session_state:
+        st.session_state.level = 0
+        st.session_state.path = []
+
+    level = st.session_state.level
+    path = st.session_state.path
+
+    df_filtered = df[df["Tahun"] == str(selected_year)]
     if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    agg = df_filtered.groupby(["FUNGSI", "SUB FUNGSI"], as_index=False)[selected_metric].sum()
-    agg = agg.sort_values(selected_metric, ascending=True).tail(top_n)
-    if agg.empty:
-        st.warning("Tidak ada data untuk tahun atau filter yang dipilih.")
-        return go.Figure(), pd.DataFrame()
+    # Apply path filters
+    for i, node in enumerate(path):
+        df_filtered = df_filtered[df_filtered[hierarchy[i]] == node]
 
-    total_value = agg[selected_metric].sum()
-    agg["Share (%)"] = 100 * agg[selected_metric] / total_value
+    current_level = hierarchy[level]
+    next_level = hierarchy[level + 1] if level + 1 < len(hierarchy) else None
 
+    group_cols = [current_level] if not next_level else [current_level, next_level]
+    agg = df_filtered.groupby(group_cols, as_index=False)[selected_metric].sum().sort_values(selected_metric, ascending=False)
+    agg = agg.head(top_n)
+
+    path_args = [c for c in group_cols if c in df_filtered.columns]
     fig = px.treemap(
         agg,
-        path=["FUNGSI", "SUB FUNGSI"],
+        path=path_args,
         values=selected_metric,
-        title=f"Distribusi Anggaran Tahun {selected_year}",
+        hover_name=current_level,
+        color=selected_metric,
+        color_continuous_scale="Blues",
+        title=f"{' → '.join(path) if path else 'FUNGSI'} - {selected_metric} Tahun {selected_year}",
     )
 
-    fig.update_layout(margin=dict(t=50, l=25, r=25, b=25))
-    return fig, agg
+    fig.update_traces(
+        texttemplate="%{label}<br>%{value:,.0f}",
+        hovertemplate="%{currentPath}<br>Nilai: %{value:,.0f}<extra></extra>",
+    )
 
-# =============================================================================
-# Bar Chart
-# =============================================================================
-def bar_chart(df, x_col, y_col, title):
-    if df.empty:
-        st.info(f"Tidak ada data untuk grafik {title}.")
-        return go.Figure()
-    fig = px.bar(df, x=x_col, y=y_col, orientation="h", text=y_col, title=title)
-    fig.update_traces(texttemplate="%{text:.2s}", textposition="outside")
-    fig.update_layout(height=500, margin=dict(t=60, l=80, r=40, b=40))
-    return fig
+    st.plotly_chart(fig, use_container_width=True)
+    clicked = plotly_events(fig, click_event=True, select_event=False)
 
-# =============================================================================
-# Child Charts
-# =============================================================================
-def show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node):
-    df_filtered = df[df["Tahun"].astype(str) == str(selected_year)]
-    if selected_kls:
-        df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
+    # Breadcrumb navigation
+    breadcrumb = " / ".join(path) if path else "FUNGSI"
+    st.markdown(f"**📍 Posisi Saat Ini:** {breadcrumb}")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.session_state.level > 0 and st.button("⬅️ Kembali"):
+            st.session_state.level -= 1
+            st.session_state.path.pop()
+            st.experimental_rerun()
 
-    if clicked_node:
-        if clicked_node in df_filtered["SUB FUNGSI"].unique():
-            df_filtered = df_filtered[df_filtered["SUB FUNGSI"] == clicked_node]
-        elif clicked_node in df_filtered["FUNGSI"].unique():
-            df_filtered = df_filtered[df_filtered["FUNGSI"] == clicked_node]
+    # Handle clicks
+    if clicked:
+        clicked_label = clicked[0]["label"]
+        if next_level:
+            st.session_state.level += 1
+            st.session_state.path.append(clicked_label)
+            st.experimental_rerun()
 
-    for col, title in [
-        ("PROGRAM", "Program"),
-        ("KEGIATAN", "Kegiatan"),
-        ("OUTPUT (KRO)", "Output (KRO)"),
-        ("SUB OUTPUT (RO)", "Sub Output (RO)"),
-    ]:
-        if col in df_filtered.columns:
-            agg = df_filtered.groupby(col, as_index=False)[selected_metric].sum()
-            st.plotly_chart(bar_chart(agg.sort_values(selected_metric), col, selected_metric, title))
 
 # =============================================================================
 # Main
@@ -523,6 +527,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
