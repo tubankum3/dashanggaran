@@ -377,9 +377,6 @@ def sidebar(df):
         df["Tahun"] = df["Tahun"].astype(str).str.extract(r"(\d{4})")[0]
         df = df[df["Tahun"].notna()]
 
-        # Debug helper
-        st.write("Unique Tahun:", df["Tahun"].unique())
-
         years = sorted(df["Tahun"].astype(int).unique().tolist())
         if len(years) == 0:
             st.error("Tidak ada data tahun yang valid di dataset.")
@@ -387,17 +384,6 @@ def sidebar(df):
 
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
-
-        # Filter K/L
-        if "KEMENTERIAN/LEMBAGA" not in df.columns:
-            st.error("Kolom 'KEMENTERIAN/LEMBAGA' tidak ditemukan di dataset.")
-            st.stop()
-        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
-        selected_kls = st.multiselect(
-            "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
-            options=["Semua"] + kl_list,
-            default=["Semua"]
-        )
 
         # Jumlah Top
         top_n = st.number_input(
@@ -419,6 +405,17 @@ def sidebar(df):
             options=numeric_cols,
             index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)")
             if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+        )
+        
+        # Filter K/L
+        if "KEMENTERIAN/LEMBAGA" not in df.columns:
+            st.error("Kolom 'KEMENTERIAN/LEMBAGA' tidak ditemukan di dataset.")
+            st.stop()
+        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
+        selected_kls = st.multiselect(
+            "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
+            options=["Semua"] + kl_list,
+            default=["Semua"]
         )
 
     if "Semua" in selected_kls:
@@ -527,6 +524,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
