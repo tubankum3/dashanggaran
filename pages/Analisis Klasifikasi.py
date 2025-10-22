@@ -363,9 +363,14 @@ def sidebar(df):
         st.markdown("### ⚙️ Pengaturan Dashboard")
 
         # --- Tahun ---
-        years = sorted(df["Tahun"].astype(int).unique())
+        years = sorted(df["Tahun"].dropna().astype(int).unique().tolist())
+
+        if not years:
+            st.error("Data tahun tidak tersedia di dataset.")
+            st.stop()
+        
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
-        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
+        selected_year = st.selectbox("Pilih Tahun", options=years, index=default_year_index)
 
         # --- Filter K/L ---
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
@@ -545,3 +550,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
