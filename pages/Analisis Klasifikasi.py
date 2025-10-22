@@ -508,12 +508,16 @@ def show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_
 # =============================================================================
 # Main
 # =============================================================================
+
 def main():
     df = load_data()
     if df.empty:
         st.error("Data gagal dimuat.")
         return
-
+    # ---
+    st.write("Kolom dalam dataset:", df.columns.tolist())
+    st.write("Jumlah baris:", len(df))
+    # ---
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
 
     header(selected_year)
@@ -546,5 +550,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
