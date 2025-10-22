@@ -360,7 +360,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False)
         df_plot.sort_values(metric, ascending=True),
         x=metric, y=y_col, color=color_col,
         orientation="h", text="__formatted", custom_data=["__formatted"],
-        title=title, labels={y_col: y_col.title(), metric: "Jumlah: Rp"},
+        title=title, labels={y_col: y_col.title(), metric: "Jumlah"},
     )
     fig.update_traces(
         hovertemplate=f"{y_col}:%{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>",
@@ -489,7 +489,7 @@ def main():
         )
         fig_fungsi.update_traces(
             texttemplate="%{label}<br>%{percentParent:.2%}",
-            hovertemplate="%{currentPath}%{label}<br>Jumlah: Rp%{value:,.0f}<br>Share: %{percentParent:.2%}<extra></extra>",
+            hovertemplate="%{currentPath}%{label}<br>Jumlah: Rp%{value:,.0f}<br>Persentase dari Induk: %{percentParent:.2%}<extra></extra>",
             textinfo="label+text", textfont_size=12
         )
         charts.append(fig_fungsi)
@@ -497,16 +497,16 @@ def main():
     # Bar Charts: Program, Kegiatan, KRO, RO
     if "PROGRAM" in df.columns:
         agg_prog = aggregate_level(df_filtered, ["PROGRAM"], selected_metric, top_n)
-        charts.append(create_bar_chart(agg_prog, selected_metric, "PROGRAM", title=f"Realisasi per Program (Top {top_n}) — {selected_year}"))
+        charts.append(create_bar_chart(agg_prog, selected_metric, "PROGRAM", title=f"{selected_metric} BERDASARKAN PROGRAM (Top {top_n}) — {selected_year}"))
     if "KEGIATAN" in df.columns:
         agg_keg = aggregate_level(df_filtered, ["PROGRAM", "KEGIATAN"], selected_metric, top_n)
-        charts.append(create_bar_chart(agg_keg, selected_metric, "KEGIATAN", color_col="PROGRAM", title=f"Realisasi per Kegiatan (Top {top_n}) — {selected_year}", stacked=True))
+        charts.append(create_bar_chart(agg_keg, selected_metric, "KEGIATAN", color_col="PROGRAM", title=f"{selected_metric} BERDASARKAN KEGIATAN (Top {top_n}) — {selected_year}", stacked=True))
     if "OUTPUT (KRO)" in df.columns:
         agg_kro = aggregate_level(df_filtered, ["OUTPUT (KRO)"], selected_metric, top_n)
-        charts.append(create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)", title=f"Realisasi per Output (KRO) (Top {top_n}) — {selected_year}"))
+        charts.append(create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)", title=f"{selected_metric} BERDASARKAN OUTPUT (KRO) (Top {top_n}) — {selected_year}"))
     if {"SUB OUTPUT (RO)", "OUTPUT (KRO)"}.issubset(df.columns):
         agg_ro = aggregate_level(df_filtered, ["OUTPUT (KRO)", "SUB OUTPUT (RO)"], selected_metric, top_n)
-        charts.append(create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)", color_col="OUTPUT (KRO)", title=f"Realisasi per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True))
+        charts.append(create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)", color_col="OUTPUT (KRO)", title=f"{selected_metric} BERDASARKAN SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True))
 
     # Display charts
     for fig in charts:
@@ -528,3 +528,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
