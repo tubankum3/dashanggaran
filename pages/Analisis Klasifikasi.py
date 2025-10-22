@@ -363,51 +363,47 @@ def sidebar(df):
         st.markdown("### ⚙️ Pengaturan Dashboard")
 
         # --- Tahun ---
-        years = sorted(df["Tahun"].dropna().astype(int).unique().tolist())
-
-        if not years:
-            st.error("Data tahun tidak tersedia di dataset.")
+        if "Tahun" not in df.columns or df["Tahun"].dropna().empty:
+            st.error("❌ Kolom 'Tahun' tidak ditemukan atau tidak berisi data.")
             st.stop()
-        
+
+        years = sorted(df["Tahun"].dropna().astype(int).unique().tolist())
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", options=years, index=default_year_index)
 
         # --- Filter K/L ---
-        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
+        if "KEMENTERIAN/LEMBAGA" not in df.columns:
+            st.error("❌ Kolom 'KEMENTERIAN/LEMBAGA' tidak ditemukan di dataset.")
+            st.stop()
+        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
         selected_kls = st.multiselect(
             "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
             options=["Semua"] + kl_list,
             default=["Semua"]
         )
 
-        # --- Jumlah Top K/L ---
+        # --- Jumlah Top ---
         top_n = st.number_input(
             "Tampilkan Top K/L berdasarkan nilai metrik",
             min_value=1,
             max_value=50,
             value=10,
             step=1,
-            help="Jumlah Kementerian/Lembaga yang ditampilkan pada grafik."
         )
 
-        # --- Pilih Metrik ---
-        df_filtered = df.copy()
-        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
-        if "Tahun" in numeric_cols:
-            numeric_cols.remove("Tahun")
+        # --- Metrik ---
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ Tidak ada kolom numerik untuk dipilih sebagai metrik.")
+            st.stop()
 
-        metric_options = numeric_cols if numeric_cols else ["(Tidak ada kolom numerik)"]
         selected_metric = st.selectbox(
             "Metrik Anggaran",
-            options=metric_options,
-            index=metric_options.index("REALISASI BELANJA KL (SAKTI)") 
-            if "REALISASI BELANJA KL (SAKTI)" in metric_options else 0,
-            key="metric_select",
-            help="Pilih jenis anggaran yang akan dianalisis."
+            options=numeric_cols,
+            index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") 
+                if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
         )
 
-    # === Return clean values ===
-    # If user picks “Semua”, treat as full dataset
     if "Semua" in selected_kls:
         selected_kls = []
 
@@ -550,4 +546,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
