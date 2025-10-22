@@ -425,7 +425,14 @@ def sidebar(df):
 # =============================================================================
 # Hierarchical Drilldown Treemap
 # =============================================================================
+# ======================================================
+# Hierarchical Drilldown Treemap (dengan ekstraksi klik yang tahan banting)
+# ======================================================
 def treemap_chart(df, selected_year, selected_kls, top_n, selected_metric):
+    """
+    Menampilkan treemap pada level saat ini berdasarkan st.session_state.level & path.
+    Mengembalikan tuple (fig, clicked_label_or_None).
+    """
     hierarchy = ["FUNGSI", "SUB FUNGSI", "PROGRAM", "KEGIATAN", "OUTPUT (KRO)", "SUB OUTPUT (RO)"]
 
     # Initialize session state for hierarchy navigation
@@ -436,62 +443,62 @@ def treemap_chart(df, selected_year, selected_kls, top_n, selected_metric):
     level = st.session_state.level
     path = st.session_state.path
 
-    df_filtered = df[df["Tahun"] == str(selected_year)]
+    df_filtered = df[df["Tahun"] == str(selected_year)].copy()
     if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    # Apply path filters
+    # Apply path filters (keadaan saat ini)
     for i, node in enumerate(path):
-        df_filtered = df_filtered[df_filtered[hierarchy[i]] == node]
+        if hierarchy[i] in df_filtered.columns:
+            df_filtered = df_filtered[df_filtered[hierarchy[i]] == node]
 
+    # Tentukan kolom saat ini dan kolom berikutnya (untuk path treemap)
     current_level = hierarchy[level]
     next_level = hierarchy[level + 1] if level + 1 < len(hierarchy) else None
 
+    # Grup sesuai level yang tersedia di data
     group_cols = [current_level] if not next_level else [current_level, next_level]
-    agg = df_filtered.groupby(group_cols, as_index=False)[selected_metric].sum().sort_values(selected_metric, ascending=False)
+    group_cols = [c for c in group_cols if c in df_filtered.columns]
+
+    if len(group_cols) == 0:
+        st.warning("Tidak ada kolom hirarki yang tersedia pada data untuk ditampilkan.")
+        return None, None
+
+    agg = (
+        df_filtered.groupby(group_cols, as_index=False)[selected_metric]
+        .sum()
+        .sort_values(selected_metric, ascending=False)
+    )
+
+    # Batasi top_n jika ada (berlaku pada jumlah baris parent-child teratas)
     agg = agg.head(top_n)
 
-    path_args = [c for c in group_cols if c in df_filtered.columns]
+    # Siapkan judul yang informatif
+    title_path = " / ".join(path) if path else "FUNGSI"
+    title = f"{title_path} — {selected_metric} — Tahun {selected_year}"
+
+    # Buat treemap
     fig = px.treemap(
         agg,
-        path=path_args,
+        path=group_cols,
         values=selected_metric,
-        hover_name=current_level,
         color=selected_metric,
         color_continuous_scale="Blues",
-        title=f"{' → '.join(path) if path else 'FUNGSI'} - {selected_metric} Tahun {selected_year}",
+        title=title,
     )
 
     fig.update_traces(
         texttemplate="%{label}<br>%{value:,.0f}",
-        hovertemplate="%{currentPath}<br>Nilai: %{value:,.0f}<extra></extra>",
+        hovertemplate="%{currentPath}<br>Nilai: %{value:,.0f}<br>Share terhadap induk: %{percentParent:.2%}<extra></extra>",
     )
+    fig.update_layout(margin=dict(t=50, l=25, r=25, b=25), height=520)
 
-    st.plotly_chart(fig, use_container_width=True)
-    clicked = plotly_events(fig, click_event=True, select_event=False)
+    # Render chart (tapi jangan langsung rerun di sini — kembalikan fig + label)
+    return fig, agg
 
-    # Breadcrumb navigation
-    breadcrumb = " / ".join(path) if path else "FUNGSI"
-    st.markdown(f"**📍 Posisi Saat Ini:** {breadcrumb}")
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if st.session_state.level > 0 and st.button("⬅️ Kembali"):
-            st.session_state.level -= 1
-            st.session_state.path.pop()
-            st.experimental_rerun()
-
-    # Handle clicks
-    if clicked:
-        clicked_label = clicked[0]["label"]
-        if next_level:
-            st.session_state.level += 1
-            st.session_state.path.append(clicked_label)
-            st.experimental_rerun()
-
-
-# =============================================================================
-# Main
-# =============================================================================
+# ======================================================
+# Main 
+# ======================================================
 def main():
     df = load_data()
     if df.empty:
@@ -499,14 +506,74 @@ def main():
         return
 
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
+
     header(selected_year)
+    st.markdown(f"Menampilkan: **{selected_metric}** — Tahun **{selected_year}**")
+    st.markdown("---")
 
-    fig, _ = treemap_chart(df, selected_year, selected_kls, top_n, selected_metric)
-    clicked = plotly_events(fig, click_event=True, select_event=False)
+    # Ambil figure treemap
+    fig, agg = treemap_chart(df, selected_year, selected_kls, top_n, selected_metric)
+    if fig is None:
+        return
+
+    # Tampilkan dan tangkap event klik (plotly_events kadang mengembalikan struktur yang berbeda)
     st.plotly_chart(fig, use_container_width=True)
+    clicked = plotly_events(fig, click_event=True, hover_event=False, select_event=False)
 
-    clicked_node = clicked[0]["label"] if clicked else None
-    show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node)
+    # Robust extraction of clicked label
+    clicked_label = None
+    if clicked and isinstance(clicked, list) and len(clicked) > 0:
+        ev = clicked[0]
+        # possible keys: 'label', 'id', or nested 'points'
+        if isinstance(ev, dict):
+            if "label" in ev and ev["label"]:
+                clicked_label = ev["label"]
+            elif "id" in ev and ev["id"]:
+                clicked_label = ev["id"]
+            elif "points" in ev and isinstance(ev["points"], list) and len(ev["points"]) > 0:
+                pt = ev["points"][0]
+                # check several possible keys inside a point
+                for k in ("label", "text", "hovertext", "customdata", "id"):
+                    if k in pt and pt[k]:
+                        # if customdata is an array, pick first element if stringable
+                        val = pt[k]
+                        if isinstance(val, (list, tuple)) and len(val) > 0:
+                            val = val[0]
+                        clicked_label = str(val)
+                        break
+
+    # If we found a clicked label, advance level/path appropriately
+    if clicked_label:
+        # Only advance when there is a next level available
+        hierarchy = ["FUNGSI", "SUB FUNGSI", "PROGRAM", "KEGIATAN", "OUTPUT (KRO)", "SUB OUTPUT (RO)"]
+        level = st.session_state.get("level", 0)
+        if level + 1 < len(hierarchy):
+            # append clicked label into path and increment level
+            st.session_state.path = st.session_state.get("path", []) + [clicked_label]
+            st.session_state.level = level + 1
+            st.experimental_rerun()
+    else:
+        # show breadcrumb + navigation controls (Back button)
+        path = st.session_state.get("path", [])
+        level = st.session_state.get("level", 0)
+        breadcrumb = " / ".join(path) if path else "FUNGSI"
+        st.markdown(f"**📍 Posisi Saat Ini:** {breadcrumb}")
+
+        # Back button
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if level > 0 and st.button("⬅️ Kembali"):
+                st.session_state.level = max(0, level - 1)
+                # pop last path element safely
+                if st.session_state.get("path"):
+                    st.session_state.path = st.session_state.path[:-1]
+                st.experimental_rerun()
+
+    # After navigation, show a small note on how to proceed
+    st.caption("Klik kotak pada treemap untuk masuk ke level berikutnya. Gunakan 'Kembali' untuk naik satu level.")
+
+    # Optionally: show child-level aggregated tables or charts here (if you want)
+    # ... (Anda bisa memanggil fungsi show_child_charts yang sudah disesuaikan untuk level saat ini)
 
     st.markdown("---")
     col1, col2 = st.columns([3, 1])
@@ -524,6 +591,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
