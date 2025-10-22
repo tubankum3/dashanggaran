@@ -401,7 +401,6 @@ def sidebar(df):
 
     return selected_year, selected_kls, top_n, selected_metric
 
-
 # ======================================================
 # Treemap
 # ======================================================
@@ -507,16 +506,12 @@ def main():
     if df.empty:
         st.error("Data gagal dimuat.")
         return
-    # ---sementara
-    st.write("Kolom dalam dataset:", df.columns.tolist())
-    st.write("Jumlah baris:", len(df))
-    df.head().to_dict()
-    # ---
+
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
 
     header(selected_year)
 
-    df_year = df[df["Tahun"] == str(selected_year)]
+    df_year = df[df["Tahun"].astype(str) == (selected_year)]
     if selected_kls:
         df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
@@ -544,6 +539,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
