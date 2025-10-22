@@ -372,6 +372,9 @@ def sidebar(df):
         df["Tahun"] = df["Tahun"].astype(str).str.extract(r"(\d{4})")[0]  # ambil hanya 4 digit angka
         df = df[df["Tahun"].notna()]
 
+        #--- sementara
+        st.write("Unique Tahun:", df["Tahun"].unique())
+        #---- s
         years = sorted(df["Tahun"].astype(int).unique().tolist())
         if len(years) == 0:
             st.error("Tidak ada data tahun yang valid di dataset.")
@@ -521,9 +524,10 @@ def main():
     if df.empty:
         st.error("Data gagal dimuat.")
         return
-    # ---
+    # ---sementara
     st.write("Kolom dalam dataset:", df.columns.tolist())
     st.write("Jumlah baris:", len(df))
+    df.head().to_dict()
     # ---
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
 
@@ -557,6 +561,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
