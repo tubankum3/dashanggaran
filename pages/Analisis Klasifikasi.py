@@ -518,7 +518,7 @@ def main():
         return
 
     init_session_state()
-    selected_year, selected_kls, top_n, selected_metric = sidebar_controls(df)
+    selected_year, selected_kls, top_n, selected_metric = sidebar(df)
     header(selected_year)
 
     # top-level filter by year & KL
@@ -697,5 +697,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
