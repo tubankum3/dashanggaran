@@ -603,15 +603,15 @@ def main():
         agg_prog = aggregate_level(df_active, ["PROGRAM"], selected_metric, top_n)
         if not agg_prog.empty:
             fig_prog = create_bar_chart(agg_prog, selected_metric, "PROGRAM",
-                                        title=f"Realisasi per Program (Top {top_n}) — {selected_year}")
+                                        title=f"{selected_metric} per Program (Top {top_n}) — {selected_year}")
             plotly_events(fig_prog, click_event=True, key=f"prog-{st.session_state.click_key}")
     
     # --- Kegiatan level ---
     if "KEGIATAN" in df_active.columns and selected_metric in df_active.columns:
-        agg_keg = aggregate_level(df_active, ["PROGRAM", "KEGIATAN"], selected_metric, top_n)
+        agg_keg = aggregate_level(df_active, ["KEGIATAN"], selected_metric, top_n)
         if not agg_keg.empty:
-            fig_keg = create_bar_chart(agg_keg, selected_metric, "KEGIATAN", color_col="PROGRAM",
-                                       title=f"Realisasi per Kegiatan (Top {top_n}) — {selected_year}", stacked=True)
+            fig_keg = create_bar_chart(agg_keg, selected_metric, "KEGIATAN", 
+                                       title=f"{selected_metric} per Kegiatan (Top {top_n}) — {selected_year}", stacked=True)
             plotly_events(fig_keg, click_event=True, key=f"keg-{st.session_state.click_key}")
     
     # --- KRO level ---
@@ -619,15 +619,15 @@ def main():
         agg_kro = aggregate_level(df_active, ["OUTPUT (KRO)"], selected_metric, top_n)
         if not agg_kro.empty:
             fig_kro = create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)",
-                                       title=f"Realisasi per Output (KRO) (Top {top_n}) — {selected_year}")
+                                       title=f"{selected_metric} per Output (KRO) (Top {top_n}) — {selected_year}")
             plotly_events(fig_kro, click_event=True, key=f"kro-{st.session_state.click_key}")
     
     # --- RO level ---
-    if {"SUB OUTPUT (RO)", "OUTPUT (KRO)"}.issubset(df_active.columns) and selected_metric in df_active.columns:
+    if "SUB OUTPUT (RO)" in df_active.columns and selected_metric in df_active.columns:
         agg_ro = aggregate_level(df_active, ["OUTPUT (KRO)", "SUB OUTPUT (RO)"], selected_metric, top_n)
         if not agg_ro.empty:
-            fig_ro = create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)", color_col="OUTPUT (KRO)",
-                                      title=f"Realisasi per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True)
+            fig_ro = create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)",
+                                      title=f"{selected_metric} per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True)
             plotly_events(fig_ro, click_event=True, key=f"ro-{st.session_state.click_key}")
     
     # --- Sidebar info (moved to bottom) ---
@@ -660,6 +660,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
