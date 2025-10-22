@@ -552,133 +552,96 @@ def main():
             # filter by exact match
             df_active = df_active[df_active[col] == sel]
 
-    # Layout: left for charts, right for info/controls
-    left, right = st.columns([3, 1])
-    with left:
-        # --- Treemap (FUNGSI -> SUB FUNGSI) ---
-        if {"FUNGSI", "SUB FUNGSI"}.issubset(df_active.columns) and selected_metric in df_active.columns:
-            # aggregate to subfunsi level (leaves)
-            agg_fungsi = aggregate_level(df_active, ["FUNGSI", "SUB FUNGSI"], selected_metric)
-            if agg_fungsi.empty:
-                st.info("Tidak ada data untuk level ini.")
+    # Layout: charts stacked vertically
+    st.markdown("## 📊 Visualisasi Hierarki dan Drill-down")
+    
+    # --- Treemap ---
+    if {"FUNGSI", "SUB FUNGSI"}.issubset(df_active.columns) and selected_metric in df_active.columns:
+        agg_fungsi = aggregate_level(df_active, ["FUNGSI", "SUB FUNGSI"], selected_metric)
+        if agg_fungsi.empty:
+            st.info("Tidak ada data untuk level ini.")
+        else:
+            total_value = agg_fungsi[selected_metric].sum()
+            if total_value == 0:
+                st.info("Semua nilai nol pada metric terpilih.")
             else:
-                total_value = agg_fungsi[selected_metric].sum()
-                if total_value == 0:
-                    st.info("Semua nilai nol pada metric terpilih.")
-                else:
-                    agg_fungsi["Share (%)"] = 100 * agg_fungsi[selected_metric] / total_value
-                    agg_fungsi["Label"] = (
-                        agg_fungsi["SUB FUNGSI"].astype(str) + "<br>" +
-                        agg_fungsi["Share (%)"].round(2).astype(str) + "%<br>" +
-                        agg_fungsi[selected_metric].apply(format_rupiah)
-                    )
-                    treemap_path = [px.Constant("All"), "FUNGSI", "SUB FUNGSI"]
-                    fig_treemap = create_treemap(agg_fungsi, selected_metric,
-                                                 title=f"DISTRIBUSI {selected_metric} — FUNGSI / SUB FUNGSI — {selected_year}",
-                                                 path=treemap_path)
-                    # clickable treemap
-                    events = plotly_events(fig_treemap, click_event=True, key=f"treemap-{st.session_state.click_key}")
-                    # events is a list of point dicts; examine 'label' returned by plotly
-                    if events:
-                        clicked = events[0].get("label")
-                        # determine whether label is a FUNGSI or SUB FUNGSI
-                        fungsi_names = agg_fungsi["FUNGSI"].unique().tolist()
-                        subfungsi_names = agg_fungsi["SUB FUNGSI"].unique().tolist()
-                        # clicking an internal FUNGSI node will have label equal fungsi name
-                        if clicked in fungsi_names:
-                            st.session_state.drill["FUNGSI"] = clicked
-                            # clear deeper levels
-                            for _, col in HIERARCHY[1:]:
-                                st.session_state.drill[col] = None
-                            st.session_state.level_index = 1
-                            st.session_state.click_key += 1
-                        elif clicked in subfungsi_names:
-                            st.session_state.drill["SUB FUNGSI"] = clicked
-                            # set parent FUNGSI if possible (find its FUNGSI)
-                            parent_row = agg_fungsi[agg_fungsi["SUB FUNGSI"] == clicked]
-                            if not parent_row.empty:
-                                st.session_state.drill["FUNGSI"] = parent_row.iloc[0]["FUNGSI"]
-                            # clear deeper levels
-                            for _, col in HIERARCHY[2:]:
-                                st.session_state.drill[col] = None
-                            st.session_state.level_index = 2
-                            st.session_state.click_key += 1
-                        # else ignore ambiguous clicks
-
-        # --- Bar charts for deeper levels (clicking drills further) ---
-        # Program (level 3)
-        if "PROGRAM" in df_active.columns and selected_metric in df_active.columns:
-            agg_prog = aggregate_level(df_active, ["PROGRAM"], selected_metric, top_n)
-            if not agg_prog.empty:
-                fig_prog = create_bar_chart(agg_prog, selected_metric, "PROGRAM",
-                                            title=f"Realisasi per Program (Top {top_n}) — {selected_year}")
-                events_prog = plotly_events(fig_prog, click_event=True, key=f"prog-{st.session_state.click_key}")
-                if events_prog:
-                    # plotly returns customdata where customdata[0] is PROGRAM (since we set that)
-                    clicked_prog = events_prog[0].get("y") or events_prog[0].get("label") or events_prog[0].get("customdata", [None])[0]
-                    if clicked_prog:
-                        st.session_state.drill["PROGRAM"] = clicked_prog
-                        # clear deeper levels
-                        for _, col in HIERARCHY[4:]:
+                agg_fungsi["Share (%)"] = 100 * agg_fungsi[selected_metric] / total_value
+                agg_fungsi["Label"] = (
+                    agg_fungsi["SUB FUNGSI"].astype(str) + "<br>" +
+                    agg_fungsi["Share (%)"].round(2).astype(str) + "%<br>" +
+                    agg_fungsi[selected_metric].apply(format_rupiah)
+                )
+                treemap_path = [px.Constant("All"), "FUNGSI", "SUB FUNGSI"]
+                fig_treemap = create_treemap(
+                    agg_fungsi, selected_metric,
+                    title=f"DISTRIBUSI {selected_metric} — FUNGSI / SUB FUNGSI — {selected_year}",
+                    path=treemap_path
+                )
+                events = plotly_events(fig_treemap, click_event=True, key=f"treemap-{st.session_state.click_key}")
+                if events:
+                    clicked = events[0].get("label")
+                    fungsi_names = agg_fungsi["FUNGSI"].unique().tolist()
+                    subfungsi_names = agg_fungsi["SUB FUNGSI"].unique().tolist()
+                    if clicked in fungsi_names:
+                        st.session_state.drill["FUNGSI"] = clicked
+                        for _, col in HIERARCHY[1:]:
                             st.session_state.drill[col] = None
-                        st.session_state.level_index = 3
+                        st.session_state.level_index = 1
                         st.session_state.click_key += 1
-
-        # Kegiatan (level 4)
-        if "KEGIATAN" in df_active.columns and selected_metric in df_active.columns:
-            agg_keg = aggregate_level(df_active, ["PROGRAM", "KEGIATAN"], selected_metric, top_n)
-            if not agg_keg.empty:
-                fig_keg = create_bar_chart(agg_keg, selected_metric, "KEGIATAN", color_col="PROGRAM",
-                                           title=f"Realisasi per Kegiatan (Top {top_n}) — {selected_year}", stacked=True)
-                events_keg = plotly_events(fig_keg, click_event=True, key=f"keg-{st.session_state.click_key}")
-                if events_keg:
-                    clicked_keg = events_keg[0].get("y") or events_keg[0].get("label") or events_keg[0].get("customdata", [None])[0]
-                    if clicked_keg:
-                        st.session_state.drill["KEGIATAN"] = clicked_keg
-                        st.session_state.level_index = 4
+                    elif clicked in subfungsi_names:
+                        st.session_state.drill["SUB FUNGSI"] = clicked
+                        parent_row = agg_fungsi[agg_fungsi["SUB FUNGSI"] == clicked]
+                        if not parent_row.empty:
+                            st.session_state.drill["FUNGSI"] = parent_row.iloc[0]["FUNGSI"]
+                        for _, col in HIERARCHY[2:]:
+                            st.session_state.drill[col] = None
+                        st.session_state.level_index = 2
                         st.session_state.click_key += 1
-
-        # OUTPUT (KRO) (level 5)
-        if "OUTPUT (KRO)" in df_active.columns and selected_metric in df_active.columns:
-            agg_kro = aggregate_level(df_active, ["OUTPUT (KRO)"], selected_metric, top_n)
-            if not agg_kro.empty:
-                fig_kro = create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)",
-                                           title=f"Realisasi per Output (KRO) (Top {top_n}) — {selected_year}")
-                events_kro = plotly_events(fig_kro, click_event=True, key=f"kro-{st.session_state.click_key}")
-                if events_kro:
-                    clicked_kro = events_kro[0].get("y") or events_kro[0].get("label") or events_kro[0].get("customdata", [None])[0]
-                    if clicked_kro:
-                        st.session_state.drill["OUTPUT (KRO)"] = clicked_kro
-                        st.session_state.level_index = 5
-                        st.session_state.click_key += 1
-
-        # SUB OUTPUT (RO) (level 6)
-        if {"SUB OUTPUT (RO)", "OUTPUT (KRO)"}.issubset(df_active.columns) and selected_metric in df_active.columns:
-            agg_ro = aggregate_level(df_active, ["OUTPUT (KRO)", "SUB OUTPUT (RO)"], selected_metric, top_n)
-            if not agg_ro.empty:
-                fig_ro = create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)", color_col="OUTPUT (KRO)",
-                                          title=f"Realisasi per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True)
-                events_ro = plotly_events(fig_ro, click_event=True, key=f"ro-{st.session_state.click_key}")
-                if events_ro:
-                    clicked_ro = events_ro[0].get("y") or events_ro[0].get("label") or events_ro[0].get("customdata", [None])[0]
-                    if clicked_ro:
-                        st.session_state.drill["SUB OUTPUT (RO)"] = clicked_ro
-                        st.session_state.level_index = 6
-                        st.session_state.click_key += 1
-
-    with right:
-        st.markdown("### Current filters")
-        st.write(f"**Tahun:** {selected_year}")
-        st.write(f"**Metrik:** {selected_metric}")
-        if selected_kls:
-            st.write("**K/L:**")
-            for k in selected_kls:
-                st.write(f"- {k}")
-        st.markdown("---")
-        st.markdown("### Drill state")
-        for lvl_name, col in HIERARCHY:
-            val = st.session_state.drill[col]
-            st.write(f"{col}: {val if val else '-'}")
+    
+    # --- Program level ---
+    if "PROGRAM" in df_active.columns and selected_metric in df_active.columns:
+        agg_prog = aggregate_level(df_active, ["PROGRAM"], selected_metric, top_n)
+        if not agg_prog.empty:
+            fig_prog = create_bar_chart(agg_prog, selected_metric, "PROGRAM",
+                                        title=f"Realisasi per Program (Top {top_n}) — {selected_year}")
+            plotly_events(fig_prog, click_event=True, key=f"prog-{st.session_state.click_key}")
+    
+    # --- Kegiatan level ---
+    if "KEGIATAN" in df_active.columns and selected_metric in df_active.columns:
+        agg_keg = aggregate_level(df_active, ["PROGRAM", "KEGIATAN"], selected_metric, top_n)
+        if not agg_keg.empty:
+            fig_keg = create_bar_chart(agg_keg, selected_metric, "KEGIATAN", color_col="PROGRAM",
+                                       title=f"Realisasi per Kegiatan (Top {top_n}) — {selected_year}", stacked=True)
+            plotly_events(fig_keg, click_event=True, key=f"keg-{st.session_state.click_key}")
+    
+    # --- KRO level ---
+    if "OUTPUT (KRO)" in df_active.columns and selected_metric in df_active.columns:
+        agg_kro = aggregate_level(df_active, ["OUTPUT (KRO)"], selected_metric, top_n)
+        if not agg_kro.empty:
+            fig_kro = create_bar_chart(agg_kro, selected_metric, "OUTPUT (KRO)",
+                                       title=f"Realisasi per Output (KRO) (Top {top_n}) — {selected_year}")
+            plotly_events(fig_kro, click_event=True, key=f"kro-{st.session_state.click_key}")
+    
+    # --- RO level ---
+    if {"SUB OUTPUT (RO)", "OUTPUT (KRO)"}.issubset(df_active.columns) and selected_metric in df_active.columns:
+        agg_ro = aggregate_level(df_active, ["OUTPUT (KRO)", "SUB OUTPUT (RO)"], selected_metric, top_n)
+        if not agg_ro.empty:
+            fig_ro = create_bar_chart(agg_ro, selected_metric, "SUB OUTPUT (RO)", color_col="OUTPUT (KRO)",
+                                      title=f"Realisasi per SUB OUTPUT (RO) (Top {top_n}) — {selected_year}", stacked=True)
+            plotly_events(fig_ro, click_event=True, key=f"ro-{st.session_state.click_key}")
+    
+    # --- Sidebar info (moved to bottom) ---
+    st.markdown("## ⚙️ Current Filters")
+    st.write(f"**Tahun:** {selected_year}")
+    st.write(f"**Metrik:** {selected_metric}")
+    if selected_kls:
+        st.write("**K/L:**")
+        for k in selected_kls:
+            st.write(f"- {k}")
+    st.markdown("---")
+    st.markdown("### Drill State")
+    for lvl_name, col in HIERARCHY:
+        st.write(f"{col}: {st.session_state.drill[col]}")
 
     # footer
     st.markdown("---")
@@ -697,6 +660,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
