@@ -408,72 +408,101 @@ def sidebar(df):
 
     return selected_year, selected_kls, top_n, selected_metric
 
-# =============================================================================
-# Charts
-# =============================================================================
-def treemap_chart(df):
-    agg = df.groupby(["FUNGSI", "SUB FUNGSI"], as_index=False)["REALISASI BELANJA KL (SAKTI)"].sum()
-    total = agg["REALISASI BELANJA KL (SAKTI)"].sum()
-    agg["Share (%)"] = 100 * agg["REALISASI BELANJA KL (SAKTI)"] / total
+# ======================================================
+# Treemap
+# ======================================================
+def treemap_chart(df, selected_year, selected_kls, top_n, selected_metric):
+    df_filtered = df[df["Tahun"] == selected_year]
+    if "Semua" not in selected_kls:
+        df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
+
+    agg = df_filtered.groupby(["FUNGSI", "SUB FUNGSI"], as_index=False)[selected_metric].sum()
+    agg = agg.sort_values(selected_metric, ascending=True).tail(top_n)
+
+    total_value = agg[selected_metric].sum()
+    agg["Share (%)"] = 100 * agg[selected_metric] / total_value
+    agg["Label"] = (
+        agg["SUB FUNGSI"]
+        + "<br>"
+        + agg["Share (%)"].round(2).astype(str)
+        + "%<br>"
+        + agg[selected_metric].apply(format_rupiah)
+    )
 
     fig = px.treemap(
-        agg, path=["FUNGSI", "SUB FUNGSI"], values="REALISASI BELANJA KL (SAKTI)",
-        color="REALISASI BELANJA KL (SAKTI)", color_continuous_scale="Blues"
+        agg,
+        path=["FUNGSI", "SUB FUNGSI"],
+        values=selected_metric,
+        hover_name="SUB FUNGSI",
+        title=f"Distribusi Anggaran Tahun {selected_year}",
     )
+
     fig.update_traces(
-        hovertemplate="<b>%{label}</b><br>Realisasi: %{value:,.0f}<br>Share: %{percentParent:.2%}<extra></extra>",
-        textinfo="label+value+percent parent"
+        texttemplate="%{label}<br>%{percentParent:.2%}",
+        hovertemplate=(
+            "%{currentPath}<br>"
+            "Realisasi: %{value:,.0f}<br>"
+            "Share terhadap Induk: %{percentParent:.2%}<br>"
+        ),
+        textinfo="label+text",
+        textfont_size=12,
     )
-    fig.update_layout(title="Realisasi per Fungsi dan Sub Fungsi", height=500, margin=dict(t=40, l=0, r=0, b=0))
 
-    st.subheader("🧭 Peta Fungsi dan Sub Fungsi (Treemap)")
-    selected = plotly_events(fig, click_event=True, hover_event=False)
-    if selected:
-        clicked = selected[0]["label"]
-        st.info(f"Menampilkan rincian untuk: **{clicked}**")
-        return clicked
-    return None
+    fig.update_layout(margin=dict(t=50, l=25, r=25, b=25))
+    return fig, agg
 
-def bar_chart(df, group_col, title, color="#1a73e8"):
-    agg = df.groupby(group_col, as_index=False)["REALISASI BELANJA KL (SAKTI)"].sum()
-    agg = agg.sort_values("REALISASI BELANJA KL (SAKTI)", ascending=True)
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=agg["REALISASI BELANJA KL (SAKTI)"],
-        y=agg[group_col],
+# ======================================================
+# Bar Chart (generic)
+# ======================================================
+def bar_chart(df, x_col, y_col, title):
+    fig = px.bar(
+        df,
+        x=x_col,
+        y=y_col,
         orientation="h",
-        text=agg["REALISASI BELANJA KL (SAKTI)"].apply(format_rupiah),
-        textposition="outside",
-        marker_color=color,
-        hovertemplate="%{y}<br>Realisasi: %{x:,.0f}<extra></extra>"
-    ))
-
-    tickvals = np.linspace(0, agg["REALISASI BELANJA KL (SAKTI)"].max(), num=6)
-    ticktext = [format_rupiah(val) for val in tickvals]
-    fig.update_layout(
+        text=y_col,
         title=title,
-        xaxis=dict(tickvals=tickvals, ticktext=ticktext),
-        yaxis=dict(title=None),
-        template="plotly_white",
-        height=400,
-        margin=dict(l=0, r=0, t=40, b=40)
+    )
+    fig.update_traces(texttemplate="%{text:.2s}", textposition="outside")
+    fig.update_xaxes(title="", tickformat=",", tickprefix="Rp ")
+    fig.update_layout(
+        yaxis_title="",
+        xaxis_title="",
+        margin=dict(t=60, l=80, r=40, b=40),
+        height=500,
     )
     return fig
 
-def show_child_charts(df, clicked_node):
-    if clicked_node:
-        df_filtered = df[
-            (df["FUNGSI"] == clicked_node) | (df["SUB FUNGSI"] == clicked_node)
-        ]
-    else:
-        df_filtered = df
+# ======================================================
+# Child charts update logic
+# ======================================================
+def show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node):
+    df_filtered = df[df["Tahun"] == selected_year]
+    if "Semua" not in selected_kls:
+        df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    st.subheader("📈 Rincian Realisasi")
-    st.plotly_chart(bar_chart(df_filtered, "PROGRAM", "Realisasi per Program", color="#1a73e8"), use_container_width=True)
-    st.plotly_chart(bar_chart(df_filtered, "KEGIATAN", "Realisasi per Kegiatan", color="#34a853"), use_container_width=True)
-    st.plotly_chart(bar_chart(df_filtered, "OUTPUT (KRO)", "Realisasi per Output (KRO)", color="#fbbc04"), use_container_width=True)
-    st.plotly_chart(bar_chart(df_filtered, "SUB OUTPUT (RO)", "Realisasi per Sub Output (RO)", color="#ea4335"), use_container_width=True)
+    if clicked_node:
+        if clicked_node in df_filtered["SUB FUNGSI"].unique():
+            df_filtered = df_filtered[df_filtered["SUB FUNGSI"] == clicked_node]
+        elif clicked_node in df_filtered["FUNGSI"].unique():
+            df_filtered = df_filtered[df_filtered["FUNGSI"] == clicked_node]
+
+    # Program chart
+    agg_program = df_filtered.groupby("PROGRAM", as_index=False)[selected_metric].sum()
+    st.plotly_chart(bar_chart(agg_program.sort_values(selected_metric), "PROGRAM", selected_metric, "Program"))
+
+    # Kegiatan chart
+    agg_keg = df_filtered.groupby("KEGIATAN", as_index=False)[selected_metric].sum()
+    st.plotly_chart(bar_chart(agg_keg.sort_values(selected_metric), "KEGIATAN", selected_metric, "Kegiatan"))
+
+    # KRO chart
+    agg_kro = df_filtered.groupby("OUTPUT (KRO)", as_index=False)[selected_metric].sum()
+    st.plotly_chart(bar_chart(agg_kro.sort_values(selected_metric), "OUTPUT (KRO)", selected_metric, "Output (KRO)"))
+
+    # RO chart
+    agg_ro = df_filtered.groupby("SUB OUTPUT (RO)", as_index=False)[selected_metric].sum()
+    st.plotly_chart(bar_chart(agg_ro.sort_values(selected_metric), "SUB OUTPUT (RO)", selected_metric, "Sub Output (RO)"))
+
 
 # =============================================================================
 # Main
@@ -492,13 +521,12 @@ def main():
     if selected_kls:
         df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    clicked_node = treemap_chart(df_year)
-    st.markdown('</div>', unsafe_allow_html=True)
+    fig, _ = treemap_chart(df, selected_year, selected_kls, top_n, selected_metric)
+    clicked = plotly_events(fig, click_event=True, select_event=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    show_child_charts(df_year, clicked_node)
-    st.markdown('</div>', unsafe_allow_html=True)
+    clicked_node = clicked[0]["label"] if clicked else None
+    show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node)
 
     # Footer
     st.markdown("---")
