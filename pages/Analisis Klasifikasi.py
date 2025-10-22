@@ -561,9 +561,11 @@ def main():
     treemap_path = [px.Constant("All")] + available_levels
     fig_treemap = create_treemap(agg_for_treemap, selected_metric, f"DISTRIBUSI {selected_metric} — {selected_year}", treemap_path)
     treemap_height = 500 + len(agg_for_treemap) * 5  # Adjust multiplier as needed
-    fig_treemap.update_layout(margin=dict(t=70, l=25, r=25, b=25), height=treemap_height,
-        title=dict(text=f"DISTRIBUSI {selected_metric} — {selected_year}", x=0.5, xanchor="center"),
-        accessibility=dict(description="Treemap distribusi anggaran berdasarkan hierarki")
+    fig_treemap.update_layout(
+        margin=dict(t=70, l=25, r=25, b=25), 
+        height=treemap_height,
+        title=dict(text=f"DISTRIBUSI {selected_metric} — {selected_year}", x=0.5, xanchor="center")
+        # Baris 'accessibility' dihapus dari sini
     )
     events = plotly_events(fig_treemap, click_event=True, key=f"treemap-{st.session_state.click_key}")
 
@@ -618,6 +620,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
