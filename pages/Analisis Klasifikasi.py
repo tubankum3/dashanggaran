@@ -392,7 +392,7 @@ def create_treemap(df, metric, title, path):
     )
     fig.update_traces(
         hovertemplate="%{label}<br>Jumlah: %{customdata[0]}<br>Persentase dari Induk: %{percentParent:.2%}<extra></extra>",
-        custom_data=[df_plot["__formatted"]],
+        customdata=[df_plot["__formatted"]], # <--- PERUBAHAN DI SINI
         textinfo="label+percent parent",
         textfont_size=12
     )
@@ -618,6 +618,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
