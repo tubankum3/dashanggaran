@@ -5,3 +5,4 @@ numpy
 gdown
 requests
 streamlit-extras
+streamlit-plotly-events
