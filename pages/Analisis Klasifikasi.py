@@ -348,8 +348,10 @@ def format_rupiah(value):
 # =============================================================================
 # Component Architecture
 # =============================================================================
+# =============================================================================
+# Header
+# =============================================================================
 def header(selected_year: str | None = None):
-    """Create comprehensive dashboard header with breadcrumb and key info"""
     year_text = selected_year if selected_year else "Overview"
     st.markdown(f"""
     <div class="dashboard-header">
@@ -357,16 +359,39 @@ def header(selected_year: str | None = None):
         <h1 class="dashboard-title">Dashboard Klasifikasi Anggaran</h1>
     </div>
     """, unsafe_allow_html=True)
-    
+
+# =============================================================================
+# Sidebar
+# =============================================================================
 def sidebar(df):
     with st.sidebar:
         st.markdown("### ⚙️ Filter Data")
 
-        # --- Tahun ---
-        years = sorted(df["Tahun"].astype(int).unique())
-        selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
+        # Pastikan kolom Tahun ada
+        if "Tahun" not in df.columns:
+            st.error("Kolom 'Tahun' tidak ditemukan di dataset.")
+            st.stop()
 
-        # --- Filter K/L ---
+        # Bersihkan nilai kosong dan ekstrak 4 digit tahun
+        df = df[df["Tahun"].notna()]
+        df["Tahun"] = df["Tahun"].astype(str).str.extract(r"(\d{4})")[0]
+        df = df[df["Tahun"].notna()]
+
+        # Debug helper
+        st.write("Unique Tahun:", df["Tahun"].unique())
+
+        years = sorted(df["Tahun"].astype(int).unique().tolist())
+        if len(years) == 0:
+            st.error("Tidak ada data tahun yang valid di dataset.")
+            st.stop()
+
+        default_year_index = years.index(2025) if 2025 in years else len(years) - 1
+        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
+
+        # Filter K/L
+        if "KEMENTERIAN/LEMBAGA" not in df.columns:
+            st.error("Kolom 'KEMENTERIAN/LEMBAGA' tidak ditemukan di dataset.")
+            st.stop()
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
         selected_kls = st.multiselect(
             "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
@@ -374,7 +399,7 @@ def sidebar(df):
             default=["Semua"]
         )
 
-        # --- Jumlah Top ---
+        # Jumlah Top
         top_n = st.number_input(
             "Tampilkan Top K/L berdasarkan nilai metrik",
             min_value=1,
@@ -383,7 +408,7 @@ def sidebar(df):
             step=1,
         )
 
-        # --- Pilih metrik ---
+        # Pilih metrik
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
             st.error("Tidak ada kolom numerik yang dapat dipilih sebagai metrik.")
@@ -393,85 +418,58 @@ def sidebar(df):
             "Metrik Anggaran",
             options=numeric_cols,
             index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)")
-                if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+            if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
         )
 
     if "Semua" in selected_kls:
         selected_kls = []
-
     return selected_year, selected_kls, top_n, selected_metric
 
-# ======================================================
+# =============================================================================
 # Treemap
-# ======================================================
+# =============================================================================
 def treemap_chart(df, selected_year, selected_kls, top_n, selected_metric):
-    df_filtered = df[df["Tahun"] == selected_year]
-    if "Semua" not in selected_kls:
+    df_filtered = df[df["Tahun"].astype(str) == str(selected_year)]
+    if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
     agg = df_filtered.groupby(["FUNGSI", "SUB FUNGSI"], as_index=False)[selected_metric].sum()
     agg = agg.sort_values(selected_metric, ascending=True).tail(top_n)
+    if agg.empty:
+        st.warning("Tidak ada data untuk tahun atau filter yang dipilih.")
+        return go.Figure(), pd.DataFrame()
 
     total_value = agg[selected_metric].sum()
     agg["Share (%)"] = 100 * agg[selected_metric] / total_value
-    agg["Label"] = (
-        agg["SUB FUNGSI"]
-        + "<br>"
-        + agg["Share (%)"].round(2).astype(str)
-        + "%<br>"
-        + agg[selected_metric].apply(format_rupiah)
-    )
 
     fig = px.treemap(
         agg,
         path=["FUNGSI", "SUB FUNGSI"],
         values=selected_metric,
-        hover_name="SUB FUNGSI",
         title=f"Distribusi Anggaran Tahun {selected_year}",
-    )
-
-    fig.update_traces(
-        texttemplate="%{label}<br>%{percentParent:.2%}",
-        hovertemplate=(
-            "%{currentPath}<br>"
-            "Realisasi: %{value:,.0f}<br>"
-            "Share terhadap Induk: %{percentParent:.2%}<br>"
-        ),
-        textinfo="label+text",
-        textfont_size=12,
     )
 
     fig.update_layout(margin=dict(t=50, l=25, r=25, b=25))
     return fig, agg
 
-# ======================================================
-# Bar Chart (generic)
-# ======================================================
+# =============================================================================
+# Bar Chart
+# =============================================================================
 def bar_chart(df, x_col, y_col, title):
-    fig = px.bar(
-        df,
-        x=x_col,
-        y=y_col,
-        orientation="h",
-        text=y_col,
-        title=title,
-    )
+    if df.empty:
+        st.info(f"Tidak ada data untuk grafik {title}.")
+        return go.Figure()
+    fig = px.bar(df, x=x_col, y=y_col, orientation="h", text=y_col, title=title)
     fig.update_traces(texttemplate="%{text:.2s}", textposition="outside")
-    fig.update_xaxes(title="", tickformat=",", tickprefix="Rp ")
-    fig.update_layout(
-        yaxis_title="",
-        xaxis_title="",
-        margin=dict(t=60, l=80, r=40, b=40),
-        height=500,
-    )
+    fig.update_layout(height=500, margin=dict(t=60, l=80, r=40, b=40))
     return fig
 
-# ======================================================
-# Child charts update logic
-# ======================================================
+# =============================================================================
+# Child Charts
+# =============================================================================
 def show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node):
-    df_filtered = df[df["Tahun"] == selected_year]
-    if "Semua" not in selected_kls:
+    df_filtered = df[df["Tahun"].astype(str) == str(selected_year)]
+    if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
     if clicked_node:
@@ -480,27 +478,19 @@ def show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_
         elif clicked_node in df_filtered["FUNGSI"].unique():
             df_filtered = df_filtered[df_filtered["FUNGSI"] == clicked_node]
 
-    # Program chart
-    agg_program = df_filtered.groupby("PROGRAM", as_index=False)[selected_metric].sum()
-    st.plotly_chart(bar_chart(agg_program.sort_values(selected_metric), "PROGRAM", selected_metric, "Program"))
-
-    # Kegiatan chart
-    agg_keg = df_filtered.groupby("KEGIATAN", as_index=False)[selected_metric].sum()
-    st.plotly_chart(bar_chart(agg_keg.sort_values(selected_metric), "KEGIATAN", selected_metric, "Kegiatan"))
-
-    # KRO chart
-    agg_kro = df_filtered.groupby("OUTPUT (KRO)", as_index=False)[selected_metric].sum()
-    st.plotly_chart(bar_chart(agg_kro.sort_values(selected_metric), "OUTPUT (KRO)", selected_metric, "Output (KRO)"))
-
-    # RO chart
-    agg_ro = df_filtered.groupby("SUB OUTPUT (RO)", as_index=False)[selected_metric].sum()
-    st.plotly_chart(bar_chart(agg_ro.sort_values(selected_metric), "SUB OUTPUT (RO)", selected_metric, "Sub Output (RO)"))
-
+    for col, title in [
+        ("PROGRAM", "Program"),
+        ("KEGIATAN", "Kegiatan"),
+        ("OUTPUT (KRO)", "Output (KRO)"),
+        ("SUB OUTPUT (RO)", "Sub Output (RO)"),
+    ]:
+        if col in df_filtered.columns:
+            agg = df_filtered.groupby(col, as_index=False)[selected_metric].sum()
+            st.plotly_chart(bar_chart(agg.sort_values(selected_metric), col, selected_metric, title))
 
 # =============================================================================
 # Main
 # =============================================================================
-
 def main():
     df = load_data()
     if df.empty:
@@ -508,12 +498,7 @@ def main():
         return
 
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
-
     header(selected_year)
-
-    df_year = df[df["Tahun"].astype(str) == (selected_year)]
-    if selected_kls:
-        df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
     fig, _ = treemap_chart(df, selected_year, selected_kls, top_n, selected_metric)
     clicked = plotly_events(fig, click_event=True, select_event=False)
@@ -522,7 +507,6 @@ def main():
     clicked_node = clicked[0]["label"] if clicked else None
     show_child_charts(df, selected_year, selected_kls, selected_metric, clicked_node)
 
-    # Footer
     st.markdown("---")
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -539,6 +523,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
