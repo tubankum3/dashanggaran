@@ -363,25 +363,8 @@ def sidebar(df):
         st.markdown("### ⚙️ Filter Data")
 
         # --- Tahun ---
-        if "Tahun" not in df.columns:
-            st.error("Kolom 'Tahun' tidak ditemukan di dataset.")
-            st.stop()
-
-        # Bersihkan nilai kosong atau bukan angka
-        df = df[df["Tahun"].notna()]
-        df["Tahun"] = df["Tahun"].astype(str).str.extract(r"(\d{4})")[0]  # ambil hanya 4 digit angka
-        df = df[df["Tahun"].notna()]
-
-        #--- sementara
-        st.write("Unique Tahun:", df["Tahun"].unique())
-        #---- s
-        years = sorted(df["Tahun"].astype(int).unique().tolist())
-        if len(years) == 0:
-            st.error("Tidak ada data tahun yang valid di dataset.")
-            st.stop()
-
-        default_year_index = years.index(2025) if 2025 in years else len(years) - 1
-        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
+        years = sorted(df["Tahun"].astype(int).unique())
+        selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
 
         # --- Filter K/L ---
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
@@ -561,6 +544,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
