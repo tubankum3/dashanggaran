@@ -316,7 +316,7 @@ def create_bar_chart(df, metric, y_col, title="", max_height=None):
         custom_data=[y_col, metric],
         title=title,
         labels={y_col: y_col, metric: "Jumlah"},
-        color_discrete_sequence=["#2E86DE"]
+        color_discrete_sequence=["#2E86DE"]  # ✅ blue tone instead of black
     )
 
     # format text and hover
@@ -329,14 +329,14 @@ def create_bar_chart(df, metric, y_col, title="", max_height=None):
     # layout adjustments
     fig.update_layout(
         margin=dict(t=60, l=250, r=25, b=25),
-        height=max_height or (500 + max(0, (len(df_plot) - 10) * 15))),
+        height=max_height or (500 + max(0, (len(df_plot) - 10) * 15)),
         plot_bgcolor="white",
         paper_bgcolor="white",
         title_font=dict(size=18),
         showlegend=False
     )
 
-    # hide x-axis, wrap y labels, ensure padding
+    # ✅ hide x-axis, wrap y labels, ensure padding
     fig.update_xaxes(visible=False)
     fig.update_yaxes(
         tickfont=dict(size=11),
@@ -345,7 +345,7 @@ def create_bar_chart(df, metric, y_col, title="", max_height=None):
         ticklabelposition="inside",  # keeps text within plot area
     )
 
-    # wrap long y-axis labels
+    # ✅ wrap long y-axis labels
     fig.for_each_yaxis(lambda axis: axis.update(ticktext=[
         "<br>".join(label[i:i+25] for i in range(0, len(label), 25))  # wrap every 25 chars
         for label in axis.ticktext or []
@@ -594,6 +594,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
