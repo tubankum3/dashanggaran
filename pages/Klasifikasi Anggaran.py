@@ -205,6 +205,36 @@ st.markdown("""
     transform: translateY(-1px);
 }
 
+.drill-btn {
+    background-color: #f0f2f6;
+    border: none;
+    color: #333;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.9rem;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+.drill-btn:hover {
+    background-color: #e2e6eb;
+}
+
+.drill-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.drill-label {
+    font-weight: 600;
+    color: #444;
+    padding-top: 4px;
+}
+
 /* Sidebar */
 .stSidebar {
     background: var(--surface);
@@ -446,12 +476,11 @@ def sidebar(df):
 def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n):
     placeholder = st.empty()
     with placeholder.container():
-        # Breadcrumb header row with Back (←) and Reset (↻)
-        left_col, mid_col, right_col = st.columns([1, 6, 1])
-        
-        # Back button
-        with left_col:
-            if st.button(":arrow_backward:", help="Kembali satu tingkat"):
+        # === Back / Reset row ===
+        st.markdown('<div class="drill-controls">', unsafe_allow_html=True)
+        col_back, col_reset = st.columns([1, 1])
+        with col_back:
+            if st.button("↩️", key="back_btn", use_container_width=True):
                 if st.session_state.level_index > 0:
                     prev_idx = max(0, st.session_state.level_index - 1)
                     prev_col = HIERARCHY[prev_idx][1]
@@ -459,14 +488,13 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                     st.session_state.level_index = prev_idx
                     st.session_state.click_key += 1
                     st.rerun()
-        
-        # Reset button
-        with right_col:
-            if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
+        with col_reset:
+            if st.button("🔄", key="reset_btn", use_container_width=True):
                 reset_drill()
                 st.rerun()
-   
-       # Breadcrumb buttons stacked vertically
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # === Breadcrumb rows ===
         active_drills = [
             (i, lvl, st.session_state.drill.get(lvl))
             for i, lvl in enumerate(available_levels)
@@ -474,22 +502,63 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         ]
         
         if active_drills:
-            st.markdown(f"##### KLASIFIKASI {selected_metric} TAHUN {selected_year} BERDASARKAN:")
-            
-            # Create a row per active drill level
+            st.markdown("#### Klasifikasi berdasarkan:")
             for idx, (i, lvl, val) in enumerate(active_drills):
-                cols = st.columns([1, 5])  # adjust ratio to your liking
-                with cols[0]:
-                    st.markdown(f"**{lvl}**")
-                with cols[1]:
-                    if st.link_button(f"{val}", url="#", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}"):
-                        # Jump directly to ancestor i
+                row = st.columns([1, 5])
+                with row[0]:
+                    st.markdown(f"<div class='drill-label'>{lvl}</div>", unsafe_allow_html=True)
+                with row[1]:
+                    if st.button(f"{val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}", use_container_width=True):
                         for j in range(i + 1, len(available_levels)):
                             st.session_state.drill[available_levels[j]] = None
                         st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
                         st.session_state.click_key += 1
                         st.rerun()
-
+#------
+       #  # Breadcrumb header row with Back (←) and Reset (↻)
+       #  left_col, mid_col, right_col = st.columns([1, 6, 1])
+        
+       #  # Back button
+       #  with left_col:
+       #      if st.button(":arrow_backward:", help="Kembali satu tingkat"):
+       #          if st.session_state.level_index > 0:
+       #              prev_idx = max(0, st.session_state.level_index - 1)
+       #              prev_col = HIERARCHY[prev_idx][1]
+       #              st.session_state.drill[prev_col] = None
+       #              st.session_state.level_index = prev_idx
+       #              st.session_state.click_key += 1
+       #              st.rerun()
+        
+       #  # Reset button
+       #  with right_col:
+       #      if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
+       #          reset_drill()
+       #          st.rerun()
+   
+       # # Breadcrumb buttons stacked vertically
+       #  active_drills = [
+       #      (i, lvl, st.session_state.drill.get(lvl))
+       #      for i, lvl in enumerate(available_levels)
+       #      if st.session_state.drill.get(lvl)
+       #  ]
+        
+       #  if active_drills:
+       #      st.markdown(f"##### KLASIFIKASI {selected_metric} TAHUN {selected_year} BERDASARKAN:")
+            
+       #      # Create a row per active drill level
+       #      for idx, (i, lvl, val) in enumerate(active_drills):
+       #          cols = st.columns([1, 5])  # adjust ratio to your liking
+       #          with cols[0]:
+       #              st.markdown(f"**{lvl}**")
+       #          with cols[1]:
+       #              if st.link_button(f"{val}", url="#", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}"):
+       #                  # Jump directly to ancestor i
+       #                  for j in range(i + 1, len(available_levels)):
+       #                      st.session_state.drill[available_levels[j]] = None
+       #                  st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
+       #                  st.session_state.click_key += 1
+       #                  st.rerun()
+#-------
         # current view level
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
         view_row = available_levels[view_idx]
@@ -588,6 +657,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
