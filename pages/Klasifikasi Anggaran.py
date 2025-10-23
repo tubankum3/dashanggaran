@@ -334,46 +334,73 @@ def aggregate_level(df, group_cols, metric, top_n=None):
         agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
     return agg
 
-import plotly.express as px
-import numpy as np
-import plotly.graph_objects as go
-
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
-    """Create a consistent horizontal bar chart with percentage labels outside the bar."""
+    """Create a consistent horizontal bar chart with formatted axes and optional max_height."""
     df_plot = df.copy()
 
-    # Compute percentage of total
-    total = df_plot[metric].sum()
-    df_plot["percentage"] = (df_plot[metric] / total * 100).round(1)
-    df_plot["__label"] = df_plot["percentage"].astype(str) + "%"
+    # formatted string for display using format_rupiah
+    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
+    # sort ascending for better readability
+    df_plot = df_plot.sort_values(metric, ascending=True)
+
+    # create figure
     fig = px.bar(
-        df_plot.sort_values(metric, ascending=True),
+        df_plot,
         x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__label",
+        text="__formatted",
+        custom_data=["__formatted"],
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah"},
+        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
     )
 
     fig.update_traces(
-        hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{x:,.0f}}<br>Persentase: %{{text}}<extra></extra>",
-        textposition="outside",
-        textfont=dict(size=12),
+        hovertemplate=f"{y_col}: %{y}<br>Jumlah: %{customdata[0]}<extra></extra>",
+        textposition="auto",
     )
 
+    # calculate chart height dynamically (base 600 + 15px per extra row)
+    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
+    final_height = int(max_height) if max_height is not None else base_height
+
+    # format x-axis ticks using format_rupiah
+    try:
+        x_max = float(df_plot[metric].max())
+    except Exception:
+        x_max = 0.0
+
+    if x_max > 0:
+        tick_vals = np.linspace(0, x_max, 6)
+        tick_texts = [format_rupiah(int(v)) for v in tick_vals]
+    else:
+        tick_vals = [0]
+        tick_texts = [format_rupiah(0)]
+
+    # layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
         yaxis={"categoryorder": "total ascending"},
-        margin=dict(t=70, l=220, r=50, b=25),
-        height=600 + max(0, (len(df_plot) - 10) * 15),
+        margin=dict(t=70, l=220, r=25, b=50),
+        height=final_height,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
     )
 
-    fig.update_xaxes(tickformat=None, title_text="Jumlah (Rp)")
+    # ✅ formatted Rupiah tick labels on x-axis
+    fig.update_xaxes(
+        tickvals=tick_vals,
+        ticktext=tick_texts,
+        title_text="Jumlah (Rp)",
+        showgrid=True,
+        zeroline=False,
+    )
+
     return fig
+
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -609,35 +636,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
