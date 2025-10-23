@@ -360,10 +360,12 @@ def jump_to_ancestor(idx):
 # Header / Sidebar (kept your implementations)
 # =============================================================================
 def header(selected_year: str | None = None):
-    year_text = selected_year if selected_year else "Overview"
+    year_text = selected_year if selected_year else "OVERVIEW"
+    metric_text = f" {selected_metric}" if selected_metric else "KLASIFIKASI"
+    kl_text = selected_kl if selected_kl else "KEMENTERIAN/LEMBAGA"
     st.markdown(f"""
     <div class="dashboard-header" role="banner" aria-label="Header Dashboard Klasifikasi Anggaran">
-        <div class="breadcrumb">DASHBOARD / KLASIFIKASI / TAHUN {year_text}</div>
+        <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text}/ {kl_text} / TAHUN {year_text}</div>
         <h1 class="dashboard-title">Dashboard Klasifikasi Anggaran</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -383,7 +385,7 @@ def sidebar(df):
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
 
-        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=20, step=1)
+        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=10, step=1)
 
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
@@ -403,41 +405,53 @@ def sidebar(df):
         if "Semua" in selected_kls:
             selected_kls = []
 
-        st.markdown("---")
-        if st.button("Kembali (Back)"):
-            # go up one level
-            if st.session_state.level_index > 0:
-                # clear the selection of the current parent level (the level we came from)
-                # e.g., if level_index == 2 we are viewing level 2 (PROGRAM) children; back should clear selection at level 1
-                prev_idx = max(0, st.session_state.level_index - 1)
-                prev_col = HIERARCHY[prev_idx][1]
-                st.session_state.drill[prev_col] = None
-                st.session_state.level_index = prev_idx
-                st.session_state.click_key += 1
-                st.rerun()
-        if st.button("Reset"):
-            reset_drill()
-            st.rerun()
+        # st.markdown("---")
+        # if st.button("Kembali (Back)"):
+        #     # go up one level
+        #     if st.session_state.level_index > 0:
+        #         # clear the selection of the current parent level (the level we came from)
+        #         # e.g., if level_index == 2 we are viewing level 2 (PROGRAM) children; back should clear selection at level 1
+        #         prev_idx = max(0, st.session_state.level_index - 1)
+        #         prev_col = HIERARCHY[prev_idx][1]
+        #         st.session_state.drill[prev_col] = None
+        #         st.session_state.level_index = prev_idx
+        #         st.session_state.click_key += 1
+        #         st.rerun()
+        # if st.button("Reset"):
+        #     reset_drill()
+        #     st.rerun()
 
     return selected_year, selected_kls, top_n, selected_metric
 
 # =============================================================================
-# Drill-down UI (benchmark-style)
+# Drill-down UI
 # =============================================================================
 def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
     placeholder = st.empty()
     with placeholder.container():
-        # Breadcrumbs row (Home + ancestors)
-        cols = st.columns(1 + sum(1 for col in available_levels if st.session_state.drill.get(col)))
+        # Breadcrumbs row (Reset + ancestors)
+        cols = st.columns(2)
         if cols:
-            if cols[0].button("🏠 Home"):
+            if cols[0].button("←"):
+                # go up one level
+                if st.session_state.level_index > 0:
+                    # clear the selection of the current parent level (the level we came from)
+                    # e.g., if level_index == 2 we are viewing level 2 (PROGRAM) children; back should clear selection at level 1
+                    prev_idx = max(0, st.session_state.level_index - 1)
+                    prev_col = HIERARCHY[prev_idx][1]
+                    st.session_state.drill[prev_col] = None
+                    st.session_state.level_index = prev_idx
+                    st.session_state.click_key += 1
+                    st.rerun()
+            if cols[1].button("Reset"):
                 reset_drill()
                 st.rerun()
+        rows = st.rows(sum(1 for row in available_levels if st.session_state.drill.get(row)))
         idx = 1
-        for i, col in enumerate(available_levels):
-            val = st.session_state.drill.get(col)
+        for i, row in enumerate(available_levels):
+            val = st.session_state.drill.get(row)
             if val:
-                if cols[idx].button(f"{col}: {val}", key=f"crumb-{col}-{val}-{st.session_state.click_key}"):
+                if rows[idx].button(f"{row}: {val}", key=f"crumb-{row}-{val}-{st.session_state.click_key}"):
                     # jump to ancestor i (show its children)
                     for j in range(i + 1, len(available_levels)):
                         st.session_state.drill[available_levels[j]] = None
@@ -448,24 +462,24 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
 
         # current view level
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
-        view_col = available_levels[view_idx]
+        view_row = available_levels[view_idx]
 
         # filter by ancestors
         df_view = df_filtered.copy()
         for j in range(view_idx):
-            anc_col = available_levels[j]
-            anc_val = st.session_state.drill.get(anc_col)
+            anc_row = available_levels[j]
+            anc_val = st.session_state.drill.get(anc_row)
             if anc_val is not None:
-                df_view = df_view[df_view[anc_col] == anc_val]
+                df_view = df_view[df_view[anc_row] == anc_val]
 
         # aggregate for bars
-        agg = aggregate_level(df_view, [view_col], selected_metric, top_n)
+        agg = aggregate_level(df_view, [view_row], selected_metric, top_n)
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
             return
 
-        title = f"{view_col} — (Top {top_n}) — Level {view_idx + 1} dari {len(available_levels)}"
-        fig = create_bar_chart(agg, selected_metric, view_col, title=title, max_height=600)
+        title = f"{view_row} — (Top {top_n}) — Level {view_idx + 1} dari {len(available_levels)}"
+        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600)
 
         # ✅ Show chart and capture clicks directly
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
@@ -547,5 +561,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
