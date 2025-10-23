@@ -334,71 +334,67 @@ def aggregate_level(df, group_cols, metric, top_n=None):
         agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
     return agg
 
+import plotly.express as px
+import numpy as np
+import plotly.graph_objects as go
+
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
-    """Create a consistent horizontal bar chart with formatted axes and optional max_height."""
+    """Basic horizontal bar chart with formatted Rupiah x-axis."""
+    if df.empty or metric not in df.columns or y_col not in df.columns:
+        return go.Figure()
+
     df_plot = df.copy()
-
-    # Calculate percentage
-    total = df_plot[metric].sum()
-    if total > 0:
-        df_plot["percentage"] = (df_plot[metric] / total * 100)
-    else:
-        df_plot["percentage"] = 0
-    
-    # formatted string for display using format_rupiah
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
-    df_plot["__pct_formatted"] = df_plot["percentage"].apply(lambda x: f"{x:.2f}%")
+    df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # sort ascending for better readability
-    df_plot = df_plot.sort_values("percentage", ascending=True)
-
-    # create figure using percentage for BOTH x-axis AND bar length
     fig = px.bar(
         df_plot,
-        x="percentage",  # ← This makes the bar length represent percentage
+        x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        custom_data=["__formatted", "__pct_formatted"],
+        text="__formatted",
         title=title,
-        labels={y_col: y_col.title(), "percentage": "Persentase (%)"},
+        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
     )
 
-    # Add percentage labels on bars
     fig.update_traces(
-        text=df_plot["__pct_formatted"],
-        textposition="inside",
-        textfont=dict(color="white", size=11),
-        hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<br>Persentase: %{{customdata[1]}}<extra></extra>",
+        textposition="auto",
+        hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<extra></extra>",
+        customdata=df_plot[["__formatted"]],
     )
 
-    # calculate chart height dynamically (base 600 + 15px per extra row)
-    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
-    final_height = int(max_height) if max_height is not None else base_height
+    # dynamic height
+    n_rows = len(df_plot)
+    base_height = 500 + max(0, (n_rows - 10) * 20)
+    height = int(max_height) if max_height else base_height
 
-    # layout
+    # format x-axis ticks
+    x_max = float(df_plot[metric].max()) if df_plot[metric].max() else 0
+    tick_vals = np.linspace(0, x_max, 6) if x_max > 0 else [0]
+    tick_texts = [format_rupiah(int(v)) for v in tick_vals]
+
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
-        yaxis={"categoryorder": "total ascending"},
-        margin=dict(t=70, l=220, r=25, b=50),
-        height=final_height,
+        yaxis=dict(categoryorder="total ascending"),
+        margin=dict(t=60, l=220, r=25, b=50),
+        height=height,
         plot_bgcolor="white",
         paper_bgcolor="white",
     )
 
-    # Format x-axis with percentage
     fig.update_xaxes(
-        title_text="Persentase (%)",
+        tickvals=tick_vals,
+        ticktext=tick_texts,
+        title_text="Jumlah (Rp)",
+        tickfont=dict(size=11),
         showgrid=True,
-        gridcolor='rgba(128,128,128,0.2)',
-        zeroline=True,
-        zerolinecolor='rgba(128,128,128,0.3)',
-        ticksuffix="%",
-        range=[0, max(df_plot["percentage"]) * 1.05],  # Auto-scale with 5% padding
+        zeroline=False,
     )
 
     return fig
+
     
 # =============================================================================
 # Hierarchy and session helpers
@@ -634,6 +630,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
