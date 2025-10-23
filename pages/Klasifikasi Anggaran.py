@@ -335,44 +335,57 @@ def aggregate_level(df, group_cols, metric, top_n=None):
     return agg
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
-    """Create a consistent horizontal bar chart with formatted axes and percentage labels."""
+    """
+    Horizontal bar chart preserving Plotly tokens correctly in f-strings.
+    - df: aggregated dataframe with columns [y_col, metric]
+    - metric: numeric metric column name
+    - y_col: categorical column name
+    - color_col: optional color grouping
+    - stacked: whether to stack bars
+    - max_height: optional override for height (pixels)
+    """
     df_plot = df.copy()
-    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
+    if metric not in df_plot.columns or y_col not in df_plot.columns:
+        return go.Figure()
 
-    # total for percentage calculation
-    total_val = df_plot[metric].sum()
-    df_plot["__pct"] = (df_plot[metric] / total_val * 100).round(2)
+    # keep original formatted label for display inside bars / hover
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # sort ascending for readability
+    # sort so small->large top-to-bottom in horizontal layout
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # main figure
+    # percent label to show inside bars
+    total = df_plot[metric].sum()
+    df_plot["pct"] = ((df_plot[metric] / total) * 100).round(2) if total and total != 0 else 0.0
+    df_plot["pct_label"] = df_plot["pct"].astype(str) + "%"
+
+    # build the figure
     fig = px.bar(
         df_plot,
         x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__pct",
-        custom_data=["__formatted", "__pct"],
+        text="__formatted",                 # you asked for formatted rupiah inside bars originally
+        custom_data=["__formatted", "pct"], # used in hover
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
+        labels={y_col: y_col.title(), metric: "Jumlah: Rp"},
     )
 
-    # ✅ Show percentage labels outside each bar
+    # IMPORTANT: escape Plotly tokens inside f-strings using double braces {{ }}
+    hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<br>Persentase: %{{customdata[1]}}%<extra></extra>"
+
     fig.update_traces(
-        texttemplate="%{text:.1f}%",
-        textposition="outside",
-        insidetextanchor="end",
-        hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>"
+        hovertemplate=hover,
+        textposition="auto",
     )
 
-    # dynamic height (base 600 + 15px per extra row)
-    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
-    final_height = int(max_height) if max_height is not None else base_height
+    # dynamic height logic (base 600 + 15 px per row beyond 10)
+    n = len(df_plot)
+    base_height = 600 + max(0, (n - 10) * 15)
+    height = int(max_height) if max_height is not None else base_height
 
-    # format x-axis ticks using format_rupiah
+    # compute x-axis tick labels as formatted rupiah (six ticks 0..max)
     try:
         x_max = float(df_plot[metric].max())
     except Exception:
@@ -385,26 +398,39 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         tick_vals = [0]
         tick_texts = [format_rupiah(0)]
 
+    # layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
         yaxis={"categoryorder": "total ascending"},
         margin=dict(t=70, l=220, r=25, b=50),
-        height=final_height,
+        height=height,
         plot_bgcolor="white",
         paper_bgcolor="white",
-        uniformtext_minsize=9,
-        uniformtext_mode="hide",
     )
 
-    # ✅ proper numeric x-axis with formatted labels
+    # apply formatted ticks to x-axis so the labels show rupiah values
     fig.update_xaxes(
         tickvals=tick_vals,
         ticktext=tick_texts,
         title_text="Jumlah (Rp)",
+        tickfont=dict(size=10),
         showgrid=True,
         zeroline=False,
     )
+
+    # wrap y labels if too long (simple chunking)
+    cat_labels = df_plot[y_col].astype(str).tolist()
+    max_chars = 30
+    wrapped = []
+    for lbl in cat_labels:
+        if len(lbl) <= max_chars:
+            wrapped.append(lbl)
+        else:
+            parts = [lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars)]
+            wrapped.append("<br>".join(parts))
+
+    fig.update_yaxes(tickvals=cat_labels, ticktext=wrapped, automargin=True, tickfont=dict(size=11))
 
     return fig
 
@@ -642,6 +668,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
