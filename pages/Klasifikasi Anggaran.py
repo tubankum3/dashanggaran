@@ -334,52 +334,75 @@ def aggregate_level(df, group_cols, metric, top_n=None):
         agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
     return agg
 
-def create_bar_chart(df, metric, y_col, title="", max_height=None):
+def create_bar_chart(df, metric, y_col, title="", top_n=10):
     df_plot = df.copy()
     df_plot["__fmt"] = df_plot[metric].apply(format_rupiah)
 
-    # create bar chart
+    # Calculate percentage of each bar relative to total
+    total = df_plot[metric].sum()
+    df_plot["pct"] = (df_plot[metric] / total * 100).round(2)
+    df_plot["label_pct"] = df_plot["pct"].astype(str) + "%"
+
+    # Sort ascending for horizontal chart
+    df_plot = df_plot.sort_values(metric, ascending=True)
+
+    # Flexible height depending on number of rows
+    n_rows = len(df_plot)
+    base_height = 500
+    if n_rows < top_n:
+        chart_height = base_height - (top_n - n_rows) * 20
+    else:
+        chart_height = base_height + (n_rows - top_n) * 20
+    chart_height = max(300, chart_height)  # don't go too low
+
+    # Create bar chart
     fig = px.bar(
-        df_plot.sort_values(metric, ascending=True),
-        x=metric, y=y_col, orientation="h",
-        text="__fmt",
-        custom_data=[y_col, metric],
+        df_plot,
+        x=metric,
+        y=y_col,
+        orientation="h",
+        text="label_pct",
+        custom_data=[y_col, metric, "pct"],
         title=title,
         labels={y_col: y_col, metric: "Jumlah"},
-        color_discrete_sequence=["#2E86DE"]  # ✅ blue tone instead of black
+        color_discrete_sequence=["#2E86DE"]  # blue tone
     )
 
-    # format text and hover
+    # Text & hover info
     fig.update_traces(
         textposition="auto",
         textfont=dict(color="white", size=12),
-        hovertemplate="%{y}<br>Jumlah: %{customdata[1]:,.0f}<extra></extra>"
+        hovertemplate="%{y}<br>Jumlah: %{customdata[1]:,.0f}<br>Persentase: %{customdata[2]}%<extra></extra>"
     )
 
-    # layout adjustments
+    # Axis formatting
+    fig.update_xaxes(
+        title_text="Jumlah (Rp)",
+        tickvals=df_plot[metric],
+        ticktext=[format_rupiah(x) for x in df_plot[metric]],
+        tickfont=dict(size=11)
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=11),
+        automargin=True,
+        ticklabeloverflow="allow",
+    )
+
+    # ✅ Wrap long y-axis labels
+    fig.for_each_yaxis(lambda axis: axis.update(ticktext=[
+        "<br>".join(label[i:i+25] for i in range(0, len(label), 25))
+        for label in axis.ticktext or []
+    ]))
+
+    # Layout
     fig.update_layout(
         margin=dict(t=60, l=250, r=25, b=25),
-        height=max_height or (500 + max(0, (len(df_plot) - 10) * 15)),
+        height=chart_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
         title_font=dict(size=18),
         showlegend=False
     )
-
-    # ✅ hide x-axis, wrap y labels, ensure padding
-    fig.update_xaxes(visible=False)
-    fig.update_yaxes(
-        tickfont=dict(size=11),
-        automargin=True,
-        ticklabeloverflow="allow",
-        ticklabelposition="inside",  # keeps text within plot area
-    )
-
-    # ✅ wrap long y-axis labels
-    fig.for_each_yaxis(lambda axis: axis.update(ticktext=[
-        "<br>".join(label[i:i+25] for i in range(0, len(label), 25))  # wrap every 25 chars
-        for label in axis.ticktext or []
-    ]))
 
     return fig
 
@@ -617,6 +640,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
