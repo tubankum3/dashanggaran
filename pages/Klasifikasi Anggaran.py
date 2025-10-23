@@ -336,73 +336,77 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
     """
-    Horizontal bar chart with x-axis showing formatted Rupiah values.
+    Horizontal bar chart with x-axis showing percentage values.
     """
     df_plot = df.copy()
 
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
-    # Sort to get the top N items, then re-sort ascending.
-    # Plotly plots the last item in the dataframe at the top of the chart.
-    # This ensures the largest of the Top N is at the top.
+    # Sort to get the top N items, then re-sort ascending for Plotly's plotting order.
     df_plot = df_plot.nlargest(top_n, metric).sort_values(metric, ascending=True)
     df_plot = df_plot.reset_index(drop=True)
 
-    # Formatted Rupiah values for display
+    # Formatted Rupiah values for display in hover text
     df_plot["__fmt"] = df_plot[metric].apply(format_rupiah)
 
-    # Calculate percentages for text labels
-    total = df_plot[metric].sum()
-    df_plot["pct"] = (df_plot[metric] / total * 100).round(2) if total != 0 else 0
-    df_plot["label_pct"] = df_plot["pct"].astype(str) + "%"
-    
-    # ✅ MODIFICATION: Wrap long category labels directly in the dataframe
+    # --- Percentage Calculation ---
+    # Note: Percentage is calculated based on the total of the items being displayed (the Top N).
+    total_in_view = df_plot[metric].sum()
+    df_plot["pct"] = (df_plot[metric] / total_in_view * 100) if total_in_view != 0 else 0
+    df_plot["label_pct"] = df_plot["pct"].round(1).astype(str) + "%"
+
+    # Wrap long category labels for the y-axis
     max_chars = 30
     df_plot["__wrapped_y_labels"] = df_plot[y_col].astype(str).apply(
         lambda lbl: "<br>".join(lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars)) if len(lbl) > max_chars else lbl
     )
 
-    # Create the chart using the new pre-formatted column for y-axis
+    # --- MODIFIED: Create the chart with 'pct' on the x-axis ---
     fig = px.bar(
         df_plot,
-        x=metric,
-        y="__wrapped_y_labels",  # Use the new wrapped label column
+        x="pct",  # Use the percentage column for the x-axis
+        y="__wrapped_y_labels",
         orientation="h",
         text="label_pct",
-        custom_data=["__fmt", "pct", metric],
+        custom_data=[y_col, "__fmt", "pct"], # Add original data for hover tooltip
         title=title,
-        labels={"__wrapped_y_labels": y_col, metric: "Jumlah (Rp)"}, # Set clean axis titles
+        labels={"__wrapped_y_labels": y_col, "pct": "Persentase"}, # Update axis labels
         color_discrete_sequence=["#2E86DE"],
     )
 
     fig.update_traces(
         textposition="auto",
         textfont=dict(color="white", size=11),
-        # Ensure hover label shows original (unwrapped) y-value
-        hovertemplate="%{" + y_col + "}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>",
+        # Hovertemplate now shows original label, absolute value, and percentage
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            "Jumlah: %{customdata[1]}<br>"
+            "Persentase: %{customdata[2]:.2f}%<extra></extra>"
+        )
     )
 
-    # Dynamic height calculation
+    # Dynamic height calculation (no change)
     n_rows = len(df_plot)
     per_row_px = 45
-    base_height = max(400, n_rows * per_row_px + 150) # Add buffer for title/margins
+    base_height = max(400, n_rows * per_row_px + 150)
     final_height = int(max_height) if max_height is not None else base_height
 
-    # Determine tick positions and labels for X-axis (your original logic was correct)
+    # --- MODIFIED: Determine tick positions and labels for Percentage X-axis ---
     try:
-        x_max = float(df_plot[metric].max())
+        x_max = float(df_plot["pct"].max())
     except (ValueError, TypeError):
         x_max = 0.0
 
     if x_max > 0:
+        # Generate about 6 evenly spaced ticks up to the max percentage
         tick_vals = np.linspace(0, x_max, 6)
-        tick_texts = [format_rupiah(int(v)) for v in tick_vals]
+        tick_texts = [f"{v:.0f}%" for v in tick_vals] # Format as integer percentage
     else:
         tick_vals = [0]
-        tick_texts = [format_rupiah(0)]
+        tick_texts = ["0%"]
 
-    # Apply simplified layout updates
+    # Apply layout updates
     fig.update_layout(
         margin=dict(t=70, l=260, r=25, b=60),
         height=final_height,
@@ -412,23 +416,23 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
         showlegend=False,
     )
 
-    # ✅ THIS SHOULD NOW WORK CORRECTLY
-    # Update X-axis with proper numeric values and formatted labels
+    # --- MODIFIED: Update X-axis configuration for percentages ---
     fig.update_xaxes(
         tickvals=tick_vals,
         ticktext=tick_texts,
         tickfont=dict(size=11),
-        title_text="Jumlah (Rp)",
+        title_text="Persentase",
         showgrid=True,
         zeroline=False,
+        # Add a little padding so the longest bar doesn't touch the edge
+        range=[0, x_max * 1.1]
     )
 
-    # ✅ MODIFICATION: Simplified Y-axis update
-    # No need to set tickvals or ticktext as they come from the dataframe now
+    # Y-axis update (no change)
     fig.update_yaxes(
         automargin=True,
         tickfont=dict(size=11),
-        title_text="", # Title is set in px.bar's `labels` argument
+        title_text="",
     )
 
     return fig
@@ -667,6 +671,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
