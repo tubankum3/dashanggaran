@@ -338,74 +338,60 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     """Create a consistent horizontal bar chart with formatted axes and optional max_height."""
     df_plot = df.copy()
 
+    # Calculate percentage
+    total = df_plot[metric].sum()
+    df_plot["percentage"] = (df_plot[metric] / total * 100) if total > 0 else 0
+    
     # formatted string for display using format_rupiah
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
+    df_plot["__pct_formatted"] = df_plot["percentage"].apply(lambda x: f"{x:.2f}%")
 
     # sort ascending for better readability
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # create figure - DON'T use text parameter here
+    # create figure using percentage for x-axis
     fig = px.bar(
         df_plot,
-        x=metric,
+        x="percentage",
         y=y_col,
         color=color_col,
         orientation="h",
-        custom_data=["__formatted"],
+        custom_data=["__formatted", "__pct_formatted"],
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
+        labels={y_col: y_col.title(), "percentage": "Persentase (%)"},
     )
 
-    # Add text labels AFTER creation
+    # Add percentage labels on bars
     fig.update_traces(
-        text=df_plot["__formatted"],
-        textposition="outside",
-        hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>",
+        text=df_plot["__pct_formatted"],
+        textposition="auto",
+        hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<br>Persentase: %{{customdata[1]}}<extra></extra>",
     )
 
     # calculate chart height dynamically (base 600 + 15px per extra row)
     base_height = 600 + max(0, (len(df_plot) - 10) * 15)
     final_height = int(max_height) if max_height is not None else base_height
 
-    # format x-axis ticks using format_rupiah
-    try:
-        x_max = float(df_plot[metric].max())
-    except Exception:
-        x_max = 0.0
-
-    if x_max > 0:
-        # Create 5 evenly spaced tick values from 0 to max
-        tick_vals = np.linspace(0, x_max, 5)
-        tick_texts = [format_rupiah(v) for v in tick_vals]
-    else:
-        tick_vals = [0]
-        tick_texts = ["Rp 0"]
-
     # layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
         yaxis={"categoryorder": "total ascending"},
-        margin=dict(t=70, l=220, r=80, b=50),  # Increased right margin for text labels
+        margin=dict(t=70, l=220, r=25, b=50),
         height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
-        xaxis_range=[0, x_max * 1.15],  # Add 15% padding for text labels
     )
 
-    # Apply formatted Rupiah tick labels on x-axis
+    # Format x-axis with percentage
     fig.update_xaxes(
-        tickmode='linear',
-        tick0=0,
-        dtick=x_max/4,  # 4 intervals
-        tickformat="~s",  # This will be overridden by ticktext
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        title_text="Jumlah (Rp)",
+        title_text="Persentase (%)",
         showgrid=True,
         gridcolor='rgba(128,128,128,0.2)',
         zeroline=True,
         zerolinecolor='rgba(128,128,128,0.3)',
+        ticksuffix="%",
+        range=[0, 105],  # 0-100% plus small padding
     )
 
     return fig
@@ -644,6 +630,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
