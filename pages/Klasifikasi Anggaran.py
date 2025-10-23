@@ -479,19 +479,20 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
             if cols[1].button("Reset"):
                 reset_drill()
                 st.rerun()
-        rows = st.rows(sum(1 for row in available_levels if st.session_state.drill.get(row)))
-        idx = 1
-        for i, row in enumerate(available_levels):
-            val = st.session_state.drill.get(row)
-            if val:
-                if rows[idx].button(f"{row}: {val}", key=f"crumb-{row}-{val}-{st.session_state.click_key}"):
-                    # jump to ancestor i (show its children)
+        # Breadcrumb buttons for each active drill level
+        active_drills = [(i, lvl, st.session_state.drill.get(lvl)) for i, lvl in enumerate(available_levels) if st.session_state.drill.get(lvl)]
+        
+        if active_drills:
+            st.markdown("#### 🧭 Jalur Drill-down:")
+            crumb_cols = st.columns(len(active_drills))
+            for idx, (i, lvl, val) in enumerate(active_drills):
+                if crumb_cols[idx].button(f"{lvl}: {val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}"):
+                    # Jump to ancestor i
                     for j in range(i + 1, len(available_levels)):
                         st.session_state.drill[available_levels[j]] = None
                     st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
                     st.session_state.click_key += 1
                     st.rerun()
-                idx += 1
 
         # current view level
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
@@ -594,6 +595,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
