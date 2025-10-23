@@ -414,10 +414,10 @@ def sidebar(df):
                 st.session_state.drill[prev_col] = None
                 st.session_state.level_index = prev_idx
                 st.session_state.click_key += 1
-                st.experimental_rerun()
+                st.rerun()
         if st.button("Reset"):
             reset_drill()
-            st.experimental_rerun()
+            st.rerun()
 
     return selected_year, selected_kls, top_n, selected_metric
 
@@ -432,7 +432,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
         if cols:
             if cols[0].button("🏠 Home"):
                 reset_drill()
-                st.experimental_rerun()
+                st.rerun()
         idx = 1
         for i, col in enumerate(available_levels):
             val = st.session_state.drill.get(col)
@@ -443,7 +443,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
                         st.session_state.drill[available_levels[j]] = None
                     st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
                     st.session_state.click_key += 1
-                    st.experimental_rerun()
+                    st.rerun()
                 idx += 1
 
         # current view level
@@ -482,7 +482,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
                 if view_idx + 1 < len(available_levels):
                     st.session_state.level_index = view_idx + 1
                 st.session_state.click_key += 1
-                st.experimental_rerun()
+                st.rerun()
 
 # =============================================================================
 # Main
@@ -547,4 +547,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
