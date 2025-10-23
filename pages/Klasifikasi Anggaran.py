@@ -339,63 +339,42 @@ import numpy as np
 import plotly.graph_objects as go
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
-    """Basic horizontal bar chart with formatted Rupiah x-axis."""
-    if df.empty or metric not in df.columns or y_col not in df.columns:
-        return go.Figure()
-
+    """Create a consistent horizontal bar chart with percentage labels outside the bar."""
     df_plot = df.copy()
-    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
-    df_plot = df_plot.sort_values(metric, ascending=True)
+
+    # Compute percentage of total
+    total = df_plot[metric].sum()
+    df_plot["percentage"] = (df_plot[metric] / total * 100).round(1)
+    df_plot["__label"] = df_plot["percentage"].astype(str) + "%"
 
     fig = px.bar(
-        df_plot,
+        df_plot.sort_values(metric, ascending=True),
         x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__formatted",
+        text="__label",
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
+        labels={y_col: y_col.title(), metric: "Jumlah"},
     )
 
     fig.update_traces(
-        textposition="auto",
-        hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<extra></extra>",
-        customdata=df_plot[["__formatted"]],
+        hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{x:,.0f}}<br>Persentase: %{{text}}<extra></extra>",
+        textposition="outside",
+        textfont=dict(size=12),
     )
-
-    # dynamic height
-    n_rows = len(df_plot)
-    base_height = 500 + max(0, (n_rows - 10) * 20)
-    height = int(max_height) if max_height else base_height
-
-    # format x-axis ticks
-    x_max = float(df_plot[metric].max()) if df_plot[metric].max() else 0
-    tick_vals = np.linspace(0, x_max, 6) if x_max > 0 else [0]
-    tick_texts = [format_rupiah(int(v)) for v in tick_vals]
 
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
-        yaxis=dict(categoryorder="total ascending"),
-        margin=dict(t=60, l=220, r=25, b=50),
-        height=height,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        yaxis={"categoryorder": "total ascending"},
+        margin=dict(t=70, l=220, r=50, b=25),
+        height=600 + max(0, (len(df_plot) - 10) * 15),
     )
 
-    fig.update_xaxes(
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        title_text="Jumlah (Rp)",
-        tickfont=dict(size=11),
-        showgrid=True,
-        zeroline=False,
-    )
-
+    fig.update_xaxes(tickformat=None, title_text="Jumlah (Rp)")
     return fig
 
-    
 # =============================================================================
 # Hierarchy and session helpers
 # =============================================================================
@@ -630,6 +609,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
