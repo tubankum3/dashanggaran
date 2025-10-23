@@ -334,113 +334,66 @@ def aggregate_level(df, group_cols, metric, top_n=None):
         agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
     return agg
 
-def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
-    """
-    Backward-compatible create_bar_chart.
-    - df: aggregated dataframe with columns [y_col, metric]
-    - metric: numeric column name
-    - y_col: categorical column name
-    - top_n: baseline number of rows for height calculation (default 10)
-    - max_height: optional pixel override for chart height
-    """
+def create_bar_chart(df, metric, y_col, title="", top_n=None):
     df_plot = df.copy()
+    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # ensure numeric metric exists
-    if metric not in df_plot.columns:
-        return go.Figure()
-
-    # sort ascending for horizontal bar order
-    df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
-
-    # formatted rupiah for hover and potential combined labels
-    df_plot["__fmt"] = df_plot[metric].apply(format_rupiah)
-
-    # percent labels
+    # Calculate % of total for labels
     total = df_plot[metric].sum()
-    if total == 0:
-        df_plot["pct"] = 0.0
-    else:
-        df_plot["pct"] = (df_plot[metric] / total * 100).round(2)
-    df_plot["label_pct"] = df_plot["pct"].astype(str) + "%"
+    df_plot["pct_label"] = df_plot[metric] / total * 100
+    df_plot["pct_label"] = df_plot["pct_label"].apply(lambda x: f"{x:.2f}%")
 
-    # determine chart height
-    n_rows = len(df_plot)
-    baseline = 500 if (top_n is None or top_n == 10) else int(500 * (top_n / 10))
-    per_row_px = 20
-    if max_height:
-        chart_height = int(max_height)
-    else:
-        # scale relative to top_n baseline
-        diff = n_rows - (top_n or 10)
-        chart_height = baseline + diff * per_row_px
-        chart_height = max(300, chart_height)
-
-    # Build figure
+    # Create bar chart
     fig = px.bar(
-        df_plot,
+        df_plot.sort_values(metric, ascending=True),
         x=metric,
         y=y_col,
         orientation="h",
-        text="label_pct",               # show percentage on bar
-        custom_data=[y_col, metric, "pct", "__fmt"],
+        text="pct_label",  # percentage on bar
+        custom_data=["__formatted", "pct_label"],
         title=title,
-        labels={y_col: y_col, metric: "Jumlah (Rp)"},
+        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
         color_discrete_sequence=["#2E86DE"],
     )
 
-    # Text & hover
+    # Bar + hover setup
     fig.update_traces(
+        hovertemplate=f"{y_col}: %{y}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}<extra></extra>",
         textposition="auto",
-        textfont=dict(color="white", size=11),
-        hovertemplate="%{y}<br>Jumlah: %{customdata[3]}<br>Persentase: %{customdata[2]}%<extra></extra>"
+        textfont=dict(color="white", size=12),
     )
 
-    # Custom x-axis tick labels in formatted rupiah
-    x_min = df_plot[metric].min()
-    x_max = df_plot[metric].max()
+    # Dynamic height
+    n_rows = len(df_plot)
+    if top_n:
+        n_rows = min(n_rows, top_n)
+    height = 500 if n_rows == 10 else max(300, 50 * n_rows)
 
-    if x_max > 0:
-        # Generate evenly spaced tick values
-        tick_vals = np.linspace(0, x_max, 6)
-        tick_texts = [format_rupiah(v) for v in tick_vals]
-        fig.update_xaxes(
-            tickvals=tick_vals,
-            ticktext=tick_texts,
-            title_text="Jumlah (Rp)",
-            tickfont=dict(size=10),
-            showgrid=True,
-            zeroline=False
-        )
-    else:
-        fig.update_xaxes(
-            tickvals=[0],
-            ticktext=["Rp 0"],
-            title_text="Jumlah (Rp)"
-        )
-
-    # Wrap long y-axis labels
-    cat_labels = df_plot[y_col].astype(str).tolist()
-    wrapped = []
-    max_chars = 30  # tweak wrapping width if needed
-    for lbl in cat_labels:
-        if len(lbl) <= max_chars:
-            wrapped.append(lbl)
-        else:
-            parts = [lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars)]
-            wrapped.append("<br>".join(parts))
-
-    # ensure y-axis matches categories order and uses wrapped text
-    fig.update_yaxes(tickvals=cat_labels, ticktext=wrapped, automargin=True, tickfont=dict(size=11))
-
-    # Layout tweaks
-    left_margin = max(200, min(350, 20 + max_chars * 7))  # heuristic for left margin
+    # Layout
     fig.update_layout(
-        margin=dict(t=60, l=left_margin, r=25, b=60),
-        height=chart_height,
+        showlegend=False,
+        yaxis={"categoryorder": "total ascending"},
+        margin=dict(t=70, l=250, r=25, b=50),
+        height=height,
         plot_bgcolor="white",
         paper_bgcolor="white",
-        title_font=dict(size=16),
-        showlegend=False
+        title_font=dict(size=18),
+    )
+
+    # ✅ Keep numeric x-axis scale but label as Rupiah
+    fig.update_xaxes(
+        tickformat=None,  # allow natural number ticks
+        title_text="Jumlah (Rp)",
+        tickfont=dict(size=11),
+        showgrid=True,
+        zeroline=False,
+    )
+
+    # ✅ Wrap long y labels
+    fig.update_yaxes(
+        tickfont=dict(size=11),
+        automargin=True,
+        ticklabeloverflow="allow",
     )
 
     return fig
@@ -679,6 +632,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
