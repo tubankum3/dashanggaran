@@ -337,6 +337,7 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """Create a consistent horizontal bar chart with formatted axes and optional max_height."""
     df_plot = df.copy()
+    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce")
 
     # formatted string for display using format_rupiah
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
@@ -637,4 +638,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
