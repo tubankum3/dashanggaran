@@ -424,29 +424,21 @@ def sidebar(df):
 # =============================================================================
 # Drill-down UI (benchmark-style)
 # =============================================================================
-def generar_drill_down(df_filtered, available_levels, selected_metric, top_n):
-    """
-    Presents a single interactive drill-down bar chart like your benchmark.
-    - Starts at level index 0 (FUNGSI).
-    - Clicking a bar sets the selection for that level and drills to next level.
-    - Back / breadcrumb buttons allow moving up.
-    """
+def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
     placeholder = st.empty()
     with placeholder.container():
         # Breadcrumbs row (Home + ancestors)
         cols = st.columns(1 + sum(1 for col in available_levels if st.session_state.drill.get(col)))
         if cols:
-            if cols[0].button("Home"):
+            if cols[0].button("🏠 Home"):
                 reset_drill()
                 st.experimental_rerun()
-        # render ancestor buttons
         idx = 1
         for i, col in enumerate(available_levels):
             val = st.session_state.drill.get(col)
             if val:
                 if cols[idx].button(f"{col}: {val}", key=f"crumb-{col}-{val}-{st.session_state.click_key}"):
                     # jump to ancestor i (show its children)
-                    # keep this ancestor selection, clear deeper ones
                     for j in range(i + 1, len(available_levels)):
                         st.session_state.drill[available_levels[j]] = None
                     st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
@@ -454,15 +446,11 @@ def generar_drill_down(df_filtered, available_levels, selected_metric, top_n):
                     st.experimental_rerun()
                 idx += 1
 
-        # current view level is st.session_state.level_index
-        view_idx = st.session_state.level_index
-        # cap view_idx
-        if view_idx >= len(available_levels):
-            view_idx = len(available_levels) - 1
+        # current view level
+        view_idx = min(st.session_state.level_index, len(available_levels) - 1)
+        view_col = available_levels[view_idx]
 
-        view_col = available_levels[view_idx]  # the column we display bars for
-
-        # Build df for this view by applying filters for ancestors (levels 0..view_idx-1)
+        # filter by ancestors
         df_view = df_filtered.copy()
         for j in range(view_idx):
             anc_col = available_levels[j]
@@ -470,7 +458,7 @@ def generar_drill_down(df_filtered, available_levels, selected_metric, top_n):
             if anc_val is not None:
                 df_view = df_view[df_view[anc_col] == anc_val]
 
-        # Aggregate for bars
+        # aggregate for bars
         agg = aggregate_level(df_view, [view_col], selected_metric, top_n)
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
@@ -478,36 +466,21 @@ def generar_drill_down(df_filtered, available_levels, selected_metric, top_n):
 
         title = f"{view_col} — (Top {top_n}) — Level {view_idx + 1} dari {len(available_levels)}"
         fig = create_bar_chart(agg, selected_metric, view_col, title=title, max_height=600)
-        # show the chart and capture clicks using plotly_events (click_event)
-        st.plotly_chart(fig, use_container_width=True)
-        events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}")
 
-        # If the user clicked a bar, drill down: set selection at view_col and increment level_index
+        # ✅ Show chart and capture clicks directly
+        events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
+
+        # handle click
         if events:
             ev = events[0]
-            # attempt to extract clicked label robustly
-            clicked = None
-            if ev.get("y"):
-                clicked = ev.get("y")
-            elif ev.get("label"):
-                clicked = ev.get("label")
-            else:
+            clicked = ev.get("y") or ev.get("label")
+            if not clicked and ev.get("customdata"):
                 cd = ev.get("customdata")
-                if cd:
-                    # customdata might be [label, metric] or nested
-                    if isinstance(cd, list) and len(cd) > 0:
-                        maybe = cd[0]
-                        if isinstance(maybe, (list, tuple)) and len(maybe) > 0:
-                            clicked = maybe[0]
-                        else:
-                            clicked = maybe
-            # set the selection and go deeper if possible
+                clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
             if clicked:
                 st.session_state.drill[view_col] = clicked
-                # move to next level if exists
                 if view_idx + 1 < len(available_levels):
                     st.session_state.level_index = view_idx + 1
-                # else stay (we're at deepest level)
                 st.session_state.click_key += 1
                 st.experimental_rerun()
 
@@ -540,7 +513,7 @@ def main():
         return
 
     # run the benchmark-style drill-down
-    generar_drill_down(df_filtered, available_levels, selected_metric, top_n)
+    general_drill_down(df_filtered, available_levels, selected_metric, top_n)
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
@@ -574,3 +547,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
