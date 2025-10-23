@@ -344,22 +344,23 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     # sort ascending for better readability
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # create figure
+    # create figure - DON'T use text parameter here
     fig = px.bar(
         df_plot,
         x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__formatted",
         custom_data=["__formatted"],
         title=title,
         labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
     )
 
+    # Add text labels AFTER creation
     fig.update_traces(
+        text=df_plot["__formatted"],
+        textposition="outside",
         hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>",
-        textposition="auto",
     )
 
     # calculate chart height dynamically (base 600 + 15px per extra row)
@@ -369,40 +370,42 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     # format x-axis ticks using format_rupiah
     try:
         x_max = float(df_plot[metric].max())
-        x_min = float(df_plot[metric].min())
     except Exception:
         x_max = 0.0
-        x_min = 0.0
 
     if x_max > 0:
-        # Create 6 evenly spaced tick values from 0 to max
-        tick_vals = np.linspace(0, x_max, 6)
+        # Create 5 evenly spaced tick values from 0 to max
+        tick_vals = np.linspace(0, x_max, 5)
         tick_texts = [format_rupiah(v) for v in tick_vals]
     else:
         tick_vals = [0]
-        tick_texts = [format_rupiah(0)]
+        tick_texts = ["Rp 0"]
 
     # layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
         yaxis={"categoryorder": "total ascending"},
-        margin=dict(t=70, l=220, r=25, b=50),
+        margin=dict(t=70, l=220, r=80, b=50),  # Increased right margin for text labels
         height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
+        xaxis_range=[0, x_max * 1.15],  # Add 15% padding for text labels
     )
 
-    # ✅ Apply formatted Rupiah tick labels on x-axis
+    # Apply formatted Rupiah tick labels on x-axis
     fig.update_xaxes(
-        tickmode='array',  # ← ADD THIS
+        tickmode='linear',
+        tick0=0,
+        dtick=x_max/4,  # 4 intervals
+        tickformat="~s",  # This will be overridden by ticktext
         tickvals=tick_vals,
         ticktext=tick_texts,
         title_text="Jumlah (Rp)",
         showgrid=True,
-        gridcolor='lightgray',  # ← Optional: make gridlines visible
-        zeroline=False,
-        range=[0, x_max * 1.05]  # ← ADD THIS: give 5% padding on right
+        gridcolor='rgba(128,128,128,0.2)',
+        zeroline=True,
+        zerolinecolor='rgba(128,128,128,0.3)',
     )
 
     return fig
@@ -641,6 +644,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
