@@ -506,10 +506,10 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         
         st.markdown(f"##### KLASIFIKASI {selected_metric} TAHUN {selected_year}")
         if active_drills:
+            st.markdown("BERDASARKAN:")
             for idx, (i, lvl, val) in enumerate(active_drills):
                 row = st.columns([1, 5])
                 with row[0]:
-                    st.markdown("BERDASARKAN:")
                     st.markdown(f"<div class='drill-label'>{lvl}</div>", unsafe_allow_html=True)
                 with row[1]:
                     if st.button(f"{val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}", use_container_width=True):
@@ -617,6 +617,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
