@@ -358,8 +358,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     )
 
     fig.update_traces(
-        hovertemplate=f"{y_col}: %{y}<br>Jumlah: %{customdata[0]}<extra></extra>",
         textposition="auto",
+        textfont=dict(color="white", size=11),
+        hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>"
     )
 
     # calculate chart height dynamically (base 600 + 15px per extra row)
@@ -636,3 +637,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
