@@ -347,7 +347,8 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
-
+    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
+    
     # keep original formatted label for display inside bars / hover
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
@@ -668,6 +669,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
