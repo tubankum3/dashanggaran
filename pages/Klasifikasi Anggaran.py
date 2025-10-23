@@ -335,36 +335,40 @@ def aggregate_level(df, group_cols, metric, top_n=None):
     return agg
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
-    """Create a consistent horizontal bar chart with formatted axes and optional max_height."""
+    """Create a consistent horizontal bar chart with formatted axes and percentage labels."""
     df_plot = df.copy()
-    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce")
+    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
 
-    # formatted string for display using format_rupiah
+    # total for percentage calculation
+    total_val = df_plot[metric].sum()
+    df_plot["__pct"] = (df_plot[metric] / total_val * 100).round(2)
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # sort ascending for better readability
+    # sort ascending for readability
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # create figure
+    # main figure
     fig = px.bar(
         df_plot,
         x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__formatted",
-        custom_data=["__formatted"],
+        text="__pct",
+        custom_data=["__formatted", "__pct"],
         title=title,
         labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
     )
 
+    # ✅ Show percentage labels outside each bar
     fig.update_traces(
-        textposition="auto",
-        textfont=dict(color="white", size=11),
+        texttemplate="%{text:.1f}%",
+        textposition="outside",
+        insidetextanchor="end",
         hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>"
     )
 
-    # calculate chart height dynamically (base 600 + 15px per extra row)
+    # dynamic height (base 600 + 15px per extra row)
     base_height = 600 + max(0, (len(df_plot) - 10) * 15)
     final_height = int(max_height) if max_height is not None else base_height
 
@@ -381,7 +385,6 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         tick_vals = [0]
         tick_texts = [format_rupiah(0)]
 
-    # layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
@@ -390,9 +393,11 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
+        uniformtext_minsize=9,
+        uniformtext_mode="hide",
     )
 
-    # ✅ formatted Rupiah tick labels on x-axis
+    # ✅ proper numeric x-axis with formatted labels
     fig.update_xaxes(
         tickvals=tick_vals,
         ticktext=tick_texts,
@@ -402,7 +407,6 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     )
 
     return fig
-
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -638,5 +642,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
