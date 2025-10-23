@@ -362,7 +362,7 @@ def jump_to_ancestor(idx):
 def header(selected_year: str | None = None):
     year_text = selected_year if selected_year else "OVERVIEW"
     metric_text = f" {selected_metric}" if selected_metric else "KLASIFIKASI"
-    kl_text = selected_kl if selected_kl else "KEMENTERIAN/LEMBAGA"
+    kl_text = selected_kls if selected_kls else "KEMENTERIAN/LEMBAGA"
     st.markdown(f"""
     <div class="dashboard-header" role="banner" aria-label="Header Dashboard Klasifikasi Anggaran">
         <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text}/ {kl_text} / TAHUN {year_text}</div>
@@ -561,6 +561,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
