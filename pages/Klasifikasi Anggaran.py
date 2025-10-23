@@ -460,20 +460,6 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                     st.session_state.click_key += 1
                     st.rerun()
         
-        # Breadcrumbs (center)
-        with mid_col:
-            active_drills = [(i, lvl, st.session_state.drill.get(lvl)) for i, lvl in enumerate(HIERARCHY) if st.session_state.drill.get(lvl[1])]
-            if active_drills:
-                crumb_cols = st.columns(len(active_drills))
-                for idx, (i, (label, col), val) in enumerate(active_drills):
-                    if crumb_cols[idx].button(f"{label}: {val}", key=f"crumb-{col}-{val}-{st.session_state.click_key}", use_container_width=True):
-                        # Jump directly to ancestor level
-                        for j in range(i + 1, len(HIERARCHY)):
-                            st.session_state.drill[HIERARCHY[j][1]] = None
-                        st.session_state.level_index = i + 1 if i + 1 < len(HIERARCHY) else i
-                        st.session_state.click_key += 1
-                        st.rerun()
-        
         # Reset button
         with right_col:
             if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
@@ -496,7 +482,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                 with cols[0]:
                     st.markdown(f"**{lvl}**")
                 with cols[1]:
-                    if st.button(f"{val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}", use_container_width=True):
+                    if st.link_button(f"{val}", url="#", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}"):
                         # Jump directly to ancestor i
                         for j in range(i + 1, len(available_levels)):
                             st.session_state.drill[available_levels[j]] = None
@@ -602,6 +588,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
