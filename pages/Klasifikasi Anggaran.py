@@ -340,19 +340,22 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
 
     # Calculate percentage
     total = df_plot[metric].sum()
-    df_plot["percentage"] = (df_plot[metric] / total * 100) if total > 0 else 0
+    if total > 0:
+        df_plot["percentage"] = (df_plot[metric] / total * 100)
+    else:
+        df_plot["percentage"] = 0
     
     # formatted string for display using format_rupiah
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
     df_plot["__pct_formatted"] = df_plot["percentage"].apply(lambda x: f"{x:.2f}%")
 
     # sort ascending for better readability
-    df_plot = df_plot.sort_values(metric, ascending=True)
+    df_plot = df_plot.sort_values("percentage", ascending=True)
 
-    # create figure using percentage for x-axis
+    # create figure using percentage for BOTH x-axis AND bar length
     fig = px.bar(
         df_plot,
-        x="percentage",
+        x="percentage",  # ← This makes the bar length represent percentage
         y=y_col,
         color=color_col,
         orientation="h",
@@ -364,7 +367,8 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     # Add percentage labels on bars
     fig.update_traces(
         text=df_plot["__pct_formatted"],
-        textposition="auto",
+        textposition="inside",
+        textfont=dict(color="white", size=11),
         hovertemplate=f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<br>Persentase: %{{customdata[1]}}<extra></extra>",
     )
 
@@ -391,7 +395,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         zeroline=True,
         zerolinecolor='rgba(128,128,128,0.3)',
         ticksuffix="%",
-        range=[0, 105],  # 0-100% plus small padding
+        range=[0, max(df_plot["percentage"]) * 1.05],  # Auto-scale with 5% padding
     )
 
     return fig
@@ -630,6 +634,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
