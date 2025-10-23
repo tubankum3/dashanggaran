@@ -307,17 +307,50 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 def create_bar_chart(df, metric, y_col, title="", max_height=None):
     df_plot = df.copy()
     df_plot["__fmt"] = df_plot[metric].apply(format_rupiah)
+
+    # create bar chart
     fig = px.bar(
         df_plot.sort_values(metric, ascending=True),
         x=metric, y=y_col, orientation="h",
         text="__fmt",
         custom_data=[y_col, metric],
         title=title,
-        labels={y_col: y_col, metric: "Jumlah"}
+        labels={y_col: y_col, metric: "Jumlah"},
+        color_discrete_sequence=["#2E86DE"]
     )
-    fig.update_traces(textposition="auto", hovertemplate="%{y}<br>Jumlah: %{customdata[1]:,.0f}<extra></extra>")
-    fig.update_layout(margin=dict(t=60, l=240, r=25, b=25), height=max_height or (500 + max(0, (len(df_plot) - 10) * 15)))
-    fig.update_xaxes(title_text="Jumlah (Rp)")
+
+    # format text and hover
+    fig.update_traces(
+        textposition="auto",
+        textfont=dict(color="white", size=12),
+        hovertemplate="%{y}<br>Jumlah: %{customdata[1]:,.0f}<extra></extra>"
+    )
+
+    # layout adjustments
+    fig.update_layout(
+        margin=dict(t=60, l=250, r=25, b=25),
+        height=max_height or (500 + max(0, (len(df_plot) - 10) * 15))),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        title_font=dict(size=18),
+        showlegend=False
+    )
+
+    # hide x-axis, wrap y labels, ensure padding
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(
+        tickfont=dict(size=11),
+        automargin=True,
+        ticklabeloverflow="allow",
+        ticklabelposition="inside",  # keeps text within plot area
+    )
+
+    # wrap long y-axis labels
+    fig.for_each_yaxis(lambda axis: axis.update(ticktext=[
+        "<br>".join(label[i:i+25] for i in range(0, len(label), 25))  # wrap every 25 chars
+        for label in axis.ticktext or []
+    ]))
+
     return fig
 
 # =============================================================================
@@ -359,13 +392,13 @@ def jump_to_ancestor(idx):
 # =============================================================================
 # Header / Sidebar (kept your implementations)
 # =============================================================================
-def header(selected_year: str | None = None):
+def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
     year_text = selected_year if selected_year else "OVERVIEW"
     metric_text = f" {selected_metric}" if selected_metric else "KLASIFIKASI"
-    kl_text = selected_kls if selected_kls else "KEMENTERIAN/LEMBAGA"
+    kl_text = ", ".join(selected_kls) if selected_kls else "KEMENTERIAN/LEMBAGA"
     st.markdown(f"""
     <div class="dashboard-header" role="banner" aria-label="Header Dashboard Klasifikasi Anggaran">
-        <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text}/ {kl_text} / TAHUN {year_text}</div>
+        <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
         <h1 class="dashboard-title">Dashboard Klasifikasi Anggaran</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -487,12 +520,12 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
         # handle click
         if events:
             ev = events[0]
-            clicked = ev.get("y") or ev.get("label")
+            clicked = ev.get("y") or ev.get("label") or ev.get("x")
             if not clicked and ev.get("customdata"):
                 cd = ev.get("customdata")
                 clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
             if clicked:
-                st.session_state.drill[view_col] = clicked
+                st.session_state.drill[view_row] = clicked
                 if view_idx + 1 < len(available_levels):
                     st.session_state.level_index = view_idx + 1
                 st.session_state.click_key += 1
@@ -513,7 +546,7 @@ def main():
         return
 
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
-    header(selected_year)
+    header(selected_year, selected_metric, selected_kls)
 
     # filter base data by year + KL
     df_filtered = df[df["Tahun"] == str(selected_year)].copy()
@@ -561,6 +594,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
