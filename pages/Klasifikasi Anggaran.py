@@ -443,7 +443,7 @@ def sidebar(df):
 # =============================================================================
 # Drill-down UI
 # =============================================================================
-def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
+def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n):
     placeholder = st.empty()
     with placeholder.container():
         # Breadcrumb header row with Back (←) and Reset (↻)
@@ -571,7 +571,7 @@ def main():
         return
 
     # run the benchmark-style drill-down
-    general_drill_down(df_filtered, available_levels, selected_metric, top_n)
+    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n)
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
@@ -602,6 +602,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
