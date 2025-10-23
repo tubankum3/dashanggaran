@@ -343,47 +343,56 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
-    df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
+    # Sort to get the top N items, then re-sort ascending.
+    # Plotly plots the last item in the dataframe at the top of the chart.
+    # This ensures the largest of the Top N is at the top.
+    df_plot = df_plot.nlargest(top_n, metric).sort_values(metric, ascending=True)
+    df_plot = df_plot.reset_index(drop=True)
 
-    # formatted Rupiah values for display
+    # Formatted Rupiah values for display
     df_plot["__fmt"] = df_plot[metric].apply(format_rupiah)
 
-    # calculate percentages for text labels
+    # Calculate percentages for text labels
     total = df_plot[metric].sum()
     df_plot["pct"] = (df_plot[metric] / total * 100).round(2) if total != 0 else 0
     df_plot["label_pct"] = df_plot["pct"].astype(str) + "%"
+    
+    # ✅ MODIFICATION: Wrap long category labels directly in the dataframe
+    max_chars = 30
+    df_plot["__wrapped_y_labels"] = df_plot[y_col].astype(str).apply(
+        lambda lbl: "<br>".join(lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars)) if len(lbl) > max_chars else lbl
+    )
 
-    # Create the chart
+    # Create the chart using the new pre-formatted column for y-axis
     fig = px.bar(
         df_plot,
         x=metric,
-        y=y_col,
+        y="__wrapped_y_labels",  # Use the new wrapped label column
         orientation="h",
         text="label_pct",
         custom_data=["__fmt", "pct", metric],
         title=title,
-        labels={y_col: y_col, metric: "Jumlah (Rp)"},
+        labels={"__wrapped_y_labels": y_col, metric: "Jumlah (Rp)"}, # Set clean axis titles
         color_discrete_sequence=["#2E86DE"],
     )
 
     fig.update_traces(
         textposition="auto",
         textfont=dict(color="white", size=11),
-        hovertemplate="%{y}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>",
+        # Ensure hover label shows original (unwrapped) y-value
+        hovertemplate="%{" + y_col + "}<br>Jumlah: %{customdata[0]}<br>Persentase: %{customdata[1]}%<extra></extra>",
     )
 
-    # Dynamic height
+    # Dynamic height calculation
     n_rows = len(df_plot)
-    baseline = 500 if (top_n is None or top_n == 10) else int(500 * (top_n / 10))
     per_row_px = 45
-    visible_rows = min(n_rows, top_n) if top_n else n_rows
-    base_height = max(300, baseline if visible_rows == (top_n or 10) else visible_rows * per_row_px)
+    base_height = max(400, n_rows * per_row_px + 150) # Add buffer for title/margins
     final_height = int(max_height) if max_height is not None else base_height
 
-    # Determine tick positions and labels using formatted Rupiah
+    # Determine tick positions and labels for X-axis (your original logic was correct)
     try:
         x_max = float(df_plot[metric].max())
-    except Exception:
+    except (ValueError, TypeError):
         x_max = 0.0
 
     if x_max > 0:
@@ -393,18 +402,7 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
         tick_vals = [0]
         tick_texts = [format_rupiah(0)]
 
-    # Wrap long category labels
-    cat_labels = df_plot[y_col].astype(str).tolist()
-    max_chars = 30
-    wrapped = []
-    for lbl in cat_labels:
-        if len(lbl) <= max_chars:
-            wrapped.append(lbl)
-        else:
-            parts = [lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars)]
-            wrapped.append("<br>".join(parts))
-
-    # Apply layout updates
+    # Apply simplified layout updates
     fig.update_layout(
         margin=dict(t=70, l=260, r=25, b=60),
         height=final_height,
@@ -412,10 +410,10 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
         paper_bgcolor="white",
         title_font=dict(size=16),
         showlegend=False,
-        yaxis={"categoryorder": "total ascending"},
     )
 
-    # ✅ X-axis: real values with formatted Rupiah ticks
+    # ✅ THIS SHOULD NOW WORK CORRECTLY
+    # Update X-axis with proper numeric values and formatted labels
     fig.update_xaxes(
         tickvals=tick_vals,
         ticktext=tick_texts,
@@ -425,11 +423,12 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
         zeroline=False,
     )
 
+    # ✅ MODIFICATION: Simplified Y-axis update
+    # No need to set tickvals or ticktext as they come from the dataframe now
     fig.update_yaxes(
-        tickvals=cat_labels,
-        ticktext=wrapped,
         automargin=True,
         tickfont=dict(size=11),
+        title_text="", # Title is set in px.bar's `labels` argument
     )
 
     return fig
@@ -668,6 +667,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
