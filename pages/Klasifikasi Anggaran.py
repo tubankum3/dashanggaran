@@ -438,22 +438,6 @@ def sidebar(df):
         if "Semua" in selected_kls:
             selected_kls = []
 
-        # st.markdown("---")
-        # if st.button("Kembali (Back)"):
-        #     # go up one level
-        #     if st.session_state.level_index > 0:
-        #         # clear the selection of the current parent level (the level we came from)
-        #         # e.g., if level_index == 2 we are viewing level 2 (PROGRAM) children; back should clear selection at level 1
-        #         prev_idx = max(0, st.session_state.level_index - 1)
-        #         prev_col = HIERARCHY[prev_idx][1]
-        #         st.session_state.drill[prev_col] = None
-        #         st.session_state.level_index = prev_idx
-        #         st.session_state.click_key += 1
-        #         st.rerun()
-        # if st.button("Reset"):
-        #     reset_drill()
-        #     st.rerun()
-
     return selected_year, selected_kls, top_n, selected_metric
 
 # =============================================================================
@@ -462,37 +446,63 @@ def sidebar(df):
 def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
     placeholder = st.empty()
     with placeholder.container():
-        # Breadcrumbs row (Reset + ancestors)
-        cols = st.columns(2)
-        if cols:
-            if cols[0].button("←"):
-                # go up one level
+        # Breadcrumb header row with Back (←) and Reset (↻)
+        left_col, mid_col, right_col = st.columns([1, 6, 1])
+        
+        # Back button
+        with left_col:
+            if st.button(":arrow_backward:", help="Kembali satu tingkat"):
                 if st.session_state.level_index > 0:
-                    # clear the selection of the current parent level (the level we came from)
-                    # e.g., if level_index == 2 we are viewing level 2 (PROGRAM) children; back should clear selection at level 1
                     prev_idx = max(0, st.session_state.level_index - 1)
                     prev_col = HIERARCHY[prev_idx][1]
                     st.session_state.drill[prev_col] = None
                     st.session_state.level_index = prev_idx
                     st.session_state.click_key += 1
                     st.rerun()
-            if cols[1].button("Reset"):
+        
+        # Breadcrumbs (center)
+        with mid_col:
+            active_drills = [(i, lvl, st.session_state.drill.get(lvl)) for i, lvl in enumerate(HIERARCHY) if st.session_state.drill.get(lvl[1])]
+            if active_drills:
+                crumb_cols = st.columns(len(active_drills))
+                for idx, (i, (label, col), val) in enumerate(active_drills):
+                    if crumb_cols[idx].button(f"{label}: {val}", key=f"crumb-{col}-{val}-{st.session_state.click_key}", use_container_width=True):
+                        # Jump directly to ancestor level
+                        for j in range(i + 1, len(HIERARCHY)):
+                            st.session_state.drill[HIERARCHY[j][1]] = None
+                        st.session_state.level_index = i + 1 if i + 1 < len(HIERARCHY) else i
+                        st.session_state.click_key += 1
+                        st.rerun()
+        
+        # Reset button
+        with right_col:
+            if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
                 reset_drill()
                 st.rerun()
-        # Breadcrumb buttons for each active drill level
-        active_drills = [(i, lvl, st.session_state.drill.get(lvl)) for i, lvl in enumerate(available_levels) if st.session_state.drill.get(lvl)]
+   
+       # Breadcrumb buttons stacked vertically
+        active_drills = [
+            (i, lvl, st.session_state.drill.get(lvl))
+            for i, lvl in enumerate(available_levels)
+            if st.session_state.drill.get(lvl)
+        ]
         
         if active_drills:
-            st.markdown("#### 🧭 Jalur Drill-down:")
-            crumb_cols = st.columns(len(active_drills))
+            st.markdown(f"##### KLASIFIKASI {selected_metric} TAHUN {selected_year} BERDASARKAN:")
+            
+            # Create a row per active drill level
             for idx, (i, lvl, val) in enumerate(active_drills):
-                if crumb_cols[idx].button(f"{lvl}: {val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}"):
-                    # Jump to ancestor i
-                    for j in range(i + 1, len(available_levels)):
-                        st.session_state.drill[available_levels[j]] = None
-                    st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
-                    st.session_state.click_key += 1
-                    st.rerun()
+                cols = st.columns([1, 5])  # adjust ratio to your liking
+                with cols[0]:
+                    st.markdown(f"**{lvl}**")
+                with cols[1]:
+                    if st.button(f"{val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}", use_container_width=True):
+                        # Jump directly to ancestor i
+                        for j in range(i + 1, len(available_levels)):
+                            st.session_state.drill[available_levels[j]] = None
+                        st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
+                        st.session_state.click_key += 1
+                        st.rerun()
 
         # current view level
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
@@ -512,7 +522,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, top_n):
             st.info("Tidak ada data untuk level ini.")
             return
 
-        title = f"{view_row} — (Top {top_n}) — Level {view_idx + 1} dari {len(available_levels)}"
+        title = f"(Top {top_n}) {view_row}  (Level {view_idx + 1} dari {len(available_levels)})"
         fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600)
 
         # ✅ Show chart and capture clicks directly
@@ -565,9 +575,6 @@ def main():
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### Current filters")
-    st.sidebar.write(f"**Tahun:** {selected_year}")
-    st.sidebar.write(f"**Metrik:** {selected_metric}")
     if selected_kls:
         st.sidebar.write("**K/L:**")
         for k in selected_kls:
@@ -595,6 +602,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
