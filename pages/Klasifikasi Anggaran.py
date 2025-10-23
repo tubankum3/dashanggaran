@@ -395,22 +395,28 @@ def create_bar_chart(df, metric, y_col, title="", top_n=10, max_height=None):
         hovertemplate="%{y}<br>Jumlah: %{customdata[3]}<br>Persentase: %{customdata[2]}%<extra></extra>"
     )
 
-    # Format x-axis ticks: choose a reasonable set of tick positions (avoid one-per-bar crowding)
-    try:
-        x_min = float(df_plot[metric].min())
-        x_max = float(df_plot[metric].max())
-    except Exception:
-        x_min, x_max = 0.0, 0.0
+    # Custom x-axis tick labels in formatted rupiah
+    x_min = df_plot[metric].min()
+    x_max = df_plot[metric].max()
 
-    if x_max > x_min:
-        # create up to 6 ticks from 0..max (nice spacing)
-        n_ticks = 6
-        tick_vals = np.linspace(0, x_max, num=n_ticks)
-        tick_texts = [format_rupiah(int(v)) for v in tick_vals]
-        fig.update_xaxes(tickvals=tick_vals, ticktext=tick_texts, title_text="Jumlah (Rp)")
+    if x_max > 0:
+        # Generate evenly spaced tick values
+        tick_vals = np.linspace(0, x_max, 6)
+        tick_texts = [format_rupiah(v) for v in tick_vals]
+        fig.update_xaxes(
+            tickvals=tick_vals,
+            ticktext=tick_texts,
+            title_text="Jumlah (Rp)",
+            tickfont=dict(size=10),
+            showgrid=True,
+            zeroline=False
+        )
     else:
-        # single value or all zero -> single tick
-        fig.update_xaxes(tickvals=[x_max], ticktext=[format_rupiah(int(x_max))], title_text="Jumlah (Rp)")
+        fig.update_xaxes(
+            tickvals=[0],
+            ticktext=["Rp 0"],
+            title_text="Jumlah (Rp)"
+        )
 
     # Wrap long y-axis labels
     cat_labels = df_plot[y_col].astype(str).tolist()
@@ -673,6 +679,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
