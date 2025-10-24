@@ -309,9 +309,10 @@ def load_data():
         return pd.DataFrame()
 
 # =============================================================================
-# Utilities (kept)
+# Utilities
 # =============================================================================
 def format_rupiah(value: float) -> str:
+    """Format numeric value to Rupiah string with units (T/M/Jt)"""
     if pd.isna(value) or value == 0:
         return "Rp 0"
     abs_val = abs(value)
@@ -324,6 +325,7 @@ def format_rupiah(value: float) -> str:
     return f"Rp {value:,.0f}"
 
 def aggregate_level(df, group_cols, metric, top_n=None):
+    """Aggregate data by grouping columns and return top N"""
     group_cols = [c for c in group_cols if c in df.columns]
     if not group_cols:
         return pd.DataFrame()
@@ -336,104 +338,126 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
-    Horizontal bar chart with auto-scaling x-axis (Rp in T/M/Jt) and dynamic interval.
+    Create horizontal bar chart with:
+    - X-axis: numeric/continuous float metric values (Rupiah)
+    - Bar labels: percentage of total
+    - Hover: both percentage and Rupiah value
     """
     df_plot = df.copy()
+    
+    # Validate columns exist
     if metric not in df_plot.columns or y_col not in df_plot.columns:
+        st.error(f"Column '{metric}' or '{y_col}' not found in data")
         return go.Figure()
-
-    # --- Ensure numeric metric values ---
-    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0)
+    
+    # ✅ CRITICAL: Ensure metric is numeric float
+    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0).astype(float)
+    
+    # Calculate total and percentage
+    total = float(df_plot[metric].sum())
+    if total > 0:
+        df_plot["__percentage"] = (df_plot[metric] / total * 100).round(1)
+    else:
+        df_plot["__percentage"] = 0.0
+    
+    # Create formatted strings for display
+    df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.1f}%")
+    df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
+    
+    # Sort by metric value ascending for better visualization
     df_plot = df_plot.sort_values(metric, ascending=True)
-    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
-
-    # --- Base bar chart ---
+    
+    # Create bar chart using metric (numeric) as x-axis
     fig = px.bar(
         df_plot,
-        x=metric,
+        x=metric,  # ✅ Using numeric metric column directly
         y=y_col,
         color=color_col,
         orientation="h",
-        text="__formatted",
+        text="__pct_label",  # Show percentage on bars
+        custom_data=["__rupiah_formatted", "__pct_label", metric],  # For hover
         title=title,
         labels={y_col: "", metric: "Jumlah (Rp)"},
     )
-
+    
+    # Update traces: text outside bars, custom hover
     fig.update_traces(
-        textposition="auto",
-        hovertemplate=f"%{{y}}<br>Jumlah: %{{text}}<extra></extra>"
+        textposition="outside",
+        textfont=dict(size=11, color="#333"),
+        cliponaxis=False,
+        hovertemplate=(
+            f"<b>%{{y}}</b><br>"
+            f"Jumlah: %{{customdata[0]}}<br>"
+            f"Persentase: %{{customdata[1]}}<extra></extra>"
+        ),
     )
-
-    # --- Compute axis scaling ---
-    x_min = float(df_plot[metric].min())
-    x_max = float(df_plot[metric].max())
-
+    
+    # Calculate dynamic height
+    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
+    final_height = int(max_height) if max_height is not None else base_height
+    
+    # ✅ Get x-axis range for numeric metric
+    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 else 0.0
+    
+    # Determine scale and unit for x-axis labels
     if x_max >= 1e12:
-        scale = 1e12
-        unit = "T"
+        scale, unit = 1e12, "T"
     elif x_max >= 1e9:
-        scale = 1e9
-        unit = "M"
+        scale, unit = 1e9, "M"
     elif x_max >= 1e6:
-        scale = 1e6
-        unit = "Jt"
+        scale, unit = 1e6, "Jt"
     else:
-        scale = 1
-        unit = ""
-
-    # --- Dynamic tick intervals ---
-    if x_max <= 0:
-        tick_vals = [0]
-    else:
-        target_ticks = 5
+        scale, unit = 1, ""
+    
+    # Calculate nice tick intervals
+    if x_max > 0:
+        target_ticks = 6
         raw_interval = x_max / target_ticks
         magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
         nice_interval = np.ceil(raw_interval / magnitude) * magnitude
         last_tick = np.ceil(x_max / nice_interval) * nice_interval
         tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
-
-    tick_texts = [f"Rp {v/scale:,.0f} {unit}" for v in tick_vals]
-
-    # --- Ensure x-axis is numeric (not categorical) ---
-    fig.update_xaxes(
-        type="linear",
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        range=[0, last_tick],
-        title_text="Jumlah (Rp)",
-        showgrid=True,
-        zeroline=False,
-        automargin=True,
-    )
-
-    # --- Wrap long labels ---
-    y_labels = df_plot[y_col].astype(str).tolist()
-    wrapped_labels = [
-        "<br>".join([lbl[i:i+30] for i in range(0, len(lbl), 30)]) if len(lbl) > 30 else lbl
-        for lbl in y_labels
-    ]
-
-    fig.update_yaxes(
-        tickvals=y_labels,
-        ticktext=wrapped_labels,
-        automargin=True,
-        categoryorder="total ascending",
-    )
-
-    # --- Adjust height dynamically ---
-    n = len(df_plot)
-    base_height = 600 + max(0, (n - 10) * 20)
-    height = int(max_height) if max_height else base_height
-
+    else:
+        tick_vals = [0]
+        last_tick = 0
+    
+    # Format tick labels
+    if unit:
+        tick_texts = [f"{v/scale:,.0f} {unit}" for v in tick_vals]
+    else:
+        tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
+    
+    # Update layout
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
-        margin=dict(t=70, l=230, r=40, b=50),
-        height=height,
+        yaxis={"categoryorder": "total ascending"},
+        margin=dict(t=70, l=250, r=80, b=50),
+        height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
     )
-
+    
+    # ✅ Update x-axis with numeric type and formatted labels
+    fig.update_xaxes(
+        type="linear",  # ✅ Ensure numeric axis
+        tickmode="array",
+        tickvals=tick_vals,
+        ticktext=tick_texts,
+        range=[0, last_tick * 1.1],  # 10% padding for outside labels
+        title_text="Jumlah (Rp)",
+        showgrid=True,
+        gridcolor="rgba(200,200,200,0.3)",
+        zeroline=True,
+        zerolinecolor="rgba(150,150,150,0.5)",
+    )
+    
+    # Update y-axis
+    fig.update_yaxes(
+        categoryorder="total ascending",
+        automargin=True,
+    )
+    
     return fig
 
 # =============================================================================
@@ -452,7 +476,7 @@ def init_session_state():
     if "drill" not in st.session_state:
         st.session_state.drill = {lvl: None for _, lvl in HIERARCHY}
     if "level_index" not in st.session_state:
-        st.session_state.level_index = 0  # 0 = show top-level bars (FUNGSI)
+        st.session_state.level_index = 0
     if "click_key" not in st.session_state:
         st.session_state.click_key = 0
 
@@ -463,17 +487,14 @@ def reset_drill():
     st.session_state.click_key += 1
 
 def jump_to_ancestor(idx):
-    """
-    Jump to ancestor level by index in available_levels.
-    Keep that ancestor selection (if exists) and clear deeper selections.
-    """
+    """Jump to ancestor level and clear deeper selections"""
     for j in range(idx + 1, len(HIERARCHY)):
         st.session_state.drill[HIERARCHY[j][1]] = None
     st.session_state.level_index = idx + 1 if idx + 1 < len(HIERARCHY) else idx
     st.session_state.click_key += 1
 
 # =============================================================================
-# Header / Sidebar (kept your implementations)
+# Header / Sidebar
 # =============================================================================
 def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
     year_text = selected_year if selected_year else "OVERVIEW"
@@ -527,10 +548,19 @@ def sidebar(df):
 # Drill-down UI
 # =============================================================================
 def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n):
+    """
+    Main drill-down interface with breadcrumb navigation and interactive chart
+    
+    Args:
+        df_filtered: Pre-filtered dataframe by year and K/L
+        available_levels: List of hierarchy column names available in data
+        selected_metric: The numeric metric column to aggregate and display
+        selected_year: Selected year for display
+        top_n: Number of top items to show
+    """
     placeholder = st.empty()
     with placeholder.container():
         # === Back / Reset row ===
-        # Breadcrumb header row with Back (←) and Reset (↻)
         left_col, mid_col, right_col = st.columns([1, 10, 1])
         
         # Back button
@@ -550,7 +580,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                 reset_drill()
                 st.rerun()
 
-        # === Breadcrumb rows ===
+        # === Breadcrumb navigation ===
         active_drills = [
             (i, lvl, st.session_state.drill.get(lvl))
             for i, lvl in enumerate(available_levels)
@@ -572,41 +602,60 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                         st.session_state.click_key += 1
                         st.rerun()
 
-        # current view level
+        # === Determine current view level ===
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
         view_row = available_levels[view_idx]
 
-        # filter by ancestors
+        # === Filter data by ancestor selections ===
         df_view = df_filtered.copy()
+        
+        # ✅ Ensure selected_metric is numeric in the filtered dataframe
+        if selected_metric in df_view.columns:
+            df_view[selected_metric] = pd.to_numeric(df_view[selected_metric], errors="coerce").fillna(0.0)
+        else:
+            st.error(f"Metric column '{selected_metric}' not found in data")
+            return
+        
         for j in range(view_idx):
             anc_row = available_levels[j]
             anc_val = st.session_state.drill.get(anc_row)
             if anc_val is not None:
                 df_view = df_view[df_view[anc_row] == anc_val]
 
-        # aggregate for bars
+        # === Aggregate data for current level ===
         agg = aggregate_level(df_view, [view_row], selected_metric, top_n)
+        
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
             return
 
+        # === Create and display chart ===
         title = f"TOP {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
         fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600)
 
-        # ✅ Show chart and capture clicks directly
+        # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
-        # handle click
+        # === Handle click events for drill-down ===
         if events:
             ev = events[0]
-            clicked = ev.get("y") or ev.get("label") or ev.get("x")
+            # Try to get clicked value from y-axis (category name)
+            clicked = ev.get("y") or ev.get("label")
+            
+            # Fallback: try customdata
             if not clicked and ev.get("customdata"):
                 cd = ev.get("customdata")
-                clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
+                if isinstance(cd, list) and len(cd) > 0:
+                    clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
+            
             if clicked:
+                # Store the clicked value in session state
                 st.session_state.drill[view_row] = clicked
+                
+                # Move to next level if available
                 if view_idx + 1 < len(available_levels):
                     st.session_state.level_index = view_idx + 1
+                
                 st.session_state.click_key += 1
                 st.rerun()
 
@@ -627,18 +676,18 @@ def main():
     selected_year, selected_kls, top_n, selected_metric = sidebar(df)
     header(selected_year, selected_metric, selected_kls)
 
-    # filter base data by year + KL
+    # Filter base data by year + K/L
     df_filtered = df[df["Tahun"] == str(selected_year)].copy()
     if selected_kls:
         df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    # determine available hierarchy columns in order
+    # Determine available hierarchy columns in order
     available_levels = [col for _, col in HIERARCHY if col in df_filtered.columns]
     if not available_levels:
         st.error("Kolom hierarki tidak ditemukan di dataset.")
         return
 
-    # run the benchmark-style drill-down
+    # Run the drill-down interface
     general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n)
 
     # Sidebar: current filters and drill state
@@ -652,7 +701,7 @@ def main():
     for _, col in HIERARCHY:
         st.sidebar.write(f"- {col}: {st.session_state.drill.get(col) if st.session_state.drill.get(col) else '-'}")
 
-    # footer
+    # Footer
     st.markdown("---")
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -670,17 +719,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
