@@ -602,39 +602,49 @@ def short_label_from_code(value, col_type):
         str: Shortened label for display
     """
     try:
-        value = str(value).strip()
-        
-        # Handle empty values
-        if not value or value == 'nan':
+        # Handle None, NaN, or empty values
+        if pd.isna(value) or value is None or value == "":
             return "Unknown"
             
+        value = str(value).strip()
+        
+        # Handle empty values after conversion
+        if not value:
+            return "Unknown"
+            
+        # Default to original value if col_type is not recognized
+        if col_type not in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA", "SUB FUNGSI", 
+                           "PROGRAM", "KEGIATAN", "OUTPUT (KRO)", "SUB OUTPUT (RO)", 
+                           "KOMPONEN", "AKUN 4 DIGIT"]:
+            return value[:15] + "..." if len(value) > 15 else value
+            
         if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
-            return value[:2]  # first 2 digits
+            return value[:4]  # first 4 digits
         elif col_type == "SUB FUNGSI":
             if len(value) >= 5:
-                return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
+                return value[:2] + "." + value[3:5]  # 2 digit + dot + 2 digit
             else:
                 return value[:4]
         elif col_type == "PROGRAM":
             if len(value) >= 9:
-                return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 2
+                return value[:3] + "." + value[4:6] + "." + value[7:9]  # 3.2.2
             else:
-                return value[:7]
+                return value[:8]
         elif col_type == "KEGIATAN":
-            return value[:4]  # first 4 digits
+            return value[:6]  # first 6 digits
         elif col_type == "OUTPUT (KRO)":
             if len(value) >= 8:
-                return value[:4] + " " + value[5:8]  # 4 digits + 3 letters
+                return value[:4] + "." + value[5:8]  # 4 digits + dot + 3 chars
             else:
                 return value[:7]
         elif col_type == "SUB OUTPUT (RO)":
             if len(value) >= 12:
-                return value[:4] + " " + value[5:8] + " " + value[9:12]  # 4 digits + 3 letters + 3 digits
+                return value[:4] + "." + value[5:8] + "." + value[9:12]  # 4.3.3
             else:
                 return value[:11]
         elif col_type == "KOMPONEN":
             if len(value) >= 11:
-                return value[:3] + " " + value[4:7] + " " + value[8:11]  # 3 letters + 3 digits + 3 digits
+                return value[:3] + "." + value[4:7] + "." + value[8:11]  # 3.3.3
             else:
                 return value[:10]
         elif col_type == "AKUN 4 DIGIT":
@@ -642,68 +652,92 @@ def short_label_from_code(value, col_type):
         else:
             # Fallback: take first meaningful part
             parts = value.split(" ")
-            return parts[0] if parts else value[:8]
+            return parts[0] if parts else value[:10]
             
     except Exception as e:
         # Fallback in case of any error
-        return str(value)[:8] if value else "N/A"
+        return str(value)[:10] if value else "N/A"
 
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=400, extra_height_per_line=3):
     """Create line chart with shortened labels for legend"""
     
-    # Create short_label column
-    df = df.copy()
-    df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
+    # Validate inputs
+    if df.empty:
+        st.warning("Dataframe kosong, tidak dapat membuat chart")
+        return None, None
+        
+    if category_col not in df.columns:
+        st.error(f"Kolom '{category_col}' tidak ditemukan dalam dataframe")
+        return None, None
     
-    # Group by Tahun and short_label (not the original category_col in the groupby)
-    df_grouped = (
-        df.groupby(["Tahun", "short_label"], as_index=False)["Nilai"]
-          .sum()
-    )
+    # Check if there's data to display
+    if df[category_col].isna().all():
+        st.warning(f"Kolom '{category_col}' tidak memiliki data yang valid")
+        return None, None
+    
+    try:
+        # Create short_label column
+        df = df.copy()
+        df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
+        
+        # Group by Tahun and short_label
+        df_grouped = (
+            df.groupby(["Tahun", "short_label"], as_index=False)["Nilai"]
+              .sum()
+        )
 
-    # Ensure Tahun is sorted and string
-    df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
-    df_grouped = df_grouped.sort_values("Tahun")
+        # Check if we have data after grouping
+        if df_grouped.empty:
+            st.warning("Tidak ada data setelah pengelompokan")
+            return None, None
 
-    # Adjust height dynamically
-    n_groups = df_grouped["short_label"].nunique()
-    height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
+        # Ensure Tahun is sorted and string
+        df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
+        df_grouped = df_grouped.sort_values("Tahun")
 
-    # Create the line chart
-    fig = px.line(
-        df_grouped,
-        x="Tahun",
-        y="Nilai",
-        color="short_label",  # Use the shortened label for color/legend
-        markers=True,
-        title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
-        labels={
-            "Tahun": "Tahun",
-            "Nilai": "Jumlah (Rp)",
-            "short_label": category_col.replace("_", " ").title(),  # legend name
-        },
-        template="plotly_white",
-        height=height,
-    )
+        # Adjust height dynamically
+        n_groups = df_grouped["short_label"].nunique()
+        height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Update layout
-    fig.update_layout(
-        hovermode="closest",
-        title_x=0,
-        legend_title_text=category_col.replace("_", " ").title(),
-        margin=dict(l=40, r=40, t=80, b=40),
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        font=dict(family="Google Sans, Roboto, Arial"),
-    )
+        # Create the line chart
+        fig = px.line(
+            df_grouped,
+            x="Tahun",
+            y="Nilai",
+            color="short_label",  # Use the shortened label for color/legend
+            markers=True,
+            title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
+            labels={
+                "Tahun": "Tahun",
+                "Nilai": "Jumlah (Rp)",
+                "short_label": category_col.replace("_", " ").title(),  # legend name
+            },
+            template="plotly_white",
+            height=height,
+        )
 
-    fig.update_traces(
-        hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
-        line=dict(width=2.5),
-        marker=dict(size=7)
-    )
+        # Update layout
+        fig.update_layout(
+            hovermode="closest",
+            title_x=0,
+            legend_title_text=category_col.replace("_", " ").title(),
+            margin=dict(l=40, r=40, t=80, b=40),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(family="Google Sans, Roboto, Arial"),
+        )
 
-    return fig, df_grouped
+        fig.update_traces(
+            hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
+            line=dict(width=2.5),
+            marker=dict(size=7)
+        )
+
+        return fig, df_grouped
+        
+    except Exception as e:
+        st.error(f"Error dalam membuat chart: {str(e)}")
+        return None, None
     
 # advanced filter =============================================================================
 def apply_advanced_filters(df_filtered):
@@ -793,57 +827,77 @@ def main():
     cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # --- Visualization Section ---
+   # --- Visualization Section ---
     st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
     
-    # Categorical columns for visualization
+    # Categorical columns for visualization - with proper validation
     cat_cols = [
         col for col in df_filtered.select_dtypes(include=["object"]).columns
-        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
+        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"] and col in df_filtered.columns
     ]
     
+    # Debug: Show available columns
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("🔍 Debug Info"):
+        st.write("Available columns:", list(df_filtered.columns))
+        st.write("Categorical columns found:", cat_cols)
+        st.write("Data shape:", df_filtered.shape)
+    
     if cat_cols:
-        tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
+        # Limit to first 5 tabs to avoid too many tabs
+        display_cat_cols = cat_cols[:5]
+        tab_labels = [f"📈 {col.replace('_', ' ').title()}" for col in display_cat_cols]
         
-        for tab, col in zip(tabs, cat_cols):
+        tabs = st.tabs(tab_labels)
+        
+        for tab, col in zip(tabs, display_cat_cols):
             with tab:
-                fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # --- Data table (wide format: metric x year) ---
-                with st.expander("📋 Data Tabel", expanded=True):
-                    display_col = col
-                    df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
-
-                    # Pivot to wide format: rows=metric, cols=years
-                    df_pivot = (
-                        df_display
-                        .pivot_table(
-                            index=display_col,
-                            columns="Tahun",
-                            values="Nilai",
-                            aggfunc="sum"
-                        )
-                        .fillna(0)
-                        .reset_index()
-                    )
-
-                    # Sort columns: Tahun ascending
-                    tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
-                    df_pivot = df_pivot[[display_col] + tahun_cols]
-
-                    # Format numeric values as currency
-                    for c in tahun_cols:
-                        df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
-
-                    # Rename first column to show selected metric
-                    df_pivot = df_pivot.rename(columns={display_col: selected_metric})
-
-                    st.dataframe(
-                        df_pivot,
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                if col in df_filtered.columns:
+                    try:
+                        fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
+                        if fig is not None:
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # --- Data table (wide format: metric x year) ---
+                            with st.expander("📋 Data Tabel", expanded=False):
+                                display_col = col
+                                df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
+    
+                                # Pivot to wide format: rows=metric, cols=years
+                                df_pivot = (
+                                    df_display
+                                    .pivot_table(
+                                        index=display_col,
+                                        columns="Tahun",
+                                        values="Nilai",
+                                        aggfunc="sum"
+                                    )
+                                    .fillna(0)
+                                    .reset_index()
+                                )
+    
+                                # Sort columns: Tahun ascending
+                                tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
+                                df_pivot = df_pivot[[display_col] + tahun_cols]
+    
+                                # Format numeric values as currency
+                                for c in tahun_cols:
+                                    df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
+    
+                                # Rename first column to show selected metric
+                                df_pivot = df_pivot.rename(columns={display_col: selected_metric})
+    
+                                st.dataframe(
+                                    df_pivot,
+                                    use_container_width=True,
+                                    hide_index=True
+                                )
+                        else:
+                            st.warning(f"Tidak dapat membuat chart untuk {col}")
+                    except Exception as e:
+                        st.error(f"Error creating chart for {col}: {str(e)}")
+                else:
+                    st.warning(f"Kolom {col} tidak ditemukan dalam data yang difilter")
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
     
@@ -866,6 +920,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
