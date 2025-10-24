@@ -422,14 +422,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
             orientation='h',
             text=row["__pct_label"],
             textposition="outside",
-            textfont=dict(size=11, color="#fff"),
+            textfont=dict(size=11, color="#333"),
             marker=dict(color="#1a73e8"),
             hovertemplate=(
                 f"{row[y_col]}<br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
                 f"Persentase: {row['__pct_label']}<extra></extra>"
             ),
-            hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
             showlegend=False,
         ))
 
@@ -448,6 +447,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
         xaxis_title="Jumlah (Rp)",
         yaxis_title="",
+    )
+    fig.update_traces(
+        hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
+        hoverinfo="text",
+    )
+    fig.update_layout(
+        hovermode="closest",  # or "y unified" if you prefer static hover line
     )
     
     # ✅ Update x-axis: use ACTUAL metric values, format labels only
@@ -730,6 +736,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
