@@ -428,7 +428,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
                 f"<b>{row[y_col]}</b><br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
                 f"Persentase: {row['__pct_label']}<extra></extra>", 
-                textposition="inside"
+                textposition="outside"
             ),
             showlegend=False,
         ))
@@ -730,3 +730,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
