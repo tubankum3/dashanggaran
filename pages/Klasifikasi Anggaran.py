@@ -421,14 +421,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
             y=[row["__wrapped_label"]],  # ✅ Use wrapped labels
             orientation='h',
             text=row["__pct_label"],
-            textposition="outside",
+            textposition="auto",
             textfont=dict(size=11, color="#333"),
             marker=dict(color='#1a73e8'),
             hovertemplate=(
                 f"<b>{row[y_col]}</b><br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
-                f"Persentase: {row['__pct_label']}<extra></extra>", 
-                textposition="outside"
+                f"Persentase: {row['__pct_label']}<extra></extra>"
             ),
             showlegend=False,
         ))
@@ -730,4 +729,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
