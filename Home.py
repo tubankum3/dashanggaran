@@ -613,13 +613,13 @@ def short_label_from_code(value, col_type):
         return value.split(" ")[0]  # fallback, first part
 
 # Chart =============================================================================
-def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=400, extra_height_per_line=3):
     # Create short_label column
     df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
 
     # Group by KEMENTERIAN/LEMBAGA, Tahun, and category_col
     df_grouped = (
-        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col, "short_label"], as_index=False)["Nilai"]
+        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col, short_label], as_index=False)["Nilai"]
           .sum()
     )
 
@@ -628,7 +628,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
     df_grouped = df_grouped.sort_values("Tahun")
 
     # Adjust height dynamically
-    n_groups = df_grouped["short_label"].nunique()
+    n_groups = df_grouped[short_label].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
     # Create the line chart
@@ -636,7 +636,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         df_grouped,
         x="Tahun",
         y="Nilai",
-        color="short_label",  # use short_label for color
+        color=short_label,  # use short_label for color
         markers=True,
         title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
         labels={
@@ -663,6 +663,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
 
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
+        customdata=df_grouped[category_col],
         line=dict(width=2.5),
         marker=dict(size=7)
     )
@@ -830,6 +831,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
