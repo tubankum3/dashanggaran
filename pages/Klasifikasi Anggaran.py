@@ -367,6 +367,19 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     # Sort by metric value ascending for better visualization
     df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
     
+    # ✅ Wrap long y-axis labels
+    cat_labels = df_plot[y_col].astype(str).tolist()
+    max_chars = 30
+    wrapped = []
+    for lbl in cat_labels:
+        if len(lbl) <= max_chars:
+            wrapped.append(lbl)
+        else:
+            parts = [lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)]
+            wrapped.append("<br>".join(parts))
+    
+    df_plot["__wrapped_label"] = wrapped
+    
     # ✅ Get x-axis range from actual metric values
     x_min = 0.0
     x_max = float(df_plot[metric].max()) if len(df_plot) > 0 and df_plot[metric].max() > 0 else 100.0
@@ -405,7 +418,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     for idx, row in df_plot.iterrows():
         fig.add_trace(go.Bar(
             x=[row[metric]],  # ✅ Use actual raw metric value
-            y=[row[y_col]],
+            y=[row["__wrapped_label"]],  # ✅ Use wrapped labels
             orientation='h',
             text=row["__pct_label"],
             textposition="outside",
@@ -414,7 +427,8 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
             hovertemplate=(
                 f"<b>{row[y_col]}</b><br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
-                f"Persentase: {row['__pct_label']}<extra></extra>"
+                f"Persentase: {row['__pct_label']}<extra></extra>", 
+                textposition="inside"
             ),
             showlegend=False,
         ))
