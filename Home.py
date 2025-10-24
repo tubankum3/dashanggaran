@@ -591,75 +591,28 @@ def sidebar(df):
     return df_filtered, selected_kl, selected_metric, selected_years
 
 def short_label_from_code(value, col_type):
-    """
-    Generate short labels for chart legends based on column type and value.
-    
-    Args:
-        value: The original value to shorten
-        col_type: The type/name of the column
-        
-    Returns:
-        str: Shortened label for display
-    """
-    try:
-        # Handle None, NaN, or empty values
-        if pd.isna(value) or value is None or value == "":
-            return "Unknown"
-            
-        value = str(value).strip()
-        
-        # Handle empty values after conversion
-        if not value:
-            return "Unknown"
-            
-        # Default to original value if col_type is not recognized
-        if col_type not in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA", "SUB FUNGSI", 
-                           "PROGRAM", "KEGIATAN", "OUTPUT (KRO)", "SUB OUTPUT (RO)", 
-                           "KOMPONEN", "AKUN 4 DIGIT"]:
-            return value[:15] + "..." if len(value) > 15 else value
-            
-        if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
-            return value[:4]  # first 4 digits
-        elif col_type == "SUB FUNGSI":
-            if len(value) >= 5:
-                return value[:2] + "." + value[3:5]  # 2 digit + dot + 2 digit
-            else:
-                return value[:4]
-        elif col_type == "PROGRAM":
-            if len(value) >= 9:
-                return value[:3] + "." + value[4:6] + "." + value[7:9]  # 3.2.2
-            else:
-                return value[:8]
-        elif col_type == "KEGIATAN":
-            return value[:6]  # first 6 digits
-        elif col_type == "OUTPUT (KRO)":
-            if len(value) >= 8:
-                return value[:4] + "." + value[5:8]  # 4 digits + dot + 3 chars
-            else:
-                return value[:7]
-        elif col_type == "SUB OUTPUT (RO)":
-            if len(value) >= 12:
-                return value[:4] + "." + value[5:8] + "." + value[9:12]  # 4.3.3
-            else:
-                return value[:11]
-        elif col_type == "KOMPONEN":
-            if len(value) >= 11:
-                return value[:3] + "." + value[4:7] + "." + value[8:11]  # 3.3.3
-            else:
-                return value[:10]
-        elif col_type == "AKUN 4 DIGIT":
-            return value[:4]
-        else:
-            # Fallback: take first meaningful part
-            parts = value.split(" ")
-            return parts[0] if parts else value[:10]
-            
-    except Exception as e:
-        # Fallback in case of any error
-        return str(value)[:10] if value else "N/A"
+    value = str(value)
+    if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
+        return value[:2]  # first 2 digits
+    elif col_type == "SUB FUNGSI":
+        return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
+    elif col_type == "PROGRAM":
+        return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 WA
+    elif col_type == "KEGIATAN":
+        return value[:4]  # first 4 digits
+    elif col_type == "OUTPUT (KRO)":
+        return value[:4] + " " + value[5:8]  # 4 digits + 3 letters
+    elif col_type == "SUB OUTPUT (RO)":
+        return value[:4] + " " + value[5:8] + " " + value[9:12]  # 4 digits + 3 letters + 3 digits
+    elif col_type == "KOMPONEN":
+        return value[:3] + " " + value[4:7] + " " + value[8:11]  # 3 letters + 3 digits + 3 digits
+    elif col_type == "AKUN 4 DIGIT":
+        return value[:4]
+    else:
+        return value.split(" ")[0]
 
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=400, extra_height_per_line=3):
-    """Create line chart with shortened labels for legend"""
+    """Create line chart with shortened labels for legend only"""
     
     # Validate inputs
     if df.empty:
@@ -676,13 +629,13 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         return None, None
     
     try:
-        # Create short_label column
+        # Create short_label column for legend only
         df = df.copy()
         df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
         
-        # Group by Tahun and short_label
+        # Group by Tahun, category_col, AND short_label to preserve original values
         df_grouped = (
-            df.groupby(["Tahun", "short_label"], as_index=False)["Nilai"]
+            df.groupby(["Tahun", category_col, "short_label"], as_index=False)["Nilai"]
               .sum()
         )
 
@@ -704,7 +657,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
             df_grouped,
             x="Tahun",
             y="Nilai",
-            color="short_label",  # Use the shortened label for color/legend
+            color="short_label",  # Use shortened label for color/legend only
             markers=True,
             title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
             labels={
@@ -727,8 +680,14 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
             font=dict(family="Google Sans, Roboto, Arial"),
         )
 
+        # Use original category_col values for hover, but show short_label in legend
         fig.update_traces(
-            hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
+            hovertemplate=(
+                f"<b>%{{customdata}}</b><br>"  # Original category_col value
+                "Tahun: %{x}<br>"
+                "Rp %{y:,.0f}<extra></extra>"
+            ),
+            customdata=df_grouped[category_col],  # Pass original values for hover
             line=dict(width=2.5),
             marker=dict(size=7)
         )
@@ -859,15 +818,15 @@ def main():
                             st.plotly_chart(fig, use_container_width=True)
                             
                             # --- Data table (wide format: metric x year) ---
-                            with st.expander("📋 Data Tabel", expanded=False):
-                                display_col = col
+                            with st.expander("📋 Data Tabel", expanded=True):
+                                display_col = col  # This is the original category_col
                                 df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
-    
+                            
                                 # Pivot to wide format: rows=metric, cols=years
                                 df_pivot = (
                                     df_display
                                     .pivot_table(
-                                        index=display_col,
+                                        index=display_col,  # Uses original category_col values
                                         columns="Tahun",
                                         values="Nilai",
                                         aggfunc="sum"
@@ -920,6 +879,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
