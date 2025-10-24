@@ -590,36 +590,74 @@ def sidebar(df):
 
     return df_filtered, selected_kl, selected_metric, selected_years
 
-# Function to get short label based on column type
 def short_label_from_code(value, col_type):
-    value = str(value)
-    if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
-        return value[:2]  # first 2 digits
-    elif col_type == "SUB FUNGSI":
-        return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
-    elif col_type == "PROGRAM":
-        return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 WA
-    elif col_type == "KEGIATAN":
-        return value[:4]  # first 4 digits
-    elif col_type == "OUTPUT (KRO)":
-        return value[:4] + " " + value[5:8]  # 4 digits + 3 letters
-    elif col_type == "SUB OUTPUT (RO)":
-        return value[:4] + " " + value[5:8] + " " + value[9:12]  # 4 digits + 3 letters + 3 digits
-    elif col_type == "KOMPONEN":
-        return value[:3] + " " + value[4:7] + " " + value[8:11]  # 3 letters + 3 digits + 3 digits
-    elif col_type == "AKUN 4 DIGIT":
-        return value[:4]
-    else:
-        return value.split(" ")[0]  # fallback, first part
+    """
+    Generate short labels for chart legends based on column type and value.
+    
+    Args:
+        value: The original value to shorten
+        col_type: The type/name of the column
+        
+    Returns:
+        str: Shortened label for display
+    """
+    try:
+        value = str(value).strip()
+        
+        # Handle empty values
+        if not value or value == 'nan':
+            return "Unknown"
+            
+        if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
+            return value[:2]  # first 2 digits
+        elif col_type == "SUB FUNGSI":
+            if len(value) >= 5:
+                return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
+            else:
+                return value[:4]
+        elif col_type == "PROGRAM":
+            if len(value) >= 9:
+                return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 2
+            else:
+                return value[:7]
+        elif col_type == "KEGIATAN":
+            return value[:4]  # first 4 digits
+        elif col_type == "OUTPUT (KRO)":
+            if len(value) >= 8:
+                return value[:4] + " " + value[5:8]  # 4 digits + 3 letters
+            else:
+                return value[:7]
+        elif col_type == "SUB OUTPUT (RO)":
+            if len(value) >= 12:
+                return value[:4] + " " + value[5:8] + " " + value[9:12]  # 4 digits + 3 letters + 3 digits
+            else:
+                return value[:11]
+        elif col_type == "KOMPONEN":
+            if len(value) >= 11:
+                return value[:3] + " " + value[4:7] + " " + value[8:11]  # 3 letters + 3 digits + 3 digits
+            else:
+                return value[:10]
+        elif col_type == "AKUN 4 DIGIT":
+            return value[:4]
+        else:
+            # Fallback: take first meaningful part
+            parts = value.split(" ")
+            return parts[0] if parts else value[:8]
+            
+    except Exception as e:
+        # Fallback in case of any error
+        return str(value)[:8] if value else "N/A"
 
-# Chart =============================================================================
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=400, extra_height_per_line=3):
+    """Create line chart with shortened labels for legend"""
+    
     # Create short_label column
+    df = df.copy()
     df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
-
-    # Group by KEMENTERIAN/LEMBAGA, Tahun, and category_col
+    
+    # Group by Tahun and short_label (not the original category_col in the groupby)
     df_grouped = (
-        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col, short_label], as_index=False)["Nilai"]
+        df.groupby(["Tahun", "short_label"], as_index=False)["Nilai"]
           .sum()
     )
 
@@ -628,7 +666,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
     df_grouped = df_grouped.sort_values("Tahun")
 
     # Adjust height dynamically
-    n_groups = df_grouped[short_label].nunique()
+    n_groups = df_grouped["short_label"].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
     # Create the line chart
@@ -636,7 +674,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         df_grouped,
         x="Tahun",
         y="Nilai",
-        color=short_label,  # use short_label for color
+        color="short_label",  # Use the shortened label for color/legend
         markers=True,
         title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
         labels={
@@ -648,9 +686,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         height=height,
     )
 
-    years = sorted(df_grouped["Tahun"].unique())
-    min_year, max_year = years[0], years[-1]
-
+    # Update layout
     fig.update_layout(
         hovermode="closest",
         title_x=0,
@@ -663,13 +699,12 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
 
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
-        customdata=df_grouped[category_col],
         line=dict(width=2.5),
         marker=dict(size=7)
     )
 
     return fig, df_grouped
-
+    
 # advanced filter =============================================================================
 def apply_advanced_filters(df_filtered):
     """
@@ -831,6 +866,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
