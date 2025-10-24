@@ -343,6 +343,19 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
+    # --- diagnostics (temporary) ---
+    st.write("DEBUG: metric column dtype:", df_plot[metric].dtype)
+    st.write("DEBUG: metric sample values:", df_plot[metric].head(10).tolist())
+    st.write("DEBUG: metric min/max:", df_plot[metric].min(), df_plot[metric].max())
+    # show tick_vals we plan to set
+    try:
+        x_max = float(df_plot[metric].max())
+    except Exception:
+        x_max = 0.0
+    raw_interval = x_max / 5 if x_max > 0 else 0
+    st.write("DEBUG: x_max, raw_interval:", x_max, raw_interval)
+    # --- end diagnostics ---
+
     # ensure numeric type
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
 
@@ -657,6 +670,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
