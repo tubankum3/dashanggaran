@@ -786,37 +786,23 @@ def main():
     cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
-   # --- Visualization Section ---
-    st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
-    
-    # Categorical columns for visualization - with proper validation
-    cat_cols = [
-        col for col in df_filtered.select_dtypes(include=["object"]).columns
-        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"] and col in df_filtered.columns
-    ]
-    
-    # Debug: Show available columns
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("🔍 Debug Info"):
-        st.write("Available columns:", list(df_filtered.columns))
-        st.write("Categorical columns found:", cat_cols)
-        st.write("Data shape:", df_filtered.shape)
-    
-    if cat_cols:
-        # Limit to first 5 tabs to avoid too many tabs
-        display_cat_cols = cat_cols[:5]
-        tab_labels = [f"📈 {col.replace('_', ' ').title()}" for col in display_cat_cols]
+       # --- Visualization Section ---
+        st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
         
-        tabs = st.tabs(tab_labels)
+        # Categorical columns for visualization
+        cat_cols = [
+            col for col in df_filtered.select_dtypes(include=["object"]).columns
+            if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
+        ]
         
-        for tab, col in zip(tabs, display_cat_cols):
-            with tab:
-                if col in df_filtered.columns:
-                    try:
-                        fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
-                        if fig is not None:
-                            st.plotly_chart(fig, use_container_width=True)
-                            
+        if cat_cols:
+            tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
+            
+            for tab, col in zip(tabs, cat_cols):
+                with tab:
+                    fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
+                    st.plotly_chart(fig, use_container_width=True)
+                                
                             # --- Data table (wide format: metric x year) ---
                             with st.expander("📋 Data Tabel", expanded=True):
                                 display_col = col  # This is the original category_col
@@ -879,6 +865,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
