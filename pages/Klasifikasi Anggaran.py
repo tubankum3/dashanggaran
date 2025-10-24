@@ -417,21 +417,22 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     
     for idx, row in df_plot.iterrows():
         fig.add_trace(go.Bar(
-            x=[row[metric]],  # ✅ Use actual raw metric value
-            y=[row["__wrapped_label"]],  # ✅ Use wrapped labels
+            x=[row[metric]],
+            y=[row["__wrapped_label"]],
             orientation='h',
             text=row["__pct_label"],
-            textposition="auto",
-            textfont=dict(size=11, color="#333"),
-            marker=dict(color='#1a73e8'),
+            textposition="outside",
+            textfont=dict(size=11, color="#fff"),
+            marker=dict(color="#1a73e8"),
             hovertemplate=(
-                f"<b>{row[y_col]}</b><br>"
+                f"{row[y_col]}<br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
                 f"Persentase: {row['__pct_label']}<extra></extra>"
             ),
+            hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
             showlegend=False,
         ))
-    
+
     # Calculate dynamic height
     base_height = 600 + max(0, (len(df_plot) - 10) * 15)
     final_height = int(max_height) if max_height is not None else base_height
@@ -729,5 +730,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
