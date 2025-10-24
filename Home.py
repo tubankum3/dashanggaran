@@ -610,7 +610,11 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         return "\n".join(lines)
 
     df_grouped[category_col] = df_grouped[category_col].apply(wrap_label)
-
+              
+    # temporary------
+    st.write("DEBUG: metric sample values:", df_grouped[category_col].head(10))
+    -----------
+              
     # Adjust height based on number of categories
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
@@ -829,6 +833,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
