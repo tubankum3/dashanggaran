@@ -339,9 +339,10 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
     Create horizontal bar chart with:
-    - X-axis: numeric/continuous float metric values (Rupiah) - NO AUTOSCALING
+    - X-axis: numeric/continuous float metric values (Rupiah)
     - Bar labels: percentage of total
     - Hover: both percentage and Rupiah value
+    - Dynamic height scaling based on number of bars
     """
     df_plot = df.copy()
     
@@ -350,51 +351,44 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         st.error(f"Column '{metric}' or '{y_col}' not found in data")
         return go.Figure()
     
-    # ✅ CRITICAL: Ensure metric is numeric float
+    # Ensure metric is numeric
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0).astype(float)
     
-    # Calculate total and percentage
+    # Compute total and percentages
     total = float(df_plot[metric].sum())
     if total > 0:
         df_plot["__percentage"] = (df_plot[metric] / total * 100).round(1)
     else:
         df_plot["__percentage"] = 0.0
     
-    # Create formatted strings for display
+    # Format display strings
     df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.2f}%")
     df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
     
-    # Sort by metric value ascending for better visualization
+    # Sort ascending by metric
     df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
     
-    # ✅ Wrap long y-axis labels
-    cat_labels = df_plot[y_col].astype(str).tolist()
-    max_chars = 30
-    wrapped = []
-    for lbl in cat_labels:
-        if len(lbl) <= max_chars:
-            wrapped.append(lbl)
-        else:
-            parts = [lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)]
-            wrapped.append("<br>".join(parts))
+    # Wrap long y-axis labels
+    max_chars = 32
+    df_plot["__wrapped_label"] = df_plot[y_col].astype(str).apply(
+        lambda lbl: "<br>".join([lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)])
+    )
     
-    df_plot["__wrapped_label"] = wrapped
-    
-    # ✅ Get x-axis range from actual metric values
+    # Get X-axis limits
     x_min = 0.0
     x_max = float(df_plot[metric].max()) if len(df_plot) > 0 and df_plot[metric].max() > 0 else 100.0
     
-    # Determine scale and unit for x-axis labels (for display only, NOT for data)
+    # Determine display scale & unit
     if x_max >= 1e12:
-        scale, unit = 1e12, "T"
+        scale, unit = 1e12, "T"   # Triliun
     elif x_max >= 1e9:
-        scale, unit = 1e9, "M"
+        scale, unit = 1e9, "Jt"   # Miliar
     elif x_max >= 1e6:
-        scale, unit = 1e6, "Jt"
+        scale, unit = 1e6, "M"    # Juta
     else:
         scale, unit = 1, ""
     
-    # Calculate nice tick intervals based on ACTUAL metric values
+    # Compute tick values (nice intervals)
     if x_max > 0:
         target_ticks = 6
         raw_interval = x_max / target_ticks
@@ -406,19 +400,19 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         tick_vals = [0, 50, 100]
         last_tick = 100
     
-    # Format tick labels with units
+    # Format tick labels
     if unit:
-        tick_texts = [f"{v/scale:.0f} {unit}" for v in tick_vals]
+        tick_texts = [f"Rp {v/scale:.0f} {unit}" for v in tick_vals]
     else:
         tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
     
-    # ✅ Create bar chart using RAW metric values (no scaling)
+    # Create figure
     fig = go.Figure()
     
-    for idx, row in df_plot.iterrows():
+    for _, row in df_plot.iterrows():
         fig.add_trace(go.Bar(
             x=[row[metric]],
-            y=[row[y_col]],  # ✅ keep the real label for drill-down
+            y=[row[y_col]],
             orientation='h',
             text=row["__pct_label"],
             textposition="outside",
@@ -431,12 +425,27 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
             ),
             showlegend=False,
         ))
-
-    # Calculate dynamic height
-    base_height = 500 + max(0, (len(df_plot) - 10) * 5)
-    final_height = int(max_height) if max_height is not None else base_height
     
-    # Update layout
+    # ✅ Dynamic height adjustment
+    n_groups = df_plot[y_col].nunique()
+    base_height = 400
+    extra_height_per_line = 5
+    minus_height_per_line = 20
+    
+    if n_groups > 10:
+        height = base_height + (n_groups - 10) * extra_height_per_line
+    elif n_groups < 10:
+        height = base_height - (10 - n_groups) * minus_height_per_line
+    else:
+        height = base_height
+    
+    # Bound height
+    height = max(300, min(height, 1200))
+    
+    # Allow manual override
+    final_height = int(max_height) if max_height is not None else height
+    
+    # Layout
     fig.update_layout(
         title=title,
         showlegend=False,
@@ -447,36 +456,28 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
         xaxis_title="",
         yaxis_title="",
-    )
-    fig.update_traces(
-        hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
-        hoverinfo="text",
-    )
-    fig.update_layout(
-        hovermode="closest",  # or "y unified" if you prefer static hover line
+        hovermode="closest",
     )
     
-    # ✅ Update x-axis: use ACTUAL metric values, format labels only
+    # Axis styling
     fig.update_xaxes(
         type="linear",
         tickmode="array",
         tickvals=tick_vals,
         ticktext=tick_texts,
-        range=[0, last_tick * 1.1],  # 10% padding for outside labels
+        range=[0, last_tick * 1.1],
         showgrid=True,
         gridcolor="rgba(200,200,200,0.3)",
         zeroline=True,
         zerolinecolor="rgba(150,150,150,0.5)",
     )
-    
-    # Update y-axis - show wrapped labels visually but keep raw y-values internally
     fig.update_yaxes(
         tickvals=df_plot[y_col],
         ticktext=df_plot["__wrapped_label"],
         categoryorder="trace",
         automargin=True,
     )
-
+    
     return fig
 
 # =============================================================================
@@ -758,6 +759,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
