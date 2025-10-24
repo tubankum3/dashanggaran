@@ -342,14 +342,15 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
+    # --- Ensure numeric metric values ---
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0)
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # Base figure — using RAW metric values
+    # --- Base figure ---
     fig = px.bar(
         df_plot,
-        x=metric,
+        x=metric,   # numeric metric column
         y=y_col,
         color=color_col,
         orientation="h",
@@ -362,11 +363,12 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>"
     fig.update_traces(hovertemplate=hover, textposition="auto")
 
+    # --- Auto chart height ---
     n = len(df_plot)
     base_height = 600 + max(0, (n - 10) * 15)
     height = int(max_height) if max_height else base_height
 
-    # --- X-axis scaling logic ---
+    # --- Dynamic tick values based on metric range ---
     x_max = float(df_plot[metric].max())
     if x_max <= 0:
         tick_vals = [0]
@@ -378,7 +380,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         last_tick = np.ceil(x_max / nice_interval) * nice_interval
         tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
 
-    # Choose unit and scale for display labels only
+    # --- Determine label unit ---
     if x_max >= 1e12:
         scale = 1e12
         unit = "T"
@@ -392,9 +394,10 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         scale = 1
         unit = ""
 
-    # Display text only (don't modify bar data)
+    # --- Format tick labels ---
     tick_texts = [f"Rp {v/scale:,.0f} {unit}" if v > 0 else "Rp 0" for v in tick_vals]
 
+    # --- Layout & styling ---
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
@@ -405,9 +408,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
     )
 
-    # Apply formatted tick labels
+    # --- Fix numeric axis so it never becomes categorical ---
     fig.update_xaxes(
-        type="linear",
+        type="linear",               # <— forces numeric axis
         tickvals=tick_vals,
         ticktext=tick_texts,
         title_text="Jumlah (Rp)",
@@ -415,9 +418,10 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         showgrid=True,
         zeroline=False,
         autorange=True,
+        range=[0, max(tick_vals)],   # <— ensures full bar visibility
     )
 
-    # Wrap y labels
+    # --- Wrap long labels on Y-axis ---
     cat_labels = df_plot[y_col].astype(str).tolist()
     wrapped = []
     for lbl in cat_labels:
@@ -435,6 +439,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     )
 
     return fig
+
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -670,6 +675,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
