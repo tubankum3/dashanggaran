@@ -592,9 +592,10 @@ def sidebar(df):
 
 # Chart =============================================================================
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str,
-          base_height=600, extra_height_per_line=10, base_wrap_len=20, base_width=700,
-          max_legend_font=12, min_legend_font=7):
+          base_height=600, extra_height_per_line=10, max_legend_font=12, min_legend_font=7,
+          legend_col_threshold=10, max_chars_per_line=20):
     import textwrap
+    import plotly.express as px
 
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
@@ -604,29 +605,22 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
     df_grouped = df_grouped.sort_values("Tahun")
 
-    # Determine dynamic wrap length based on longest label
-    max_label_len = df_grouped[category_col].astype(str).map(len).max()
-    wrap_len = min(base_wrap_len, max(10, int(base_wrap_len * 20 / max_label_len)))
-
+    # Break long labels into shorter strings
     def wrap_label(label):
-        return "<br>".join(textwrap.wrap(str(label), wrap_len))
+        lines = textwrap.wrap(str(label), max_chars_per_line)
+        return "\n".join(lines)
 
     df_grouped[category_col] = df_grouped[category_col].apply(wrap_label)
 
-    # Adjust height based on number of legend items
+    # Adjust height based on number of categories
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Estimate extra width needed for legend
-    max_lines = max_label_len // wrap_len + 1
-    legend_width = max_lines * 15  # 15 pixels per line
-    width = base_width + legend_width
+    # Scale legend font dynamically
+    legend_font = max(min_legend_font, min(max_legend_font, max_legend_font - (n_groups-10)//2))
 
-    # Dynamically scale legend font size based on number of categories
-    if n_groups <= 10:
-        legend_font = max_legend_font
-    else:
-        legend_font = max(min_legend_font, max_legend_font - (n_groups - 10) // 2)
+    # Determine number of legend columns
+    legend_columns = 1 if n_groups <= legend_col_threshold else 2
 
     fig = px.line(
         df_grouped,
@@ -641,28 +635,30 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
             category_col: category_col.replace("_", " ").title(),
         },
         template="plotly_white",
-        height=height,
-        width=width
+        height=height
     )
 
     fig.update_layout(
-        hovermode="closest",
-        title_x=0,
-        legend_title_text=category_col.replace("_", " ").title(),
         legend=dict(
+            title=category_col.replace("_", " ").title(),
+            font=dict(size=legend_font),
             orientation="v",
             yanchor="top",
             y=1,
             xanchor="left",
             x=1.02,
-            itemsizing="constant",
             traceorder="normal",
-            font=dict(size=legend_font)
+            tracegroupgap=0,
+            valign="top",
+            itemwidth=120,
+            itemsizing="constant",
+            # key part: multiple columns
+            tracegroupgap=0,
+            yref="paper",
+            xref="paper",
+            columns=legend_columns
         ),
-        margin=dict(l=40, r=20 + legend_width, t=80, b=40),
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        font=dict(family="Google Sans, Roboto, Arial"),
+        margin=dict(l=40, r=20 + legend_columns*120, t=80, b=40)
     )
 
     fig.update_traces(
@@ -834,6 +830,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
