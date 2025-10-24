@@ -337,27 +337,16 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
     Horizontal bar chart with auto-scaling x-axis (Rp in T/M/Jt).
-    - df: dataframe with columns [y_col, metric]
-    - metric: numeric metric column
-    - y_col: categorical column
-    - color_col: optional color grouping
-    - stacked: whether to stack bars
-    - max_height: optional chart height
     """
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
-    # Ensure numeric values
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0)
-
-    # Keep formatted string for inside bar text
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
-
-    # Sort smallest → largest for horizontal layout
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # Build base figure
+    # Base figure — using RAW metric values
     fig = px.bar(
         df_plot,
         x=metric,
@@ -370,16 +359,14 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         labels={y_col: y_col.title(), metric: "Jumlah: Rp"},
     )
 
-    # Hover template
     hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>"
     fig.update_traces(hovertemplate=hover, textposition="auto")
 
-    # Dynamic chart height
     n = len(df_plot)
     base_height = 600 + max(0, (n - 10) * 15)
     height = int(max_height) if max_height else base_height
 
-    # Determine numeric range and tick interval
+    # --- X-axis scaling logic ---
     x_max = float(df_plot[metric].max())
     if x_max <= 0:
         tick_vals = [0]
@@ -391,7 +378,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         last_tick = np.ceil(x_max / nice_interval) * nice_interval
         tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
 
-    # Determine scale and unit
+    # Choose unit and scale for display labels only
     if x_max >= 1e12:
         scale = 1e12
         unit = "T"
@@ -405,10 +392,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         scale = 1
         unit = ""
 
-    # Format tick labels dynamically
-    tick_texts = [f"Rp {v/scale:,.2f} {unit}" if v > 0 else "Rp 0" for v in tick_vals]
+    # Display text only (don't modify bar data)
+    tick_texts = [f"Rp {v/scale:,.0f} {unit}" if v > 0 else "Rp 0" for v in tick_vals]
 
-    # Layout configuration
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
@@ -419,28 +405,26 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
     )
 
-    # Apply formatted ticks to x-axis
+    # Apply formatted tick labels
     fig.update_xaxes(
         type="linear",
-        range=[0, max(tick_vals)],
         tickvals=tick_vals,
         ticktext=tick_texts,
         title_text="Jumlah (Rp)",
         tickfont=dict(size=10),
         showgrid=True,
         zeroline=False,
-        autorange=False,
+        autorange=True,
     )
 
-    # Wrap long y-axis labels
+    # Wrap y labels
     cat_labels = df_plot[y_col].astype(str).tolist()
-    max_chars = 30
     wrapped = []
     for lbl in cat_labels:
-        if len(lbl) <= max_chars:
+        if len(lbl) <= 30:
             wrapped.append(lbl)
         else:
-            parts = [lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)]
+            parts = [lbl[i:i+30] for i in range(0, len(lbl), 30)]
             wrapped.append("<br>".join(parts))
 
     fig.update_yaxes(
@@ -686,6 +670,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
