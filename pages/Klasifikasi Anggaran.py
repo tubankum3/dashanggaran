@@ -458,7 +458,14 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         yaxis_title="",
         hovermode="closest",
     )
-    
+    fig.update_traces(
+        hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
+        hoverinfo="text",
+    )
+    fig.update_layout(
+        hovermode="closest",  # or "y unified" if you prefer static hover line
+    )
+
     # Axis styling
     fig.update_xaxes(
         type="linear",
@@ -759,6 +766,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
