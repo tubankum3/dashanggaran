@@ -595,7 +595,6 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
           base_height=600, extra_height_per_line=10, max_legend_font=12, min_legend_font=7,
           legend_col_threshold=10, max_chars_per_line=20):
     import textwrap
-    import plotly.express as px
 
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
@@ -638,28 +637,28 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         height=height
     )
 
-    fig.update_layout(
-        legend=dict(
-            title=category_col.replace("_", " ").title(),
-            font=dict(size=legend_font),
-            orientation="v",
-            yanchor="top",
-            y=1,
-            xanchor="left",
-            x=1.02,
-            traceorder="normal",
-            tracegroupgap=0,
-            valign="top",
-            itemwidth=120,
-            itemsizing="constant",
-            # key part: multiple columns
-            tracegroupgap=0,
-            yref="paper",
-            xref="paper",
-            columns=legend_columns
-        ),
-        margin=dict(l=40, r=20 + legend_columns*120, t=80, b=40)
-    )
+    # fig.update_layout(
+    #     legend=dict(
+    #         title=category_col.replace("_", " ").title(),
+    #         font=dict(size=legend_font),
+    #         orientation="v",
+    #         yanchor="top",
+    #         y=1,
+    #         xanchor="left",
+    #         x=1.02,
+    #         traceorder="normal",
+    #         tracegroupgap=0,
+    #         valign="top",
+    #         itemwidth=120,
+    #         itemsizing="constant",
+    #         # key part: multiple columns
+    #         tracegroupgap=0,
+    #         yref="paper",
+    #         xref="paper",
+    #         columns=legend_columns
+    #     ),
+    #     margin=dict(l=40, r=20 + legend_columns*120, t=80, b=40)
+    # )
 
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
@@ -830,6 +829,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
