@@ -591,28 +591,43 @@ def sidebar(df):
     return df_filtered, selected_kl, selected_metric, selected_years
 
 # Chart =============================================================================
-def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10, wrap_len=20):
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str,
+          base_height=600, extra_height_per_line=10, base_wrap_len=20, base_width=700,
+          max_legend_font=12, min_legend_font=7):
+    import textwrap
+
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
     )
 
-    # Ensure Tahun is sorted and string
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
     df_grouped = df_grouped.sort_values("Tahun")
 
-    # Wrap long legend labels
+    # Determine dynamic wrap length based on longest label
+    max_label_len = df_grouped[category_col].astype(str).map(len).max()
+    wrap_len = min(base_wrap_len, max(10, int(base_wrap_len * 20 / max_label_len)))
+
     def wrap_label(label):
-        import textwrap
         return "<br>".join(textwrap.wrap(str(label), wrap_len))
 
     df_grouped[category_col] = df_grouped[category_col].apply(wrap_label)
 
-    # Adjust height dynamically
+    # Adjust height based on number of legend items
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Create the line chart
+    # Estimate extra width needed for legend
+    max_lines = max_label_len // wrap_len + 1
+    legend_width = max_lines * 15  # 15 pixels per line
+    width = base_width + legend_width
+
+    # Dynamically scale legend font size based on number of categories
+    if n_groups <= 10:
+        legend_font = max_legend_font
+    else:
+        legend_font = max(min_legend_font, max_legend_font - (n_groups - 10) // 2)
+
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -627,16 +642,24 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         },
         template="plotly_white",
         height=height,
+        width=width
     )
-
-    years = sorted(df_grouped["Tahun"].unique())
-    min_year, max_year = years[0], years[-1]
 
     fig.update_layout(
         hovermode="closest",
         title_x=0,
         legend_title_text=category_col.replace("_", " ").title(),
-        margin=dict(l=40, r=40, t=80, b=40),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+            itemsizing="constant",
+            traceorder="normal",
+            font=dict(size=legend_font)
+        ),
+        margin=dict(l=40, r=20 + legend_width, t=80, b=40),
         paper_bgcolor="white",
         plot_bgcolor="white",
         font=dict(family="Google Sans, Roboto, Arial"),
@@ -811,6 +834,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
