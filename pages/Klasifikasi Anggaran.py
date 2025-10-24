@@ -605,7 +605,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         
         # Back button
         with left_col:
-            if st.button(":arrow_backward:", help="Kembali satu tingkat"):
+            if st.button(icon=":material/arrow_back:", help="Kembali satu tingkat"):
                 if st.session_state.level_index > 0:
                     prev_idx = max(0, st.session_state.level_index - 1)
                     prev_col = HIERARCHY[prev_idx][1]
@@ -616,7 +616,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         
         # Reset button
         with right_col:
-            if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
+            if st.button(icon=":material/restart_alt:", help="Kembali ke tampilan awal"):
                 reset_drill()
                 st.rerun()
 
@@ -733,6 +733,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
