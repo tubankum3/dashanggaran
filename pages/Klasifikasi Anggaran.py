@@ -1,8 +1,6 @@
 import streamlit as st
-import os
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_plotly_events import plotly_events
 import zipfile
@@ -513,13 +511,6 @@ def reset_drill():
     st.session_state.level_index = 0
     st.session_state.click_key += 1
 
-def jump_to_ancestor(idx):
-    """Jump to ancestor level and clear deeper selections"""
-    for j in range(idx + 1, len(HIERARCHY)):
-        st.session_state.drill[HIERARCHY[j][1]] = None
-    st.session_state.level_index = idx + 1 if idx + 1 < len(HIERARCHY) else idx
-    st.session_state.click_key += 1
-
 # =============================================================================
 # Header / Sidebar
 # =============================================================================
@@ -549,7 +540,7 @@ def sidebar(df):
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
 
-        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=10, step=1)
+        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=11, step=1)
 
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
@@ -587,26 +578,6 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
     """
     placeholder = st.empty()
     with placeholder.container():
-        # # === Back / Reset row ===
-        # left_col, mid_col, right_col = st.columns([1, 10, 1])
-        
-        # # Back button
-        # with left_col:
-        #     if st.button(":arrow_backward:", help="Kembali satu tingkat"):
-        #         if st.session_state.level_index > 0:
-        #             prev_idx = max(0, st.session_state.level_index - 1)
-        #             prev_col = HIERARCHY[prev_idx][1]
-        #             st.session_state.drill[prev_col] = None
-        #             st.session_state.level_index = prev_idx
-        #             st.session_state.click_key += 1
-        #             st.rerun()
-        
-        # # Reset button
-        # with right_col:
-        #     if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
-        #         reset_drill()
-        #         st.rerun()
-
         # === Breadcrumb navigation ===
         active_drills = [
             (i, lvl, st.session_state.drill.get(lvl))
@@ -743,10 +714,6 @@ def main():
         st.sidebar.write("**K/L:**")
         for k in selected_kls:
             st.sidebar.write(f"- {k}")
-    st.sidebar.markdown("---")
-    # st.sidebar.markdown("### Drill state")
-    # for _, col in HIERARCHY:
-    #     st.sidebar.write(f"- {col}: {st.session_state.drill.get(col) if st.session_state.drill.get(col) else '-'}")
 
     # Footer
     st.markdown("---")
@@ -766,6 +733,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
