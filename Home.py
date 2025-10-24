@@ -786,67 +786,83 @@ def main():
     cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
-       # --- Visualization Section ---
-        st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
+    # --- Visualization Section ---
+    st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
+    
+    # Categorical columns for visualization - with proper validation
+    cat_cols = [
+        col for col in df_filtered.select_dtypes(include=["object"]).columns
+        if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"] and col in df_filtered.columns
+    ]
         
-        # Categorical columns for visualization
-        cat_cols = [
-            col for col in df_filtered.select_dtypes(include=["object"]).columns
-            if col not in ["KEMENTERIAN/LEMBAGA", "Tahun"]
-        ]
+    if cat_cols:
+        # Show ALL categorical columns, not just first 5
+        tab_labels = [f"📈 {col.replace('_', ' ').title()}" for col in cat_cols]
         
-        if cat_cols:
-            tabs = st.tabs([f"📈 {col.replace('_', ' ').title()}" for col in cat_cols])
-            
-            for tab, col in zip(tabs, cat_cols):
-                with tab:
-                    fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
-                    st.plotly_chart(fig, use_container_width=True)
-                                
-                            # --- Data table (wide format: metric x year) ---
-                            with st.expander("📋 Data Tabel", expanded=True):
-                                display_col = col  # This is the original category_col
-                                df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
+        # Create tabs for all categorical columns
+        tabs = st.tabs(tab_labels)
+        
+        for tab, col in zip(tabs, cat_cols):
+            with tab:
+                if col in df_filtered.columns:
+                    try:
+                        # Check if this column has any non-null data
+                        if df_filtered[col].notna().sum() == 0:
+                            st.warning(f"Kolom '{col}' tidak memiliki data yang valid")
+                            continue
                             
-                                # Pivot to wide format: rows=metric, cols=years
-                                df_pivot = (
-                                    df_display
-                                    .pivot_table(
-                                        index=display_col,  # Uses original category_col values
-                                        columns="Tahun",
-                                        values="Nilai",
-                                        aggfunc="sum"
+                        fig, grouped_df = chart(df_filtered, col, selected_metric, selected_kl)
+                        if fig is not None:
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # --- Data table (wide format: metric x year) ---
+                            with st.expander("📋 Data Tabel", expanded=False):
+                                if grouped_df is not None and not grouped_df.empty:
+                                    display_col = col
+                                    df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
+    
+                                    # Pivot to wide format: rows=metric, cols=years
+                                    df_pivot = (
+                                        df_display
+                                        .pivot_table(
+                                            index=display_col,
+                                            columns="Tahun",
+                                            values="Nilai",
+                                            aggfunc="sum"
+                                        )
+                                        .fillna(0)
+                                        .reset_index()
                                     )
-                                    .fillna(0)
-                                    .reset_index()
-                                )
     
-                                # Sort columns: Tahun ascending
-                                tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
-                                df_pivot = df_pivot[[display_col] + tahun_cols]
+                                    # Sort columns: Tahun ascending
+                                    tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
+                                    df_pivot = df_pivot[[display_col] + tahun_cols]
     
-                                # Format numeric values as currency
-                                for c in tahun_cols:
-                                    df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
+                                    # Format numeric values as currency
+                                    for c in tahun_cols:
+                                        df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
     
-                                # Rename first column to show selected metric
-                                df_pivot = df_pivot.rename(columns={display_col: selected_metric})
+                                    # Rename first column to show selected metric
+                                    df_pivot = df_pivot.rename(columns={display_col: selected_metric})
     
-                                st.dataframe(
-                                    df_pivot,
-                                    use_container_width=True,
-                                    hide_index=True
-                                )
+                                    st.dataframe(
+                                        df_pivot,
+                                        use_container_width=True,
+                                        hide_index=True
+                                    )
+                                else:
+                                    st.info("Tidak ada data untuk ditampilkan dalam tabel")
                         else:
                             st.warning(f"Tidak dapat membuat chart untuk {col}")
                     except Exception as e:
                         st.error(f"Error creating chart for {col}: {str(e)}")
+                        # Show raw data for debugging
+                        with st.expander("🔧 Debug Data"):
+                            st.write(f"Sample values in {col}:", df_filtered[col].head(10).tolist())
                 else:
                     st.warning(f"Kolom {col} tidak ditemukan dalam data yang difilter")
     else:
         st.info("ℹ️ Tidak ada kolom kategorikal yang tersedia untuk visualisasi.")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
     
     # --- Footer ---
     st.markdown("---")
@@ -865,6 +881,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
