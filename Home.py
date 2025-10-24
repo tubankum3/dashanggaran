@@ -591,7 +591,7 @@ def sidebar(df):
     return df_filtered, selected_kl, selected_metric, selected_years
 
 # Chart =============================================================================
-def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10, wrap_len=20):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
@@ -600,6 +600,13 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
     # Ensure Tahun is sorted and string
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
     df_grouped = df_grouped.sort_values("Tahun")
+
+    # Wrap long legend labels
+    def wrap_label(label):
+        import textwrap
+        return "<br>".join(textwrap.wrap(str(label), wrap_len))
+
+    df_grouped[category_col] = df_grouped[category_col].apply(wrap_label)
 
     # Adjust height dynamically
     n_groups = df_grouped[category_col].nunique()
@@ -804,6 +811,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
