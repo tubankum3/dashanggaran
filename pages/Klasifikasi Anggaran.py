@@ -336,7 +336,7 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
-    Horizontal bar chart with auto-scaling x-axis (Rp in T/M/Jt).
+    Horizontal bar chart with auto-scaling x-axis (Rp in T/M/Jt) and dynamic interval.
     """
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
@@ -344,43 +344,30 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
 
     # --- Ensure numeric metric values ---
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0)
-    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
     df_plot = df_plot.sort_values(metric, ascending=True)
+    df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # --- Base figure ---
+    # --- Base bar chart ---
     fig = px.bar(
         df_plot,
-        x=metric,   # numeric metric column
+        x=metric,
         y=y_col,
         color=color_col,
         orientation="h",
         text="__formatted",
-        custom_data=["__formatted"],
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah: Rp"},
+        labels={y_col: "", metric: "Jumlah (Rp)"},
     )
 
-    hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>"
-    fig.update_traces(hovertemplate=hover, textposition="auto")
+    fig.update_traces(
+        textposition="auto",
+        hovertemplate=f"%{{y}}<br>Jumlah: %{{text}}<extra></extra>"
+    )
 
-    # --- Auto chart height ---
-    n = len(df_plot)
-    base_height = 600 + max(0, (n - 10) * 15)
-    height = int(max_height) if max_height else base_height
-
-    # --- Dynamic tick values based on metric range ---
+    # --- Compute axis scaling ---
+    x_min = float(df_plot[metric].min())
     x_max = float(df_plot[metric].max())
-    if x_max <= 0:
-        tick_vals = [0]
-    else:
-        target_ticks = 5
-        raw_interval = x_max / target_ticks
-        magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
-        nice_interval = np.ceil(raw_interval / magnitude) * magnitude
-        last_tick = np.ceil(x_max / nice_interval) * nice_interval
-        tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
 
-    # --- Determine label unit ---
     if x_max >= 1e12:
         scale = 1e12
         unit = "T"
@@ -394,52 +381,60 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         scale = 1
         unit = ""
 
-    # --- Format tick labels ---
-    tick_texts = [f"Rp {v/scale:,.0f} {unit}" if v > 0 else "Rp 0" for v in tick_vals]
+    # --- Dynamic tick intervals ---
+    if x_max <= 0:
+        tick_vals = [0]
+    else:
+        target_ticks = 5
+        raw_interval = x_max / target_ticks
+        magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
+        nice_interval = np.ceil(raw_interval / magnitude) * magnitude
+        last_tick = np.ceil(x_max / nice_interval) * nice_interval
+        tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
 
-    # --- Layout & styling ---
+    tick_texts = [f"Rp {v/scale:,.0f} {unit}" for v in tick_vals]
+
+    # --- Ensure x-axis is numeric (not categorical) ---
+    fig.update_xaxes(
+        type="linear",
+        tickvals=tick_vals,
+        ticktext=tick_texts,
+        range=[0, last_tick],
+        title_text="Jumlah (Rp)",
+        showgrid=True,
+        zeroline=False,
+        automargin=True,
+    )
+
+    # --- Wrap long labels ---
+    y_labels = df_plot[y_col].astype(str).tolist()
+    wrapped_labels = [
+        "<br>".join([lbl[i:i+30] for i in range(0, len(lbl), 30)]) if len(lbl) > 30 else lbl
+        for lbl in y_labels
+    ]
+
+    fig.update_yaxes(
+        tickvals=y_labels,
+        ticktext=wrapped_labels,
+        automargin=True,
+        categoryorder="total ascending",
+    )
+
+    # --- Adjust height dynamically ---
+    n = len(df_plot)
+    base_height = 600 + max(0, (n - 10) * 20)
+    height = int(max_height) if max_height else base_height
+
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
-        yaxis={"categoryorder": "total ascending"},
-        margin=dict(t=70, l=220, r=25, b=50),
+        margin=dict(t=70, l=230, r=40, b=50),
         height=height,
         plot_bgcolor="white",
         paper_bgcolor="white",
     )
 
-    # --- Fix numeric axis so it never becomes categorical ---
-    fig.update_xaxes(
-        type="linear",               # <— forces numeric axis
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        title_text="Jumlah (Rp)",
-        tickfont=dict(size=10),
-        showgrid=True,
-        zeroline=False,
-        autorange=True,
-        range=[0, max(tick_vals)],   # <— ensures full bar visibility
-    )
-
-    # --- Wrap long labels on Y-axis ---
-    cat_labels = df_plot[y_col].astype(str).tolist()
-    wrapped = []
-    for lbl in cat_labels:
-        if len(lbl) <= 30:
-            wrapped.append(lbl)
-        else:
-            parts = [lbl[i:i+30] for i in range(0, len(lbl), 30)]
-            wrapped.append("<br>".join(parts))
-
-    fig.update_yaxes(
-        tickvals=cat_labels,
-        ticktext=wrapped,
-        automargin=True,
-        tickfont=dict(size=11),
-    )
-
     return fig
-
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -675,6 +670,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
