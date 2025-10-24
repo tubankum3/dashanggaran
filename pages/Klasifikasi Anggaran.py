@@ -418,7 +418,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     for idx, row in df_plot.iterrows():
         fig.add_trace(go.Bar(
             x=[row[metric]],
-            y=[row["__wrapped_label"]],
+            y=[row[y_col]],  # ✅ keep the real label for drill-down
             orientation='h',
             text=row["__pct_label"],
             textposition="outside",
@@ -469,12 +469,14 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         zerolinecolor="rgba(150,150,150,0.5)",
     )
     
-    # Update y-axis - keep category order
+    # Update y-axis - show wrapped labels visually but keep raw y-values internally
     fig.update_yaxes(
-        categoryorder="trace",  # Maintain the order from df_plot
+        tickvals=df_plot[y_col],
+        ticktext=df_plot["__wrapped_label"],
+        categoryorder="trace",
         automargin=True,
     )
-    
+
     return fig
 
 # =============================================================================
@@ -736,6 +738,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
