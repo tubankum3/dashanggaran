@@ -336,7 +336,7 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
-    Horizontal bar chart with x-axis formatted as 'Rp XXX T' using format_rupiah().
+    Horizontal bar chart with proper x-axis numeric ticks (Rupiah format)
     """
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
@@ -385,23 +385,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
     )
 
-    # calculate tick positions and formatted labels using your format_rupiah()
-    try:
-        x_max = float(df_plot[metric].max())
-    except Exception:
-        x_max = 0.0
-
-    if x_max > 0:
-        tick_vals = np.linspace(0, x_max, 6)
-        tick_texts = [format_rupiah(v) for v in tick_vals]
-    else:
-        tick_vals = [0]
-        tick_texts = [format_rupiah(0)]
-
-    # apply formatted ticks to x-axis (Rp XXX T)
+    # fix x-axis: keep Plotly’s numeric scaling but format as Rupiah
     fig.update_xaxes(
-        tickvals=tick_vals,
-        ticktext=tick_texts,
+        tickformat=",",  # comma separators
         title_text="Jumlah (Rp)",
         tickfont=dict(size=10),
         showgrid=True,
@@ -418,6 +404,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     fig.update_yaxes(tickvals=cat_labels, ticktext=wrapped, automargin=True, tickfont=dict(size=11))
 
     return fig
+
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -653,6 +640,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
