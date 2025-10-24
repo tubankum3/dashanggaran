@@ -816,7 +816,7 @@ def main():
                             st.plotly_chart(fig, use_container_width=True)
                             
                             # --- Data table (wide format: metric x year) ---
-                            with st.expander("📋 Data Tabel", expanded=False):
+                            with st.expander("📋 Data Tabel", expanded=True):
                                 if grouped_df is not None and not grouped_df.empty:
                                     display_col = col
                                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
@@ -881,6 +881,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
