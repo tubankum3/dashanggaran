@@ -361,7 +361,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         df_plot["__percentage"] = 0.0
     
     # Create formatted strings for display
-    df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.1f}%")
+    df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.2f}%")
     df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
     
     # Sort by metric value ascending for better visualization
@@ -433,7 +433,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         ))
 
     # Calculate dynamic height
-    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
+    base_height = 500 + max(0, (len(df_plot) - 10) * 5)
     final_height = int(max_height) if max_height is not None else base_height
     
     # Update layout
@@ -445,7 +445,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
-        xaxis_title="Jumlah (Rp)",
+        xaxis_title="",
         yaxis_title="",
     )
     fig.update_traces(
@@ -579,25 +579,25 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
     """
     placeholder = st.empty()
     with placeholder.container():
-        # === Back / Reset row ===
-        left_col, mid_col, right_col = st.columns([1, 10, 1])
+        # # === Back / Reset row ===
+        # left_col, mid_col, right_col = st.columns([1, 10, 1])
         
-        # Back button
-        with left_col:
-            if st.button(":arrow_backward:", help="Kembali satu tingkat"):
-                if st.session_state.level_index > 0:
-                    prev_idx = max(0, st.session_state.level_index - 1)
-                    prev_col = HIERARCHY[prev_idx][1]
-                    st.session_state.drill[prev_col] = None
-                    st.session_state.level_index = prev_idx
-                    st.session_state.click_key += 1
-                    st.rerun()
+        # # Back button
+        # with left_col:
+        #     if st.button(":arrow_backward:", help="Kembali satu tingkat"):
+        #         if st.session_state.level_index > 0:
+        #             prev_idx = max(0, st.session_state.level_index - 1)
+        #             prev_col = HIERARCHY[prev_idx][1]
+        #             st.session_state.drill[prev_col] = None
+        #             st.session_state.level_index = prev_idx
+        #             st.session_state.click_key += 1
+        #             st.rerun()
         
-        # Reset button
-        with right_col:
-            if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
-                reset_drill()
-                st.rerun()
+        # # Reset button
+        # with right_col:
+        #     if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
+        #         reset_drill()
+        #         st.rerun()
 
         # === Breadcrumb navigation ===
         active_drills = [
@@ -620,6 +620,26 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                         st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
                         st.session_state.click_key += 1
                         st.rerun()
+        
+        # === Back / Reset row ===
+        left_col, mid_col, right_col = st.columns([1, 10, 1])
+        
+        # Back button
+        with left_col:
+            if st.button(":arrow_backward:", help="Kembali satu tingkat"):
+                if st.session_state.level_index > 0:
+                    prev_idx = max(0, st.session_state.level_index - 1)
+                    prev_col = HIERARCHY[prev_idx][1]
+                    st.session_state.drill[prev_col] = None
+                    st.session_state.level_index = prev_idx
+                    st.session_state.click_key += 1
+                    st.rerun()
+        
+        # Reset button
+        with right_col:
+            if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
+                reset_drill()
+                st.rerun()
 
         # === Determine current view level ===
         view_idx = min(st.session_state.level_index, len(available_levels) - 1)
@@ -716,9 +736,9 @@ def main():
         for k in selected_kls:
             st.sidebar.write(f"- {k}")
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### Drill state")
-    for _, col in HIERARCHY:
-        st.sidebar.write(f"- {col}: {st.session_state.drill.get(col) if st.session_state.drill.get(col) else '-'}")
+    # st.sidebar.markdown("### Drill state")
+    # for _, col in HIERARCHY:
+    #     st.sidebar.write(f"- {col}: {st.session_state.drill.get(col) if st.session_state.drill.get(col) else '-'}")
 
     # Footer
     st.markdown("---")
@@ -738,6 +758,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
