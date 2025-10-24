@@ -336,41 +336,28 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
-    Horizontal bar chart with x-axis formatted in auto-scaled Rupiah (Rp XXX M/T)
-    and dynamic tick intervals.
+    Horizontal bar chart with auto-scaling x-axis (Rp in T/M/Jt).
+    - df: dataframe with columns [y_col, metric]
+    - metric: numeric metric column
+    - y_col: categorical column
+    - color_col: optional color grouping
+    - stacked: whether to stack bars
+    - max_height: optional chart height
     """
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
 
-    # --- diagnostics (temporary) ---
-    st.write("DEBUG: metric column dtype:", df_plot[metric].dtype)
-    st.write("DEBUG: metric sample values:", df_plot[metric].head(10).tolist())
-    st.write("DEBUG: metric min/max:", df_plot[metric].min(), df_plot[metric].max())
-    # show tick_vals we plan to set
-    try:
-        x_max = float(df_plot[metric].max())
-    except Exception:
-        x_max = 0.0
-    raw_interval = x_max / 5 if x_max > 0 else 0
-    st.write("DEBUG: x_max, raw_interval:", x_max, raw_interval)
-    # --- end diagnostics ---
+    # Ensure numeric values
+    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0)
 
-    # ensure numeric type
-    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
-
-    # formatted label for inside bars
+    # Keep formatted string for inside bar text
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # sort ascending for horizontal layout
+    # Sort smallest → largest for horizontal layout
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # percentage labels
-    total = df_plot[metric].sum()
-    df_plot["pct"] = ((df_plot[metric] / total) * 100).round(2) if total else 0.0
-    df_plot["pct_label"] = df_plot["pct"].astype(str) + "%"
-
-    # create figure
+    # Build base figure
     fig = px.bar(
         df_plot,
         x=metric,
@@ -378,43 +365,50 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         color=color_col,
         orientation="h",
         text="__formatted",
-        custom_data=["__formatted", "pct"],
+        custom_data=["__formatted"],
         title=title,
-        labels={y_col: y_col.title(), metric: "Jumlah (Rp)"},
+        labels={y_col: y_col.title(), metric: "Jumlah: Rp"},
     )
 
-    hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<br>Persentase: %{{customdata[1]}}%<extra></extra>"
+    # Hover template
+    hover = f"{y_col}: %{{y}}<br>Jumlah: %{{customdata[0]}}<extra></extra>"
     fig.update_traces(hovertemplate=hover, textposition="auto")
 
-    # dynamic chart height
+    # Dynamic chart height
     n = len(df_plot)
-    height = int(max_height) if max_height else 600 + max(0, (n - 10) * 15)
+    base_height = 600 + max(0, (n - 10) * 15)
+    height = int(max_height) if max_height else base_height
 
-    # calculate ticks dynamically
-    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 else 0.0
-    if x_max > 0:
-        raw_interval = x_max / 5
-        magnitude = 10 ** int(np.floor(np.log10(raw_interval))) if raw_interval > 0 else 1
-        interval = round(raw_interval / magnitude) * magnitude
-        tick_vals = np.arange(0, x_max + interval, interval)
-    else:
+    # Determine numeric range and tick interval
+    x_max = float(df_plot[metric].max())
+    if x_max <= 0:
         tick_vals = [0]
+    else:
+        target_ticks = 5
+        raw_interval = x_max / target_ticks
+        magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
+        nice_interval = np.ceil(raw_interval / magnitude) * magnitude
+        last_tick = np.ceil(x_max / nice_interval) * nice_interval
+        tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
 
-    # formatted tick labels
-    tick_texts = [format_rupiah(v) for v in tick_vals]
+    # Determine scale and unit
+    if x_max >= 1e12:
+        scale = 1e12
+        unit = "T"
+    elif x_max >= 1e9:
+        scale = 1e9
+        unit = "M"
+    elif x_max >= 1e6:
+        scale = 1e6
+        unit = "Jt"
+    else:
+        scale = 1
+        unit = ""
 
-    # make sure x-axis is treated as linear, not categorical
-    fig.update_xaxes(
-        type="linear",
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        title_text="Jumlah (Rp)",
-        tickfont=dict(size=10),
-        showgrid=True,
-        zeroline=False,
-    )
+    # Format tick labels dynamically
+    tick_texts = [f"Rp {v/scale:,.2f} {unit}" if v > 0 else "Rp 0" for v in tick_vals]
 
-    # layout tweaks
+    # Layout configuration
     fig.update_layout(
         showlegend=bool(color_col),
         barmode="stack" if stacked else "relative",
@@ -425,14 +419,36 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
     )
 
-    # wrap long y labels
+    # Apply formatted ticks to x-axis
+    fig.update_xaxes(
+        type="linear",
+        range=[0, max(tick_vals)],
+        tickvals=tick_vals,
+        ticktext=tick_texts,
+        title_text="Jumlah (Rp)",
+        tickfont=dict(size=10),
+        showgrid=True,
+        zeroline=False,
+        autorange=False,
+    )
+
+    # Wrap long y-axis labels
     cat_labels = df_plot[y_col].astype(str).tolist()
     max_chars = 30
-    wrapped = [
-        lbl if len(lbl) <= max_chars else "<br>".join(lbl[i:i+max_chars] for i in range(0, len(lbl), max_chars))
-        for lbl in cat_labels
-    ]
-    fig.update_yaxes(tickvals=cat_labels, ticktext=wrapped, automargin=True, tickfont=dict(size=11))
+    wrapped = []
+    for lbl in cat_labels:
+        if len(lbl) <= max_chars:
+            wrapped.append(lbl)
+        else:
+            parts = [lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)]
+            wrapped.append("<br>".join(parts))
+
+    fig.update_yaxes(
+        tickvals=cat_labels,
+        ticktext=wrapped,
+        automargin=True,
+        tickfont=dict(size=11),
+    )
 
     return fig
 
@@ -670,6 +686,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
