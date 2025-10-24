@@ -590,10 +590,36 @@ def sidebar(df):
 
     return df_filtered, selected_kl, selected_metric, selected_years
 
+# Function to get short label based on column type
+def short_label_from_code(value, col_type):
+    value = str(value)
+    if col_type in ["SUMBER DANA", "FUNGSI", "JENIS BELANJA"]:
+        return value[:2]  # first 2 digits
+    elif col_type == "SUB FUNGSI":
+        return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
+    elif col_type == "PROGRAM":
+        return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 WA
+    elif col_type == "KEGIATAN":
+        return value[:4]  # first 4 digits
+    elif col_type == "OUTPUT (KRO)":
+        return value[:4] + " " + value[5:8]  # 4 digits + 3 letters
+    elif col_type == "SUB OUTPUT (RO)":
+        return value[:4] + " " + value[5:8] + " " + value[9:12]  # 4 digits + 3 letters + 3 digits
+    elif col_type == "KOMPONEN":
+        return value[:3] + " " + value[4:7] + " " + value[8:11]  # 3 letters + 3 digits + 3 digits
+    elif col_type == "AKUN 4 DIGIT":
+        return value[:4]
+    else:
+        return value.split(" ")[0]  # fallback, first part
+
 # Chart =============================================================================
 def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
+    # Create short_label column
+    df["short_label"] = df[category_col].apply(lambda x: short_label_from_code(x, category_col))
+
+    # Group by KEMENTERIAN/LEMBAGA, Tahun, and category_col
     df_grouped = (
-        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
+        df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col, "short_label"], as_index=False)["Nilai"]
           .sum()
     )
 
@@ -602,7 +628,7 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
     df_grouped = df_grouped.sort_values("Tahun")
 
     # Adjust height dynamically
-    n_groups = df_grouped[category_col].nunique()
+    n_groups = df_grouped["short_label"].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
     # Create the line chart
@@ -610,13 +636,13 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
         df_grouped,
         x="Tahun",
         y="Nilai",
-        color=category_col,
+        color="short_label",  # use short_label for color
         markers=True,
         title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
         labels={
             "Tahun": "Tahun",
             "Nilai": "Jumlah (Rp)",
-            category_col: category_col.replace("_", " ").title(),
+            "short_label": category_col.replace("_", " ").title(),  # legend name
         },
         template="plotly_white",
         height=height,
@@ -804,6 +830,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
