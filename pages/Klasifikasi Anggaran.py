@@ -339,7 +339,7 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
     Create horizontal bar chart with:
-    - X-axis: numeric/continuous float metric values (Rupiah)
+    - X-axis: numeric/continuous float metric values (Rupiah) - NO AUTOSCALING
     - Bar labels: percentage of total
     - Hover: both percentage and Rupiah value
     """
@@ -365,41 +365,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
     
     # Sort by metric value ascending for better visualization
-    df_plot = df_plot.sort_values(metric, ascending=True)
+    df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
     
-    # Create bar chart using metric (numeric) as x-axis
-    fig = px.bar(
-        df_plot,
-        x=metric,  # ✅ Using numeric metric column directly
-        y=y_col,
-        color=color_col,
-        orientation="h",
-        text="__pct_label",  # Show percentage on bars
-        custom_data=["__rupiah_formatted", "__pct_label", metric],  # For hover
-        title=title,
-        labels={y_col: "", metric: "Jumlah (Rp)"},
-    )
+    # ✅ Get x-axis range from actual metric values
+    x_min = 0.0
+    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 and df_plot[metric].max() > 0 else 100.0
     
-    # Update traces: text outside bars, custom hover
-    fig.update_traces(
-        textposition="outside",
-        textfont=dict(size=11, color="#333"),
-        cliponaxis=False,
-        hovertemplate=(
-            f"<b>%{{y}}</b><br>"
-            f"Jumlah: %{{customdata[0]}}<br>"
-            f"Persentase: %{{customdata[1]}}<extra></extra>"
-        ),
-    )
-    
-    # Calculate dynamic height
-    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
-    final_height = int(max_height) if max_height is not None else base_height
-    
-    # ✅ Get x-axis range for numeric metric
-    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 else 0.0
-    
-    # Determine scale and unit for x-axis labels
+    # Determine scale and unit for x-axis labels (for display only, NOT for data)
     if x_max >= 1e12:
         scale, unit = 1e12, "T"
     elif x_max >= 1e9:
@@ -409,52 +381,77 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     else:
         scale, unit = 1, ""
     
-    # Calculate nice tick intervals
+    # Calculate nice tick intervals based on ACTUAL metric values
     if x_max > 0:
         target_ticks = 6
         raw_interval = x_max / target_ticks
         magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
         nice_interval = np.ceil(raw_interval / magnitude) * magnitude
         last_tick = np.ceil(x_max / nice_interval) * nice_interval
-        tick_vals = np.arange(0, last_tick + nice_interval, nice_interval)
+        tick_vals = list(np.arange(0, last_tick + nice_interval, nice_interval))
     else:
-        tick_vals = [0]
-        last_tick = 0
+        tick_vals = [0, 50, 100]
+        last_tick = 100
     
-    # Format tick labels
+    # Format tick labels with units
     if unit:
-        tick_texts = [f"{v/scale:,.0f} {unit}" for v in tick_vals]
+        tick_texts = [f"{v/scale:.0f} {unit}" for v in tick_vals]
     else:
         tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
     
+    # ✅ Create bar chart using RAW metric values (no scaling)
+    fig = go.Figure()
+    
+    for idx, row in df_plot.iterrows():
+        fig.add_trace(go.Bar(
+            x=[row[metric]],  # ✅ Use actual raw metric value
+            y=[row[y_col]],
+            orientation='h',
+            text=row["__pct_label"],
+            textposition="outside",
+            textfont=dict(size=11, color="#333"),
+            marker=dict(color='#1a73e8'),
+            hovertemplate=(
+                f"<b>{row[y_col]}</b><br>"
+                f"Jumlah: {row['__rupiah_formatted']}<br>"
+                f"Persentase: {row['__pct_label']}<extra></extra>"
+            ),
+            showlegend=False,
+        ))
+    
+    # Calculate dynamic height
+    base_height = 600 + max(0, (len(df_plot) - 10) * 15)
+    final_height = int(max_height) if max_height is not None else base_height
+    
     # Update layout
     fig.update_layout(
-        showlegend=bool(color_col),
-        barmode="stack" if stacked else "relative",
-        yaxis={"categoryorder": "total ascending"},
+        title=title,
+        showlegend=False,
+        barmode="relative",
         margin=dict(t=70, l=250, r=80, b=50),
         height=final_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
+        xaxis_title="Jumlah (Rp)",
+        yaxis_title="",
     )
     
-    # ✅ Update x-axis with numeric type and formatted labels
+    # ✅ Update x-axis: use ACTUAL metric values, format labels only
     fig.update_xaxes(
-        type="linear",  # ✅ Ensure numeric axis
+        type="linear",
         tickmode="array",
         tickvals=tick_vals,
         ticktext=tick_texts,
         range=[0, last_tick * 1.1],  # 10% padding for outside labels
-        title_text="Jumlah (Rp)",
         showgrid=True,
         gridcolor="rgba(200,200,200,0.3)",
         zeroline=True,
         zerolinecolor="rgba(150,150,150,0.5)",
     )
     
-    # Update y-axis
+    # Update y-axis - keep category order
     fig.update_yaxes(
-        categoryorder="total ascending",
+        categoryorder="trace",  # Maintain the order from df_plot
         automargin=True,
     )
     
