@@ -336,25 +336,25 @@ def aggregate_level(df, group_cols, metric, top_n=None):
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
-    Horizontal bar chart with proper x-axis numeric ticks (Rupiah format)
+    Horizontal bar chart with auto-scaled Rupiah formatting and dynamic tick intervals.
     """
     df_plot = df.copy()
     if metric not in df_plot.columns or y_col not in df_plot.columns:
         return go.Figure()
     df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0)
 
-    # keep formatted string for display inside bars / hover
+    # formatted label for bar text / hover
     df_plot["__formatted"] = df_plot[metric].apply(format_rupiah)
 
-    # sort ascending so smaller values are on top
+    # sort so smaller values are on top
     df_plot = df_plot.sort_values(metric, ascending=True)
 
-    # compute percentage labels
+    # percentage share
     total = df_plot[metric].sum()
     df_plot["pct"] = ((df_plot[metric] / total) * 100).round(2) if total else 0.0
     df_plot["pct_label"] = df_plot["pct"].astype(str) + "%"
 
-    # build figure
+    # plot
     fig = px.bar(
         df_plot,
         x=metric,
@@ -374,6 +374,19 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     n = len(df_plot)
     height = int(max_height) if max_height else 600 + max(0, (n - 10) * 15)
 
+    # determine tick spacing dynamically
+    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 else 0.0
+    if x_max <= 0:
+        tick_vals = [0]
+    else:
+        # heuristic: roughly 5–8 ticks, rounded to nice intervals
+        raw_interval = x_max / 5
+        magnitude = 10 ** int(np.floor(np.log10(raw_interval))) if raw_interval > 0 else 1
+        interval = round(raw_interval / magnitude) * magnitude
+        tick_vals = np.arange(0, x_max + interval, interval)
+
+    tick_texts = [format_rupiah(v) for v in tick_vals]
+
     # layout
     fig.update_layout(
         showlegend=bool(color_col),
@@ -385,16 +398,17 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
         paper_bgcolor="white",
     )
 
-    # fix x-axis: keep Plotly’s numeric scaling but format as Rupiah
+    # x-axis formatting
     fig.update_xaxes(
-        tickformat=",",  # comma separators
+        tickvals=tick_vals,
+        ticktext=tick_texts,
         title_text="Jumlah (Rp)",
         tickfont=dict(size=10),
         showgrid=True,
         zeroline=False,
     )
 
-    # wrap long labels
+    # wrap long y labels
     cat_labels = df_plot[y_col].astype(str).tolist()
     max_chars = 30
     wrapped = [
@@ -404,7 +418,6 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     fig.update_yaxes(tickvals=cat_labels, ticktext=wrapped, automargin=True, tickfont=dict(size=11))
 
     return fig
-
 
 # =============================================================================
 # Hierarchy and session helpers
@@ -640,6 +653,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
