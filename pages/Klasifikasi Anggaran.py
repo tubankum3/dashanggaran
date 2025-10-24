@@ -382,9 +382,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     if x_max >= 1e12:
         scale, unit = 1e12, "T"   # Triliun
     elif x_max >= 1e9:
-        scale, unit = 1e9, "Jt"   # Miliar
+        scale, unit = 1e9, "M"   # Miliar
     elif x_max >= 1e6:
-        scale, unit = 1e6, "M"    # Juta
+        scale, unit = 1e6, "Jt"    # Juta
     else:
         scale, unit = 1, ""
     
@@ -759,6 +759,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
