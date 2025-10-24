@@ -591,40 +591,21 @@ def sidebar(df):
     return df_filtered, selected_kl, selected_metric, selected_years
 
 # Chart =============================================================================
-def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str,
-          base_height=600, extra_height_per_line=10, max_legend_font=12, min_legend_font=7,
-          legend_col_threshold=10, max_chars_per_line=20):
-    import textwrap
-
+def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl: str, base_height=600, extra_height_per_line=10):
     df_grouped = (
         df.groupby(["KEMENTERIAN/LEMBAGA", "Tahun", category_col], as_index=False)["Nilai"]
           .sum()
     )
 
+    # Ensure Tahun is sorted and string
     df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
     df_grouped = df_grouped.sort_values("Tahun")
 
-    # Break long labels into shorter strings
-    def wrap_label(label):
-        lines = textwrap.wrap(str(label), max_chars_per_line)
-        return "\n".join(lines)
-
-    df_grouped[category_col] = df_grouped[category_col].apply(wrap_label)
-              
-    # temporary------
-    st.write("DEBUG: metric sample values:", df_grouped[category_col].head(10))
-    -----------
-              
-    # Adjust height based on number of categories
+    # Adjust height dynamically
     n_groups = df_grouped[category_col].nunique()
     height = base_height + (n_groups * extra_height_per_line if n_groups > 10 else 0)
 
-    # Scale legend font dynamically
-    legend_font = max(min_legend_font, min(max_legend_font, max_legend_font - (n_groups-10)//2))
-
-    # Determine number of legend columns
-    legend_columns = 1 if n_groups <= legend_col_threshold else 2
-
+    # Create the line chart
     fig = px.line(
         df_grouped,
         x="Tahun",
@@ -638,31 +619,21 @@ def chart(df: pd.DataFrame, category_col: str, selected_metric: str, selected_kl
             category_col: category_col.replace("_", " ").title(),
         },
         template="plotly_white",
-        height=height
+        height=height,
     )
 
-    # fig.update_layout(
-    #     legend=dict(
-    #         title=category_col.replace("_", " ").title(),
-    #         font=dict(size=legend_font),
-    #         orientation="v",
-    #         yanchor="top",
-    #         y=1,
-    #         xanchor="left",
-    #         x=1.02,
-    #         traceorder="normal",
-    #         tracegroupgap=0,
-    #         valign="top",
-    #         itemwidth=120,
-    #         itemsizing="constant",
-    #         # key part: multiple columns
-    #         tracegroupgap=0,
-    #         yref="paper",
-    #         xref="paper",
-    #         columns=legend_columns
-    #     ),
-    #     margin=dict(l=40, r=20 + legend_columns*120, t=80, b=40)
-    # )
+    years = sorted(df_grouped["Tahun"].unique())
+    min_year, max_year = years[0], years[-1]
+
+    fig.update_layout(
+        hovermode="closest",
+        title_x=0,
+        legend_title_text=category_col.replace("_", " ").title(),
+        margin=dict(l=40, r=40, t=80, b=40),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(family="Google Sans, Roboto, Arial"),
+    )
 
     fig.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Tahun: %{x}<br>Rp %{y:,.0f}<extra></extra>",
@@ -833,6 +804,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
