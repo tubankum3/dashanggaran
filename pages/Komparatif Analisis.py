@@ -364,6 +364,25 @@ def sidebar(df):
         years = sorted(df["Tahun"].astype(int).unique())
         selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
 
+        category_cols = [
+            c for c in df.select_dtypes(include=["object"]).columns
+            if c.lower() != "tahun"
+        ]
+
+        if not category_cols:
+            st.error("Tidak ada kolom kategori yang dapat dipilih.")
+            st.stop()
+
+        selected_metric = st.selectbox(
+            "Pilih Kategori",
+            options=["-- Pilih Kategori --"] + category_cols,
+            index=0,
+        )
+
+        if selected_metric == "-- Pilih Kategori --":
+            st.warning("Silakan pilih salah satu kategori untuk melanjutkan.")
+            st.stop()
+
         top_n = st.number_input(
             "Tampilkan Top K/L berdasarkan Pagu DIPA Revisi",
             min_value=1,
@@ -380,7 +399,7 @@ def sidebar(df):
             default=[]
         )
 
-    return selected_year, selected_kls, top_n
+    return selected_year, selected_kls, top_n, selected_metric
 
 # =============================================================================
 # Chart
@@ -506,10 +525,10 @@ def main():
         return
 
     # Sidebar selections
-    selected_year, selected_kls, top_n = sidebar(df)
-
+    selected_year, selected_kls, top_n, selected_metric = sidebar(df)
+    
     # Header displayed at the top
-    header(str(selected_year, selected_metric, selected_kls))
+    header(str(selected_year), selected_metric, selected_kls)
 
     # Filter by selected K/Ls (if any)
     if selected_kls:
@@ -562,6 +581,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
