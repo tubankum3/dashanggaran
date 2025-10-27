@@ -347,7 +347,7 @@ def format_rupiah(value):
 # =============================================================================
 # Component Architecture
 # =============================================================================
-  def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
+def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
     year_text = selected_year if selected_year else "Overview"
     metric_text = f" {selected_metric}" if selected_metric else ""
@@ -721,6 +721,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
