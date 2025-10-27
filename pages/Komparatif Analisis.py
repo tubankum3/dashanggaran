@@ -405,21 +405,21 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
 
     fig = go.Figure()
 
-    # Range Bar (Awal–Revisi) — use numeric y positions
+    # Range Bar (Awal–Revisi)
     fig.add_trace(go.Bar(
         y=y_pos,
         x=(agg[col_end] - agg[col_start]),
         base=agg[col_start],
         orientation="h",
-        marker=dict(color=color_range, line=dict(color=color_range, width=0.5)),
+        marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
         name=f"Rentang {' '.join(col_start.split()[-3:])}–{' '.join(col_end.split()[-3:])}",
         hovertemplate=(f"{col_start}: %{{base:,.0f}}<br>"
                        f"{col_end}: %{{customdata:,.0f}}<extra></extra>"),
         customdata=agg[col_end]
     ))
 
-    # Varians line + caps (color-coded per-row)
-    cap_size = 0.2  # adjust for visual; smaller if many rows
+    # Varians line + caps
+    cap_size = 0.1  # adjust for visual; smaller if many rows
     for i, row in agg.iterrows():
         x_real = row["REALISASI BELANJA KL (SAKTI)"]
         x_pagu = row[col_end]
@@ -433,7 +433,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
             x=[x_real, x_pagu],
             y=[y, y],
             mode="lines",
-            line=dict(color=var_color, width=2),
+            line=dict(color=var_color, width=1),
             showlegend=False,
             hoverinfo="skip"
         ))
@@ -443,7 +443,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
             x=[x_real, x_real],
             y=[y + cap_size, y - cap_size],
             mode="lines",
-            line=dict(color=var_color, width=2),
+            line=dict(color=var_color, width=1),
             showlegend=False,
             hoverinfo="skip"
         ))
@@ -453,22 +453,21 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
             x=[x_pagu, x_pagu],
             y=[y + cap_size, y - cap_size],
             mode="lines",
-            line=dict(color=var_color, width=2),
+            line=dict(color=var_color, width=1),
             showlegend=False,
             hoverinfo="skip"
         ))
 
-    # Realisasi Marker (you can also color markers based on var_color if you prefer)
-    # here we color marker uniformly but add a border for contrast
+    # Realisasi Marker
     fig.add_trace(go.Scatter(
         y=y_pos,
         x=agg["REALISASI BELANJA KL (SAKTI)"],
         mode="markers",
-        marker=dict(color=color_marker, size=12, line=dict(color="white", width=1.5)),
+        marker=dict(color=color_marker, size=12, line=dict(color="white", width=1)),
         name="Realisasi Belanja (SAKTI)",
         hovertemplate=(
             "Realisasi: %{x:,.0f}<br>"
-            "Varian (Pagu-Realisasi): %{customdata:,.0f}<extra></extra>"
+            "Varian (Pagu Efektif-Realisasi): %{customdata:,.0f}<extra></extra>"
         ),
         customdata=agg["VARIANS"]
     ))
@@ -485,7 +484,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         xaxis_title="Jumlah (Rupiah)",
         yaxis_title="Kementerian / Lembaga",
         template="plotly_white",
-        height= max(400, 40 * len(agg)),  # adapt height a bit to rows
+        height= max(500, 50 * len(agg)),  # adapt height a bit to rows
         xaxis=dict(showgrid=True, zeroline=False, tickvals=tickvals, ticktext=ticktext),
         yaxis=dict(tickmode="array", tickvals=list(y_pos), ticktext=y_ticktext, autorange="reversed"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -528,7 +527,7 @@ def main():
             color_range="#b2dfdb", color_marker="#00897b"
         )
         st.plotly_chart(fig1, use_container_width=True)
-        st.write("Rentang merupakan selisih antara Pagu Revisi Efektif dan Pagu Awal Efektif")
+        st.caption("*Rentang merupakan selisih antara Pagu Revisi Efektif dan Pagu Awal Efektif")
 
     with tab2:
         fig2 = comparison_chart(
@@ -538,7 +537,7 @@ def main():
             color_range="#c5cae9", color_marker="#1a73e8"
         )
         st.plotly_chart(fig2, use_container_width=True)
-        st.write("Rentang merupakan besaran Blokir DIPA")
+        st.caption("*Rentang merupakan besaran Blokir DIPA Awal")
 
     with tab3:
         fig3 = comparison_chart(
@@ -548,7 +547,7 @@ def main():
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
-        st.write("Rentang merupakan besaran Blokir DIPA")
+        st.caption("*Rentang merupakan besaran Blokir DIPA Revisi")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -560,6 +559,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
