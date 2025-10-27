@@ -380,81 +380,57 @@ def sidebar(df):
 
     return selected_year, selected_kls, top_n
 
-def chart(df: pd.DataFrame, year: int, top_n: int = 10):
-    df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce")
-    df_year = df[df["Tahun"] == year].copy()
-
-    # Remove placeholder KL
+# =============================================================================
+# Generic Chart Function
+# =============================================================================
+def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_range="#b2dfdb", color_marker="#1a73e8"):
+    """Reusable chart builder for different Pagu comparisons."""
+    df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
-    # Aggregate
     agg = (
         df_year.groupby("KEMENTERIAN/LEMBAGA", as_index=False)[
-            ["REALISASI BELANJA KL (SAKTI)", "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF"]
+            ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
         ].sum()
-    )
+    ).sort_values(col_end, ascending=True).tail(top_n)
 
-    # Sort and select top_n
-    agg = agg.sort_values("PAGU DIPA REVISI EFEKTIF", ascending=True).tail(top_n)
-
-    # Range bar colors
-    colors = [
-        "#b2dfdb" if row["PAGU DIPA REVISI EFEKTIF"] >= row["PAGU DIPA AWAL EFEKTIF"] else "#d0d0d0"
-        for _, row in agg.iterrows()
-    ]
-
-    # Marker colors
-    marker_colors = [
-        "#e53935" if row["REALISASI BELANJA KL (SAKTI)"] < min(row["PAGU DIPA AWAL EFEKTIF"], row["PAGU DIPA REVISI EFEKTIF"]) else "#00897b"
-        for _, row in agg.iterrows()
-    ]
-
-    # --- Figure ---
     fig = go.Figure()
 
-    # Range bars
+    # Range Bar
     fig.add_trace(go.Bar(
         y=agg["KEMENTERIAN/LEMBAGA"],
-        x=(agg["PAGU DIPA REVISI EFEKTIF"] - agg["PAGU DIPA AWAL EFEKTIF"]).abs(),
-        base=agg[["PAGU DIPA REVISI EFEKTIF", "PAGU DIPA AWAL EFEKTIF"]].min(axis=1),
+        x=(agg[col_end] - agg[col_start]).abs(),
+        base=agg[[col_start, col_end]].min(axis=1),
         orientation="h",
-        marker=dict(color=colors),
-        name="Rentang Pagu DIPA Efektif (Awal–Revisi)",
+        marker=dict(color=color_range),
+        name=f"Rentang {col_start.split()[-1]}–{col_end.split()[-1]}",
         hovertemplate=(
-            "Pagu Awal: %{base:,.0f}<br>"
-            "Pagu Revisi: %{customdata:,.0f}<extra></extra>"
+            f"{col_start}: %{{base:,.0f}}<br>"
+            f"{col_end}: %{{customdata:,.0f}}<extra></extra>"
         ),
-        customdata=agg["PAGU DIPA REVISI EFEKTIF"]
+        customdata=agg[col_end]
     ))
 
-    # Realisasi markers
+    # Realisasi Marker
     fig.add_trace(go.Scatter(
         y=agg["KEMENTERIAN/LEMBAGA"],
         x=agg["REALISASI BELANJA KL (SAKTI)"],
         mode="markers",
-        marker=dict(color=marker_colors, size=12, line=dict(color="white", width=1.5)),
+        marker=dict(color=color_marker, size=12, line=dict(color="white", width=1.5)),
         name="Realisasi Belanja (SAKTI)",
         hovertemplate="Realisasi: %{x:,.0f}<extra></extra>"
     ))
 
-    # Format x-axis with rupiah labels
-    tickvals = np.linspace(0, agg["PAGU DIPA REVISI EFEKTIF"].max(), num=6)
+    tickvals = np.linspace(0, agg[col_end].max(), num=6)
     ticktext = [format_rupiah(val) for val in tickvals]
 
-    # Layout
     fig.update_layout(
-        title=f"Perbandingan Realisasi Belanja dengan Rentang Pagu DIPA Awal dan Revisi (Efektif)<br>Tahun {year}",
+        title=f"Perbandingan Realisasi Belanja {title_suffix}<br>Tahun {year}",
         xaxis_title="Jumlah (Rupiah)",
         yaxis_title="Kementerian / Lembaga",
-        barmode="overlay",
         template="plotly_white",
         height=600,
-        xaxis=dict(
-            showgrid=True,
-            zeroline=False,
-            tickvals=tickvals,
-            ticktext=ticktext
-        ),
+        xaxis=dict(showgrid=True, zeroline=False, tickvals=tickvals, ticktext=ticktext),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(l=40, r=40, t=100, b=40)
     )
@@ -480,16 +456,39 @@ def main():
     if selected_kls:
         df = df[df["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
 
-    # Chart section
-    st.plotly_chart(chart(df, selected_year, top_n), use_container_width=True)
+    # Tabs for charts
+    tab1, tab2, tab3 = st.tabs([
+        "1️⃣ Realisasi vs Rentang Pagu DIPA Awal dan Revisi (Efektif)",
+        "2️⃣ Realisasi vs Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal",
+        "3️⃣ Realisasi vs Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi"
+    ])
 
-    # Footer
-    st.markdown("---")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
-    with col2:
-        st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
+    with tab1:
+        fig1 = comparison_chart(
+            df, selected_year, top_n,
+            "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
+            "dengan Rentang Pagu DIPA Awal dan Revisi (Efektif)",
+            color_range="#b2dfdb", color_marker="#00897b"
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with tab2:
+        fig2 = comparison_chart(
+            df, selected_year, top_n,
+            "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
+            "dengan Rentang Pagu DIPA Awal (Efektif) dan Pagu DIPA Awal",
+            color_range="#c5cae9", color_marker="#1a73e8"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    with tab3:
+        fig3 = comparison_chart(
+            df, selected_year, top_n,
+            "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
+            "dengan Rentang Pagu DIPA Revisi (Efektif) dan Pagu DIPA Revisi",
+            color_range="#ffe082", color_marker="#e53935"
+        )
+        st.plotly_chart(fig3, use_container_width=True)
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -499,4 +498,5 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
+
         st.info("Silakan refresh halaman atau hubungi administrator.")
