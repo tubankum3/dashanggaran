@@ -381,10 +381,10 @@ def sidebar(df):
     return selected_year, selected_kls, top_n
 
 # =============================================================================
-# Generic Chart Function
+# Chart
 # =============================================================================
 def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_range="#b2dfdb", color_marker="#1a73e8"):
-    """Reusable chart builder for different Pagu comparisons."""
+    """chart builder for different Pagu comparisons."""
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
@@ -403,7 +403,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         base=agg[[col_start, col_end]].min(axis=1),
         orientation="h",
         marker=dict(color=color_range),
-        name=f"Rentang {col_start.split()[-1]}–{col_end.split()[-1]}",
+        name=f"Rentang {col_start.split()[-2]}–{col_end.split()[-2]}",
         hovertemplate=(
             f"{col_start}: %{{base:,.0f}}<br>"
             f"{col_end}: %{{customdata:,.0f}}<extra></extra>"
@@ -458,9 +458,9 @@ def main():
 
     # Tabs for charts
     tab1, tab2, tab3 = st.tabs([
-        "1️⃣ Realisasi vs Rentang Pagu DIPA Awal dan Revisi (Efektif)",
-        "2️⃣ Realisasi vs Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal",
-        "3️⃣ Realisasi vs Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi"
+        "1️⃣ Realisasi vs Pagu DIPA Awal dan Revisi (Efektif)",
+        "2️⃣ Realisasi vs Pagu DIPA Awal Efektif",
+        "3️⃣ Realisasi vs Pagu DIPA Revisi Efektif"
     ])
 
     with tab1:
@@ -476,7 +476,7 @@ def main():
         fig2 = comparison_chart(
             df, selected_year, top_n,
             "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
-            "dengan Rentang Pagu DIPA Awal (Efektif) dan Pagu DIPA Awal",
+            "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal",
             color_range="#c5cae9", color_marker="#1a73e8"
         )
         st.plotly_chart(fig2, use_container_width=True)
@@ -485,7 +485,7 @@ def main():
         fig3 = comparison_chart(
             df, selected_year, top_n,
             "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
-            "dengan Rentang Pagu DIPA Revisi (Efektif) dan Pagu DIPA Revisi",
+            "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi",
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
@@ -500,3 +500,4 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
