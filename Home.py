@@ -437,7 +437,7 @@ def calculate_financial_metrics(df: pd.DataFrame) -> dict:
 # Header =============================================================================
 def header(selected_kl: str | None = None, selected_metric: str | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
-    kl_text = selected_kl if selected_kl else "Overview"
+    kl_text = "Semua K/L" if selected_kl == "Semua" else (selected_kl)
     metric_text = f" {selected_metric}" if selected_metric else ""
     st.markdown(f"""
     <div class="dashboard-header">
@@ -504,15 +504,18 @@ def sidebar(df):
         df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("int64")
 
         # === Select K/L ===
-        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
+        kl_list = ["Semua"] + sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
         selected_kl = st.selectbox(
             "Pilih Kementerian/Lembaga",
             kl_list,
             key="ministry_select",
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
-
-        df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+        
+        if selected_kl == "Semua":
+            df_filtered = df.copy()
+        else:
+            df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
 
         # === Detect numeric columns for metric choices ===
         numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
@@ -782,12 +785,12 @@ def main():
     
     # --- Display summary cards ---
     st.markdown(f"<div class='section-title'>RINGKASAN KINERJA {selected_metric}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='material-card'>{selected_kl}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='material-card'>{'Semua Kementerian/Lembaga' if selected_kl == 'Semua' else selected_kl}</div>", unsafe_allow_html=True)
     cards(metrics, selected_kl=selected_kl, selected_metric=selected_metric)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # --- Visualization Section ---
-    st.markdown("<div class='section-title'>📊 Visualisasi Data</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>TREN ANALISIS</div>", unsafe_allow_html=True)
     
     # Categorical columns for visualization - with proper validation
     cat_cols = [
@@ -881,6 +884,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
