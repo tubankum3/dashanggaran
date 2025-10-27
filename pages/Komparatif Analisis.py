@@ -384,8 +384,10 @@ def sidebar(df):
 # Chart
 # =============================================================================
 def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
-                     color_range="#b2dfdb", color_marker="#1a73e8", color_varian="#757575"):
-    """Chart builder showing Pagu ranges, Realisasi markers, and Varian (Pagu–Realisasi) lines with caps."""
+                     color_range="#b2dfdb", color_marker="#1a73e8"):
+    """Chart builder showing Pagu ranges, Realisasi markers, and Varian lines with end caps.
+       Y axis is numeric positions so we can draw caps reliably; labels are set as ticktext.
+    """
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
@@ -393,62 +395,73 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         df_year.groupby("KEMENTERIAN/LEMBAGA", as_index=False)[
             ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
         ].sum()
-    ).sort_values(col_end, ascending=True).tail(top_n)
+    ).sort_values(col_end, ascending=True).tail(top_n).reset_index(drop=True)
 
     # Calculate variance
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
 
+    # numeric y positions (0..n-1)
+    y_pos = np.arange(len(agg))
+
     fig = go.Figure()
 
-    # Range Bar (Awal–Revisi)
+    # Range Bar (Awal–Revisi) — use numeric y positions
     fig.add_trace(go.Bar(
-        y=agg["KEMENTERIAN/LEMBAGA"],
+        y=y_pos,
         x=(agg[col_end] - agg[col_start]),
         base=agg[col_start],
         orientation="h",
-        marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
+        marker=dict(color=color_range, line=dict(color=color_range, width=0.5)),
         name=f"Rentang {' '.join(col_start.split()[-3:])}–{' '.join(col_end.split()[-3:])}",
         hovertemplate=(f"{col_start}: %{{base:,.0f}}<br>"
                        f"{col_end}: %{{customdata:,.0f}}<extra></extra>"),
         customdata=agg[col_end]
     ))
 
-    # Varians line + caps
-    cap_size = 0.2  # how tall the small vertical caps appear (in Y units)
+    # Varians line + caps (color-coded per-row)
+    cap_size = 0.2  # adjust for visual; smaller if many rows
     for i, row in agg.iterrows():
-        y_val = row["KEMENTERIAN/LEMBAGA"]
-        y_index = i  # numeric index for small cap offset
+        x_real = row["REALISASI BELANJA KL (SAKTI)"]
+        x_pagu = row[col_end]
+        y = y_pos[i]
+
+        # choose color: black if Realisasi < Pagu (underspend), red if overspend
+        var_color = "black" if x_real < x_pagu else "red"
+
         # main horizontal line
         fig.add_trace(go.Scatter(
-            x=[row["REALISASI BELANJA KL (SAKTI)"], row[col_end]],
-            y=[y_val, y_val],
+            x=[x_real, x_pagu],
+            y=[y, y],
             mode="lines",
-            line=dict(color=color_varian, width=2),
-            showlegend=False,
-            hoverinfo="skip"
-        ))
-        # left cap
-        fig.add_trace(go.Scatter(
-            x=[row["REALISASI BELANJA KL (SAKTI)"], row["REALISASI BELANJA KL (SAKTI)"]],
-            y=[y_val + cap_size, y_val - cap_size],
-            mode="lines",
-            line=dict(color=color_varian, width=2),
-            showlegend=False,
-            hoverinfo="skip"
-        ))
-        # right cap
-        fig.add_trace(go.Scatter(
-            x=[row[col_end], row[col_end]],
-            y=[y_val + cap_size, y_val - cap_size],
-            mode="lines",
-            line=dict(color=color_varian, width=2),
+            line=dict(color=var_color, width=2),
             showlegend=False,
             hoverinfo="skip"
         ))
 
-    # Realisasi Marker
+        # left cap (at Realisasi)
+        fig.add_trace(go.Scatter(
+            x=[x_real, x_real],
+            y=[y + cap_size, y - cap_size],
+            mode="lines",
+            line=dict(color=var_color, width=2),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+
+        # right cap (at Pagu)
+        fig.add_trace(go.Scatter(
+            x=[x_pagu, x_pagu],
+            y=[y + cap_size, y - cap_size],
+            mode="lines",
+            line=dict(color=var_color, width=2),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+
+    # Realisasi Marker (you can also color markers based on var_color if you prefer)
+    # here we color marker uniformly but add a border for contrast
     fig.add_trace(go.Scatter(
-        y=agg["KEMENTERIAN/LEMBAGA"],
+        y=y_pos,
         x=agg["REALISASI BELANJA KL (SAKTI)"],
         mode="markers",
         marker=dict(color=color_marker, size=12, line=dict(color="white", width=1.5)),
@@ -460,18 +473,23 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         customdata=agg["VARIANS"]
     ))
 
-    tickvals = np.linspace(0, agg[col_end].max(), num=6)
+    # x ticks (formatted rupiah)
+    tickvals = np.linspace(0, max(agg[col_end].max(), agg["REALISASI BELANJA KL (SAKTI)"].max()), num=6)
     ticktext = [format_rupiah(val) for val in tickvals]
+
+    # set y axis tick labels to K/L names
+    y_ticktext = agg["KEMENTERIAN/LEMBAGA"].tolist()
 
     fig.update_layout(
         title=f"Perbandingan Realisasi Belanja {title_suffix}<br>Tahun {year}",
         xaxis_title="Jumlah (Rupiah)",
         yaxis_title="Kementerian / Lembaga",
         template="plotly_white",
-        height=600,
+        height= max(400, 40 * len(agg)),  # adapt height a bit to rows
         xaxis=dict(showgrid=True, zeroline=False, tickvals=tickvals, ticktext=ticktext),
+        yaxis=dict(tickmode="array", tickvals=list(y_pos), ticktext=y_ticktext, autorange="reversed"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=40, r=40, t=100, b=40)
+        margin=dict(l=250, r=40, t=100, b=40)  # left margin bigger to fit long labels
     )
 
     return fig
@@ -542,6 +560,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
