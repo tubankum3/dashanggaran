@@ -515,6 +515,119 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
 
     return fig
 
+def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
+                                 col_start, col_end, title_suffix,
+                                 color_range="#b2dfdb", color_marker="#1a73e8"):
+    """Chart showing Pagu ranges, Realisasi markers, and Varian lines by selected category.
+       Automatically aggregates all K/Ls if none selected. Supports top_n limiting.
+    """
+    df_year = df[df["Tahun"].astype(int) == year].copy()
+    df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
+
+    # ✅ If user selected K/Ls, filter by them. Otherwise use all data (aggregate nationally)
+    if selected_kls:
+        df_filtered = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
+    else:
+        df_filtered = df_year.copy()
+
+    # Group by selected category
+    agg = (
+        df_filtered.groupby(selected_metric, as_index=False)[
+            ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
+        ].sum()
+    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).head(top_n).reset_index(drop=True)
+
+    if agg.empty:
+        st.warning(f"Tidak ada data untuk kategori '{selected_metric}' di tahun {year}.")
+        return None
+
+    # Calculate variance (Pagu - Realisasi)
+    agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
+
+    # numeric y positions for consistent line plotting
+    y_pos = np.arange(len(agg))
+
+    fig = go.Figure()
+
+    # Range Bar (Awal–Revisi)
+    fig.add_trace(go.Bar(
+        y=y_pos,
+        x=(agg[col_end] - agg[col_start]),
+        base=agg[col_start],
+        orientation="h",
+        width=0.6,
+        marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
+        name=f"Rentang {' '.join(col_start.split()[-3:])}–{' '.join(col_end.split()[-3:])}",
+        hovertemplate=(f"{col_start}: %{{base:,.0f}}<br>"
+                       f"{col_end}: %{{customdata:,.0f}}<extra></extra>"),
+        customdata=agg[col_end]
+    ))
+
+    # Varians line + caps
+    cap_size = max(0.05, 0.5 / len(agg))  # dynamically scale cap size based on number of rows
+    for i, row in agg.iterrows():
+        x_real = row["REALISASI BELANJA KL (SAKTI)"]
+        x_pagu = row[col_end]
+        y = y_pos[i]
+        var_color = "black" if x_real < x_pagu else "red"
+
+        # main variance line
+        fig.add_trace(go.Scatter(
+            x=[x_real, x_pagu],
+            y=[y, y],
+            mode="lines",
+            line=dict(color=var_color, width=1),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+
+        # vertical caps
+        for x_cap in [x_real, x_pagu]:
+            fig.add_trace(go.Scatter(
+                x=[x_cap, x_cap],
+                y=[y + cap_size, y - cap_size],
+                mode="lines",
+                line=dict(color=var_color, width=1),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+
+    # Realisasi marker
+    fig.add_trace(go.Scatter(
+        y=y_pos,
+        x=agg["REALISASI BELANJA KL (SAKTI)"],
+        mode="markers",
+        marker=dict(color=color_marker, size=12, line=dict(color="white", width=1)),
+        name="Realisasi Belanja (SAKTI)",
+        hovertemplate=(
+            "Realisasi: %{x:,.0f}<br>"
+            "Varian (Pagu Efektif-Realisasi): %{customdata:,.0f}<extra></extra>"
+        ),
+        customdata=agg["VARIANS"]
+    ))
+
+    tickvals = np.linspace(0, max(agg[col_end].max(), agg["REALISASI BELANJA KL (SAKTI)"].max()), num=6)
+    ticktext = [format_rupiah(val) for val in tickvals]
+    y_ticktext = agg[selected_metric].astype(str).tolist()
+
+    fig.update_layout(
+        title=(
+            f"Perbandingan Realisasi Belanja per {selected_metric}<br>"
+            f"Tahun {year}"
+            + (f" — K/L Terpilih" if selected_kls else " — Seluruh K/L")
+        ),
+        xaxis_title="Jumlah (Rupiah)",
+        yaxis_title=selected_metric,
+        template="plotly_white",
+        height=max(500, 50 * len(agg)),
+        xaxis=dict(showgrid=True, zeroline=False, tickvals=tickvals, ticktext=ticktext),
+        yaxis=dict(tickmode="array", tickvals=list(y_pos), ticktext=y_ticktext, autorange="reversed"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=250, r=40, t=100, b=40)
+    )
+
+    return fig
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -549,6 +662,15 @@ def main():
             color_range="#b2dfdb", color_marker="#00897b"
         )
         st.plotly_chart(fig1, use_container_width=True)
+               
+        fig11 = comparison_chart_by_category(
+            df, selected_year, selected_kls, selected_metric, top_n,
+            "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
+            "dengan Rentang Pagu per Kategori",
+            color_range="#aed581", color_marker="#33691e"
+        )
+        if fig11:
+            st.plotly_chart(fig11, use_container_width=True)
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
 
     with tab2:
@@ -559,6 +681,15 @@ def main():
             color_range="#c5cae9", color_marker="#1a73e8"
         )
         st.plotly_chart(fig2, use_container_width=True)
+
+        fig22 = comparison_chart_by_category(
+            df, selected_year, selected_kls, selected_metric, top_n,
+            "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
+            "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal per Kategori",
+            color_range="#aed581", color_marker="#33691e"
+        )
+        if fig22:
+            st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
 
     with tab3:
@@ -569,6 +700,15 @@ def main():
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
+        
+        fig33 = comparison_chart_by_category(
+            df, selected_year, selected_kls, selected_metric, top_n,
+            "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
+            "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi per Kategori",
+            color_range="#aed581", color_marker="#33691e"
+        )
+        if fig33:
+            st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
 
 # =============================================================================
@@ -581,6 +721,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
