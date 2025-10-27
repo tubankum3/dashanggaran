@@ -395,7 +395,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         df_year.groupby("KEMENTERIAN/LEMBAGA", as_index=False)[
             ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
         ].sum()
-    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).tail(top_n).reset_index(drop=True)
+    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).head(top_n).reset_index(drop=True)
 
     # Calculate variance
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
@@ -560,6 +560,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
