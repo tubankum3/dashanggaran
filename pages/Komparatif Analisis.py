@@ -537,7 +537,7 @@ def main():
             color_range="#c5cae9", color_marker="#1a73e8"
         )
         st.plotly_chart(fig2, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :black[Blokir] DIPA Awal")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
 
     with tab3:
         fig3 = comparison_chart(
@@ -547,7 +547,7 @@ def main():
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :black[Blokir] DIPA Revisi")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -559,6 +559,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
