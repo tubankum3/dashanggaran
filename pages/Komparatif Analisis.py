@@ -399,7 +399,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
     # Range Bar
     fig.add_trace(go.Bar(
         y=agg["KEMENTERIAN/LEMBAGA"],
-        x=(agg[col_end] - agg[col_start]).abs(),
+        x=(agg[col_end] - agg[col_start]),
         base=agg[col_start],
         orientation="h",
         marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
@@ -471,24 +471,27 @@ def main():
             color_range="#b2dfdb", color_marker="#00897b"
         )
         st.plotly_chart(fig1, use_container_width=True)
+        st.write("Rentang merupakan selisih antara Pagu Revisi Efektif dan Pagu Awal Efektif")
 
     with tab2:
         fig2 = comparison_chart(
             df, selected_year, top_n,
-            "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA AWAL",
+            "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
             "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal",
             color_range="#c5cae9", color_marker="#1a73e8"
         )
         st.plotly_chart(fig2, use_container_width=True)
+        st.write("Rentang merupakan besaran Blokir DIPA")
 
     with tab3:
         fig3 = comparison_chart(
             df, selected_year, top_n,
-            "PAGU DIPA REVISI EFEKTIF", "PAGU DIPA REVISI",
+            "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
             "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi",
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
+        st.write("Rentang merupakan besaran Blokir DIPA")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -500,6 +503,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
