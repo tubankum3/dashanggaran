@@ -394,6 +394,9 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         ].sum()
     ).sort_values(col_end, ascending=True).tail(top_n)
 
+    # Calculate variance (pagu - realisasi)
+    agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
+
     fig = go.Figure()
 
     # Range Bar
@@ -411,17 +414,28 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         customdata=agg[col_end]
     ))
 
-    # Realisasi Marker
+    # Realisasi Marker + Varians Error Bar
     fig.add_trace(go.Scatter(
         y=agg["KEMENTERIAN/LEMBAGA"],
         x=agg["REALISASI BELANJA KL (SAKTI)"],
         mode="markers",
         marker=dict(color=color_marker, size=12, line=dict(color="white", width=1.5)),
         name="Realisasi Belanja (SAKTI)",
-        hovertemplate="Realisasi: %{x:,.0f}<extra></extra>"
+        error_x=dict(
+            type="data",
+            array=agg["VARIANS"],
+            visible=True,
+            color=color_marker,
+            thickness=1.5
+        ),
+        hovertemplate=(
+            "Realisasi: %{x:,.0f}<br>"
+            "Varian (Pagu-Realisasi): %{customdata:,.0f}<extra></extra>"
+        ),
+        customdata=agg["VARIANS"]
     ))
 
-    tickvals = np.linspace(0, agg["REALISASI BELANJA KL (SAKTI)"].max(), num=6)
+    tickvals = np.linspace(0, agg[col_end].max(), num=6)
     ticktext = [format_rupiah(val) for val in tickvals]
 
     fig.update_layout(
@@ -503,6 +517,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
