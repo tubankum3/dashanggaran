@@ -364,24 +364,13 @@ def sidebar(df):
         years = sorted(df["Tahun"].astype(int).unique())
         selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
 
-        category_cols = [
-            c for c in df.select_dtypes(include=["object"]).columns
-            if c.lower() != "tahun"
-        ]
-
-        if not category_cols:
-            st.error("Tidak ada kolom kategori yang dapat dipilih.")
-            st.stop()
-
-        selected_metric = st.selectbox(
-            "Pilih Kategori",
-            options=["-- Pilih Kategori --"] + category_cols,
-            index=0,
+        category_cols = [col for col in df.select_dtypes(include="object").columns if col != "Tahun"]
+        
+        selected_metric = st.sidebar.selectbox(
+            "Kategori / Dimensi Analisis",
+            options=category_cols,
+            index=category_cols.index("KEMENTERIAN/LEMBAGA") if "KEMENTERIAN/LEMBAGA" in category_cols else 0,
         )
-
-        if selected_metric == "-- Pilih Kategori --":
-            st.warning("Silakan pilih salah satu kategori untuk melanjutkan.")
-            st.stop()
 
         top_n = st.number_input(
             "Tampilkan Top K/L berdasarkan Pagu DIPA Revisi",
@@ -663,13 +652,13 @@ def main():
         )
         st.plotly_chart(fig1, use_container_width=True)
                
-        fig11 = comparison_chart_by_category(
-            df, selected_year, selected_kls, selected_metric, top_n,
-            "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
-            "dengan Rentang Pagu per Kategori",
-            color_range="#aed581", color_marker="#33691e"
-        )
-        if fig11:
+        if selected_metric != "KEMENTERIAN/LEMBAGA":
+            fig11 = comparison_chart_by_category(
+                df, selected_year, selected_kls, selected_metric, top_n,
+                "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
+                "dengan Rentang Pagu per Kategori",
+                color_range="#aed581", color_marker="#33691e"
+            )
             st.plotly_chart(fig11, use_container_width=True)
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
 
@@ -682,13 +671,13 @@ def main():
         )
         st.plotly_chart(fig2, use_container_width=True)
 
-        fig22 = comparison_chart_by_category(
-            df, selected_year, selected_kls, selected_metric, top_n,
-            "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
-            "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal per Kategori",
-            color_range="#aed581", color_marker="#33691e"
-        )
-        if fig22:
+        if selected_metric != "KEMENTERIAN/LEMBAGA":
+            fig22 = comparison_chart_by_category(
+                df, selected_year, selected_kls, selected_metric, top_n,
+                "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
+                "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal per Kategori",
+                color_range="#aed581", color_marker="#33691e"
+            )
             st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
 
@@ -700,14 +689,14 @@ def main():
             color_range="#ffe082", color_marker="#e53935"
         )
         st.plotly_chart(fig3, use_container_width=True)
-        
-        fig33 = comparison_chart_by_category(
-            df, selected_year, selected_kls, selected_metric, top_n,
-            "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
-            "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi per Kategori",
-            color_range="#aed581", color_marker="#33691e"
-        )
-        if fig33:
+
+        if selected_metric != "KEMENTERIAN/LEMBAGA":
+            fig33 = comparison_chart_by_category(
+                df, selected_year, selected_kls, selected_metric, top_n,
+                "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
+                "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi per Kategori",
+                color_range="#aed581", color_marker="#33691e"
+            )
             st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
 
@@ -721,6 +710,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
