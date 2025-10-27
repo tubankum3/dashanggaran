@@ -399,7 +399,10 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
 
     # Calculate variance
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
-
+                         
+    # Sort by revised budget
+    agg = agg.sort_values("REALISASI BELANJA KL (SAKTI)", ascending=True)
+                         
     # numeric y positions (0..n-1)
     y_pos = np.arange(len(agg))
 
@@ -560,6 +563,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
