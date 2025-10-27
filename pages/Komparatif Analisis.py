@@ -347,12 +347,14 @@ def format_rupiah(value):
 # =============================================================================
 # Component Architecture
 # =============================================================================
-def header(selected_year: str | None = None):
+  def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
     """Create comprehensive dashboard header with breadcrumb and key info"""
     year_text = selected_year if selected_year else "Overview"
+    metric_text = f" {selected_metric}" if selected_metric else ""
+    kl_text = ", ".join(selected_kls) if selected_kls else "KEMENTERIAN/LEMBAGA"
     st.markdown(f"""
     <div class="dashboard-header">
-        <div class="breadcrumb">DASHBOARD / KOMPARASI / TAHUN {year_text}</div>
+        <div class="breadcrumb">DASHBOARD / KOMPARASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
         <h1 class="dashboard-title">Dashboard Komparasi Realisasi vs Pagu DIPA</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -507,7 +509,7 @@ def main():
     selected_year, selected_kls, top_n = sidebar(df)
 
     # Header displayed at the top
-    header(str(selected_year))
+    header(str(selected_year, selected_metric, selected_kls))
 
     # Filter by selected K/Ls (if any)
     if selected_kls:
@@ -560,6 +562,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
