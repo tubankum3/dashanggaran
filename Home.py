@@ -504,7 +504,9 @@ def sidebar(df):
         df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("int64")
 
         # === Select K/L ===
-        kl_list = ["Semua"] + sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
+        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
+        kl_list.append("Semua")  # add "Semua" at the end
+        
         selected_kl = st.selectbox(
             "Pilih Kementerian/Lembaga",
             kl_list,
@@ -512,6 +514,7 @@ def sidebar(df):
             help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
         )
         
+        # === Filter data ===
         if selected_kl == "Semua":
             df_filtered = df.copy()
         else:
@@ -884,6 +887,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
