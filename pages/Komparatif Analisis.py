@@ -383,8 +383,9 @@ def sidebar(df):
 # =============================================================================
 # Chart
 # =============================================================================
-def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_range="#b2dfdb", color_marker="#1a73e8"):
-    """chart builder for different Pagu comparisons."""
+def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
+                     color_range="#b2dfdb", color_marker="#1a73e8", color_varian="#757575"):
+    """Chart builder showing Pagu ranges, Realisasi markers, and Varian (Pagu–Realisasi) lines with caps."""
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
@@ -394,12 +395,12 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         ].sum()
     ).sort_values(col_end, ascending=True).tail(top_n)
 
-    # Calculate variance (pagu - realisasi)
+    # Calculate variance
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
 
     fig = go.Figure()
 
-    # Range Bar
+    # Range Bar (Awal–Revisi)
     fig.add_trace(go.Bar(
         y=agg["KEMENTERIAN/LEMBAGA"],
         x=(agg[col_end] - agg[col_start]),
@@ -407,27 +408,51 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         orientation="h",
         marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
         name=f"Rentang {' '.join(col_start.split()[-3:])}–{' '.join(col_end.split()[-3:])}",
-        hovertemplate=(
-            f"{col_start}: %{{base:,.0f}}<br>"
-            f"{col_end}: %{{customdata:,.0f}}<extra></extra>"
-        ),
+        hovertemplate=(f"{col_start}: %{{base:,.0f}}<br>"
+                       f"{col_end}: %{{customdata:,.0f}}<extra></extra>"),
         customdata=agg[col_end]
     ))
 
-    # Realisasi Marker + Varians Error Bar
+    # Varians line + caps
+    cap_size = 0.2  # how tall the small vertical caps appear (in Y units)
+    for i, row in agg.iterrows():
+        y_val = row["KEMENTERIAN/LEMBAGA"]
+        y_index = i  # numeric index for small cap offset
+        # main horizontal line
+        fig.add_trace(go.Scatter(
+            x=[row["REALISASI BELANJA KL (SAKTI)"], row[col_end]],
+            y=[y_val, y_val],
+            mode="lines",
+            line=dict(color=color_varian, width=2),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        # left cap
+        fig.add_trace(go.Scatter(
+            x=[row["REALISASI BELANJA KL (SAKTI)"], row["REALISASI BELANJA KL (SAKTI)"]],
+            y=[y_val + cap_size, y_val - cap_size],
+            mode="lines",
+            line=dict(color=color_varian, width=2),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        # right cap
+        fig.add_trace(go.Scatter(
+            x=[row[col_end], row[col_end]],
+            y=[y_val + cap_size, y_val - cap_size],
+            mode="lines",
+            line=dict(color=color_varian, width=2),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+
+    # Realisasi Marker
     fig.add_trace(go.Scatter(
         y=agg["KEMENTERIAN/LEMBAGA"],
         x=agg["REALISASI BELANJA KL (SAKTI)"],
         mode="markers",
         marker=dict(color=color_marker, size=12, line=dict(color="white", width=1.5)),
         name="Realisasi Belanja (SAKTI)",
-        error_x=dict(
-            type="data",
-            array=agg["VARIANS"],
-            visible=True,
-            color=color_marker,
-            thickness=1.5
-        ),
         hovertemplate=(
             "Realisasi: %{x:,.0f}<br>"
             "Varian (Pagu-Realisasi): %{customdata:,.0f}<extra></extra>"
@@ -517,6 +542,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
