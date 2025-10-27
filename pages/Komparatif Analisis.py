@@ -421,7 +421,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
         hovertemplate="Realisasi: %{x:,.0f}<extra></extra>"
     ))
 
-    tickvals = np.linspace(0, agg["REALISASI BELANJA KL (SAKTI)"], num=6)
+    tickvals = np.linspace(0, agg["REALISASI BELANJA KL (SAKTI)"].max(), num=6)
     ticktext = [format_rupiah(val) for val in tickvals]
 
     fig.update_layout(
@@ -500,6 +500,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
