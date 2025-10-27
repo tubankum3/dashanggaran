@@ -411,6 +411,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         x=(agg[col_end] - agg[col_start]),
         base=agg[col_start],
         orientation="h",
+        width=0.6,
         marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
         name=f"Rentang {' '.join(col_start.split()[-3:])}–{' '.join(col_end.split()[-3:])}",
         hovertemplate=(f"{col_start}: %{{base:,.0f}}<br>"
@@ -559,6 +560,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
