@@ -400,10 +400,10 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix, color_ra
     fig.add_trace(go.Bar(
         y=agg["KEMENTERIAN/LEMBAGA"],
         x=(agg[col_end] - agg[col_start]).abs(),
-        base=agg[col_start].max(axis=1),
+        base=agg[col_start],
         orientation="h",
         marker=dict(color=color_range, cornerradius=15, line=dict(color=color_range, width=0.5)),
-        name=f"Rentang {col_start.split()[-2:]}–{col_end.split()[-2:]}",
+        name=f"Rentang {col_start.split()[-2:].apply(lambda x: ' '.join(x))}–{col_end.split()[-2:].apply(lambda x: ' '.join(x))}",
         hovertemplate=(
             f"{col_start}: %{{base:,.0f}}<br>"
             f"{col_end}: %{{customdata:,.0f}}<extra></extra>"
@@ -500,6 +500,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
