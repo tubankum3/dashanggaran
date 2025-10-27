@@ -494,7 +494,8 @@ HIERARCHY = [
     ("PROGRAM", "PROGRAM"),
     ("KEGIATAN", "KEGIATAN"),
     ("OUTPUT (KRO)", "OUTPUT (KRO)"),
-    ("SUB OUTPUT (RO)", "SUB OUTPUT (RO)")
+    ("SUB OUTPUT (RO)", "SUB OUTPUT (RO)"),
+    ("KOMPONEN", "KOMPONEN")
 ]
 
 def init_session_state():
@@ -733,6 +734,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
