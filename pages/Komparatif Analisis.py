@@ -351,7 +351,7 @@ def header(selected_year: str | None = None, selected_metric: str | None = None,
     """Create comprehensive dashboard header with breadcrumb and key info"""
     year_text = selected_year if selected_year else "Overview"
     metric_text = f" {selected_metric}" if selected_metric else ""
-    kl_text = ", ".join(selected_kls) if selected_kls else "KEMENTERIAN/LEMBAGA"
+    kl_text = ", ".join(selected_kls) if selected_kls else "SELURUH K/L"
     st.markdown(f"""
     <div class="dashboard-header">
         <div class="breadcrumb">DASHBOARD / KOMPARASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
@@ -717,4 +717,5 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
