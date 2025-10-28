@@ -367,18 +367,18 @@ def sidebar(df):
         category_cols = [col for col in df.select_dtypes(include="object").columns if col != "Tahun"]
         
         selected_metric = st.sidebar.selectbox(
-            "Kategori / Dimensi Analisis",
+            "Kategori/Klasifikasi",
             options=category_cols,
             index=category_cols.index("KEMENTERIAN/LEMBAGA") if "KEMENTERIAN/LEMBAGA" in category_cols else 0,
         )
 
         top_n = st.number_input(
-            "Tampilkan Top K/L berdasarkan Pagu DIPA Revisi",
+            "Tampilkan Top-N Data",
             min_value=1,
             max_value=50,
             value=10,
             step=1,
-            help="Jumlah Kementerian/Lembaga yang ditampilkan pada grafik."
+            help="Jumlah Data yang ditampilkan pada grafik berdasarkan Realisasi Belanja."
         )
         
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
@@ -407,9 +407,10 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         ].sum()
     ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).head(top_n).reset_index(drop=True)
 
-    # Calculate variance
+    # Calculate variance and realization percentage
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
-                         
+    agg["PERSEN_REALISASI"] = (agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end]) * 100
+                   
     # numeric y positions (0..n-1)
     y_pos = np.arange(len(agg))
 
@@ -477,10 +478,11 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         marker=dict(color=color_marker, size=12, line=dict(color="white", width=1)),
         name="Realisasi Belanja (SAKTI)",
         hovertemplate=(
-            "Realisasi: %{x:,.0f}<br>"
-            "Varian (Pagu Efektif-Realisasi): %{customdata:,.0f}<extra></extra>"
+            "Realisasi: %{x:,.0f} "
+            "(%{customdata[1]:.1f}%)<br>"
+            "Varian (Pagu Efektif-Realisasi): %{customdata[0]:,.0f}<extra></extra>"
         ),
-        customdata=agg["VARIANS"]
+        customdata=np.stack((agg["VARIANS"], agg["PERSEN_REALISASI"]), axis=-1)
     ))
 
     # x ticks (formatted rupiah)
@@ -530,8 +532,9 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
         st.warning(f"Tidak ada data untuk kategori '{selected_metric}' di tahun {year}.")
         return None
 
-    # Calculate variance (Pagu - Realisasi)
+    # Calculate variance and realization percentage
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
+    agg["PERSEN_REALISASI"] = (agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end]) * 100
 
     # numeric y positions for consistent line plotting
     y_pos = np.arange(len(agg))
@@ -589,10 +592,11 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
         marker=dict(color=color_marker, size=12, line=dict(color="white", width=1)),
         name="Realisasi Belanja (SAKTI)",
         hovertemplate=(
-            "Realisasi: %{x:,.0f}<br>"
-            "Varian (Pagu Efektif-Realisasi): %{customdata:,.0f}<extra></extra>"
+            "Realisasi: %{x:,.0f} "
+            "(%{customdata[1]:.1f}%)<br>"
+            "Varian (Pagu Efektif-Realisasi): %{customdata[0]:,.0f}<extra></extra>"
         ),
-        customdata=agg["VARIANS"]
+        customdata=np.stack((agg["VARIANS"], agg["PERSEN_REALISASI"]), axis=-1)
     ))
 
     tickvals = np.linspace(0, max(agg[col_end].max(), agg["REALISASI BELANJA KL (SAKTI)"].max()), num=6)
@@ -600,10 +604,11 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
     y_ticktext = agg[selected_metric].astype(str).tolist()
 
     fig.update_layout(
+        title=f"Perbandingan Realisasi Belanja {title_suffix}<br>Tahun {year}",
         title=(
-            f"Perbandingan Realisasi Belanja per {selected_metric}<br>"
+            f"Perbandingan Realisasi Belanja {title_suffix} berdasarkan {selected_metric}<br>"
             f"Tahun {year}"
-            + (f" — K/L Terpilih" if selected_kls else " — Seluruh K/L")
+            + (f" untuk K/L Terpilih" if selected_kls else " untuk Seluruh K/L")
         ),
         xaxis_title="Jumlah (Rupiah)",
         yaxis_title=selected_metric,
@@ -660,7 +665,7 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig11, use_container_width=True)
-        st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
+        st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
 
     with tab2:
         fig2 = comparison_chart(
@@ -679,7 +684,7 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig22, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
 
     with tab3:
         fig3 = comparison_chart(
@@ -698,7 +703,7 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig33, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -710,6 +715,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
