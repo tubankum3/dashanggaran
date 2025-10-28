@@ -363,15 +363,7 @@ def sidebar(df):
     with st.sidebar:
         years = sorted(df["Tahun"].astype(int).unique())
         selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
-
-        category_cols = [col for col in df.select_dtypes(include="object").columns if col != "Tahun"]
         
-        selected_metric = st.sidebar.selectbox(
-            "Kategori/Klasifikasi",
-            options=category_cols,
-            index=category_cols.index("KEMENTERIAN/LEMBAGA") if "KEMENTERIAN/LEMBAGA" in category_cols else 0,
-        )
-
         top_n = st.number_input(
             "Tampilkan Top-N Data",
             min_value=1,
@@ -381,6 +373,14 @@ def sidebar(df):
             help="Jumlah Data yang ditampilkan pada grafik berdasarkan Realisasi Belanja."
         )
         
+        category_cols = [col for col in df.select_dtypes(include="object").columns if col != "Tahun"]
+        
+        selected_metric = st.sidebar.selectbox(
+            "Kategori/Klasifikasi",
+            options=category_cols,
+            index=category_cols.index("KEMENTERIAN/LEMBAGA") if "KEMENTERIAN/LEMBAGA" in category_cols else 0,
+        )
+
         kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique())
         selected_kls = st.multiselect(
             "Pilih Kementerian/Lembaga (bisa lebih dari satu)",
@@ -717,3 +717,4 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
