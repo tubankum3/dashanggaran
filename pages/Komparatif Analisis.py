@@ -604,7 +604,6 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
     y_ticktext = agg[selected_metric].astype(str).tolist()
 
     fig.update_layout(
-        title=f"Perbandingan Realisasi Belanja {title_suffix}<br>Tahun {year}",
         title=(
             f"Perbandingan Realisasi Belanja {title_suffix} berdasarkan {selected_metric}<br>"
             f"Tahun {year}"
@@ -718,6 +717,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
