@@ -665,7 +665,8 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig11, use_container_width=True)
-        st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
+        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
 
     with tab2:
         fig2 = comparison_chart(
@@ -684,7 +685,8 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig22, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
+        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
 
     with tab3:
         fig3 = comparison_chart(
@@ -703,7 +705,8 @@ def main():
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig33, use_container_width=True)
-        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi<br>**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
+        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
 
 # =============================================================================
 # Error Handling & Entry Point
@@ -715,6 +718,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
