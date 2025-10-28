@@ -660,7 +660,7 @@ def main():
             fig11 = comparison_chart_by_category(
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
-                "dengan Rentang Pagu per Kategori",
+                "dengan Rentang Pagu DIPA Efektif",
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig11, use_container_width=True)
@@ -680,7 +680,7 @@ def main():
             fig22 = comparison_chart_by_category(
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
-                "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal per Kategori",
+                "dengan Rentang Pagu DIPA Awal Efektif",
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig22, use_container_width=True)
@@ -700,7 +700,7 @@ def main():
             fig33 = comparison_chart_by_category(
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
-                "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi per Kategori",
+                "dengan Rentang Pagu DIPA Revisi Efektif",
                 color_range="#aed581", color_marker="#33691e"
             )
             st.plotly_chart(fig33, use_container_width=True)
@@ -717,30 +717,3 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
