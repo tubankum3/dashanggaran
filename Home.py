@@ -164,7 +164,7 @@ st.markdown("""
 }
 
 .metric-sublabel {
-    font-size: 0.575rem;
+    font-size: 0.675rem;
     color: #5f6368;
     font-weight: 500;
     text-transform: none;
@@ -895,6 +895,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
