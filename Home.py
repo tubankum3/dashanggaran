@@ -163,6 +163,14 @@ st.markdown("""
     letter-spacing: 0.5px;
 }
 
+.metric-sublabel {
+    font-size: 0.575rem;
+    color: #5f6368;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0.5px;
+}
+
 .metric-trend {
     display: inline-flex;
     align-items: center;
@@ -478,7 +486,7 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
         <div class="metric-card">
             <div class="metric-label">Tingkat Pertumbuhan Tahunan Majemuk (CAGR)</div>
             <div class="metric-value">{metrics['cagr']:+.1f}%</div>
-            <div class="metric-label">Pertumbuhan tahunan rata-rata selama rentang periode waktu tertentu</div>
+            <div class="metric-sublabel">Pertumbuhan tahunan rata-rata selama rentang periode waktu tertentu</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -488,7 +496,7 @@ def cards(metrics: dict, selected_kl=None, selected_metric=None):
         <div class="metric-card">
             <div class="metric-label">Tingkat Pertumbuhan Tahunan Rata-rata (AAGR)</div>
             <div class="metric-value">{metrics['aagr']:+.1f}%</div>
-            <div class="metric-label">Rata-rata tingkat pertumbuhan tahunan</div>
+            <div class="metric-sublabel">Rata-rata tingkat pertumbuhan tahunan</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -887,6 +895,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
