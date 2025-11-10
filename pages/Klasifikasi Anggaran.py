@@ -366,11 +366,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     # Sort ascending by metric
     df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
     
-    # Wrap long y-axis labels
+    # Wrap long y-axis labels (wrap at spaces)
+    import textwrap
     max_chars = 32
     df_plot["__wrapped_label"] = df_plot[y_col].astype(str).apply(
-        lambda lbl: "<br>".join([lbl[i:i + max_chars] for i in range(0, len(lbl), max_chars)])
+        lambda lbl: "<br>".join(textwrap.wrap(lbl, width=max_chars, break_long_words=False))
     )
+
     
     # Get X-axis limits
     x_min = 0.0
@@ -734,6 +736,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
