@@ -362,7 +362,8 @@ def header(selected_year: str | None = None, selected_metric: str | None = None,
 def sidebar(df):
     with st.sidebar:
         years = sorted(df["Tahun"].astype(int).unique())
-        selected_year = st.selectbox("Pilih Tahun", options=years, index=len(years)-1)
+        default_year_index = years.index(2025) if 2025 in years else len(years) - 1
+        selected_year = st.selectbox("Pilih Tahun", options=years, index=default_year_index)
         
         top_n = st.number_input(
             "Tampilkan Top-N Data",
@@ -717,5 +718,6 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
