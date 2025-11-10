@@ -505,7 +505,7 @@ def sidebar(df):
     with st.sidebar:
         st.markdown("""
         <div class="sidebar-section">
-            <h3 style='margin: 0.1rem 0.1rem 0.1rem 0.1rem; color: var(--on-surface);'>🔍 Filter Data</h3>
+            <h3 style='margin: 0.1rem 0.1rem 0.1rem 0.1rem; color: var(--on-surface);'>Filter Data</h3>
         """, unsafe_allow_html=True)
 
         # === Ensure Tahun is numeric ===
@@ -553,8 +553,9 @@ def sidebar(df):
                 st.session_state["filter__year_range"] = (single_year, single_year)
                 selected_years = (single_year, single_year)
             else:
-                # normal slider for multiple years — use a unique key per K/L if you prefer
-                min_year, max_year = int(min(year_options)), int(max(year_options))
+                # normal slider for multiple years
+                # min_year, max_year = int(min(year_options)), int(max(year_options))
+                min_year, max_year = int(min(year_options)), int(datetime.now().strftime('%Y')) #use the current year as max
                 # prefill from session_state if exists
                 default_range = st.session_state.get("filter__year_range", (min_year, max_year))
                 # ensure default_range is within min/max bounds
@@ -895,6 +896,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
