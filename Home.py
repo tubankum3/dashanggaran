@@ -550,20 +550,22 @@ def sidebar(df):
             st.session_state["filter__year_range"] = (single_year, single_year)
             selected_years = (single_year, single_year)
         else:
-            # normal slider for multiple years
-            min_year, max_year = int(min(year_options)), int(max(year_options))
-            # prefill from session_state if exists
-            default_range = st.session_state.get("filter__year_range", (min_year, max_year))
-            # ensure default_range is within min/max bounds
-            default_range = (
-                max(min_year, default_range[0]),
-                min(max_year, default_range[1])
-            )
+            current_year = int(datetime.now().strftime('%Y'))
+            min_year = int(min(year_options))
+            max_year_data = int(max(year_options))
+        
+            # default end-year → current year but capped by data max
+            default_end = min(current_year, max_year_data)
+        
+            # default start-year → read from session or fall back to min_year
+            default_start = st.session_state.get("filter__year_range", (min_year, default_end))[0]
+            default_start = max(min_year, default_start)  # clamp to range
+        
             selected_years = st.slider(
                 "Rentang Tahun",
                 min_value=min_year,
-                max_value=int(datetime.now().strftime('%Y')), #use the current year as max
-                value=default_range,
+                max_value=max_year_data,  # slider max equals dataset max year
+                value=(default_start, default_end),
                 step=1,
                 key="filter__year_range"
             )
@@ -893,6 +895,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
