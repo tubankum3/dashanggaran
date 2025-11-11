@@ -6,3 +6,4 @@ gdown
 requests
 streamlit-extras
 streamlit-plotly-events
+openpyxl
