@@ -7,6 +7,7 @@ import zipfile
 import io
 import requests
 from datetime import datetime
+from io import BytesIO
 
 # =============================================================================
 # Page Configuration
@@ -322,6 +323,13 @@ def format_rupiah(value: float) -> str:
         return f"Rp {value/1_000_000:.2f} Jt"
     return f"Rp {value:,.0f}"
 
+def rupiah_separator(x):
+    try:
+        x = float(x)
+    except:
+        return x
+    return f"Rp {x:,.0f}".replace(",", ".")
+    
 def aggregate_level(df, group_cols, metric, top_n=None):
     """Aggregate data by grouping columns and return top N"""
     group_cols = [c for c in group_cols if c in df.columns]
@@ -657,51 +665,65 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
-        # === Display Detailed Table for Explanation
+        # === Display Detailed Table with Grand Total & Rupiah Formatting ===
         with st.expander("Tabel Rincian Data"):
-            # Select columns to show
             display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
             display_cols = [c for c in display_cols if c in df_view.columns]
         
             df_table = df_view[display_cols].copy()
         
-            # Ensure metric is numeric for sorting/aggregation
-            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0.0)
+            # Ensure numeric
+            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0)
         
-            # Sort descending so the largest values appear first
+            # Sort largest first
             df_table = df_table.sort_values(by=selected_metric, ascending=False).reset_index(drop=True)
         
-            # Keep a hidden numeric copy for download/export
+            # Hidden numeric column for export
             hidden_numeric_col = f"_numeric_{selected_metric}"
             df_table[hidden_numeric_col] = df_table[selected_metric]
         
-            # Format visible metric column as Rupiah strings using .apply with Python formatting
-            df_table[selected_metric] = df_table[selected_metric].apply(lambda x: f"Rp {x:,.0f}")
+            # Convert visible metric to Rupiah display strings
+            df_table[selected_metric] = df_table[selected_metric].apply(rupiah_separator)
         
-            # === Add Grand Total Row (use numeric sum, then format) ===
+            # —— ADD GRAND TOTAL ROW ——
             grand_total = df_table[hidden_numeric_col].sum()
         
             total_row = {col: "" for col in df_table.columns}
-            # Put "GRAND TOTAL" label in the first available hierarchy column (fallback to KEMENTERIAN/LEMBAGA)
             label_col = next((col for col in available_levels if col in df_table.columns), "KEMENTERIAN/LEMBAGA")
             total_row[label_col] = "TOTAL"
             total_row[hidden_numeric_col] = grand_total
-            total_row[selected_metric] = f"Rp {grand_total:,.0f}"
+            total_row[selected_metric] = rupiah_separator(grand_total)
         
             df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
         
-            # Drop hidden numeric from display but keep df_table for download
+            # Display table (drop hidden numeric column)
             df_display = df_table.drop(columns=[hidden_numeric_col])
+            
+            # Make GRAND TOTAL bold
+            def highlight_grand_total(row):
+                if "TOTAL" in row.values:
+                    return ["font-weight: bold"] * len(row)
+                return [""] * len(row)
+            
+            styled_df = df_display.style.apply(highlight_grand_total, axis=1)
+            
+            st.table(styled_df)
+
         
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            # —— EXCEL DOWNLOAD ——
+            buffer = BytesIO()
+            df_table.rename(columns={hidden_numeric_col: f"{selected_metric} (numeric)"}).to_excel(
+                buffer,
+                index=False,
+                sheet_name="Data"
+            )
+            buffer.seek(0)
         
-            # Download CSV (include numeric column in exported file)
-            csv_for_export = df_table.rename(columns={hidden_numeric_col: f"{selected_metric} (numeric)"}).to_csv(index=False).encode("utf-8")
             st.download_button(
-                "Download CSV (includes numeric metric)",
-                data=csv_for_export,
-                file_name=f"drill_view_{selected_metric}_{selected_year}.csv",
-                mime="text/csv"
+                label="Download Excel",
+                data=buffer,
+                file_name=f"drill_view_{selected_metric}_{selected_year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         # === Handle click events for drill-down ===
@@ -783,6 +805,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
