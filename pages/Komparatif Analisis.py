@@ -344,6 +344,13 @@ def format_rupiah(value):
         return f"Rp {value/1_000_000:.2f} Jt"
     return f"Rp {value:,.0f}"
 
+def rupiah_separator(x):
+    try:
+        x = float(x)
+    except:
+        return x
+    return f"Rp {x:,.0f}".replace(",", ".")
+    
 def generate_table(df, year, selected_kls, selected_metric, col_start, col_end):
     df_year = df[df["Tahun"].astype(int) == year].copy()
     if selected_kls:
@@ -808,6 +815,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
