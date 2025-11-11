@@ -657,45 +657,53 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
-        # === Display Detailed Table for Explanation ===
-        with st.expander("Lihat Tabel Rincian Data"):
-            # Keep only useful columns
+        # === Display Detailed Table for Explanation
+        with st.expander("Tabel Rincian Data"):
+            # Select columns to show
             display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
             display_cols = [c for c in display_cols if c in df_view.columns]
         
             df_table = df_view[display_cols].copy()
         
-            # Ensure metric column is numeric
-            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0)
+            # Ensure metric is numeric for sorting/aggregation
+            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0.0)
         
-            # Sort so highest values appear first
+            # Sort descending so the largest values appear first
             df_table = df_table.sort_values(by=selected_metric, ascending=False).reset_index(drop=True)
         
-            # === Add Grand Total Row ===
-            grand_total = df_table[selected_metric].sum()
+            # Keep a hidden numeric copy for download/export
+            hidden_numeric_col = f"_numeric_{selected_metric}"
+            df_table[hidden_numeric_col] = df_table[selected_metric]
+        
+            # Format visible metric column as Rupiah strings using .apply with Python formatting
+            df_table[selected_metric] = df_table[selected_metric].apply(lambda x: f"Rp {x:,.0f}")
+        
+            # === Add Grand Total Row (use numeric sum, then format) ===
+            grand_total = df_table[hidden_numeric_col].sum()
         
             total_row = {col: "" for col in df_table.columns}
+            # Put "GRAND TOTAL" label in the first available hierarchy column (fallback to KEMENTERIAN/LEMBAGA)
             label_col = next((col for col in available_levels if col in df_table.columns), "KEMENTERIAN/LEMBAGA")
-            total_row[label_col] = "GRAND TOTAL"
-            total_row[selected_metric] = grand_total
+            total_row[label_col] = "TOTAL"
+            total_row[hidden_numeric_col] = grand_total
+            total_row[selected_metric] = f"Rp {grand_total:,.0f}"
         
             df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
         
-            # Display with Streamlit's formatting
-            st.dataframe(
-                df_table,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    selected_metric: st.column_config.NumberColumn(
-                        selected_metric,
-                        format="Rp {0:,.0f}",
-                        help="Nilai dalam Rupiah"
-                    )
-                }
+            # Drop hidden numeric from display but keep df_table for download
+            df_display = df_table.drop(columns=[hidden_numeric_col])
+        
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+            # Download CSV (include numeric column in exported file)
+            csv_for_export = df_table.rename(columns={hidden_numeric_col: f"{selected_metric} (numeric)"}).to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download CSV (includes numeric metric)",
+                data=csv_for_export,
+                file_name=f"drill_view_{selected_metric}_{selected_year}.csv",
+                mime="text/csv"
             )
 
-        
         # === Handle click events for drill-down ===
         if events:
             ev = events[0]
@@ -775,6 +783,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
