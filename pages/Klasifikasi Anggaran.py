@@ -658,26 +658,30 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
         # === Display Detailed Table for Explanation ===
-        with st.expander("Tabel Rincian Data"):
+        with st.expander("Lihat Tabel Rincian Data"):
             # Keep only useful columns
             display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
             display_cols = [c for c in display_cols if c in df_view.columns]
         
             df_table = df_view[display_cols].copy()
         
-            # Sort so the largest values appear first
-            df_table = df_table.sort_values(by=selected_metric, ascending=False)
+            # Ensure metric column is numeric
+            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0)
+        
+            # Sort so highest values appear first
+            df_table = df_table.sort_values(by=selected_metric, ascending=False).reset_index(drop=True)
         
             # === Add Grand Total Row ===
             grand_total = df_table[selected_metric].sum()
         
             total_row = {col: "" for col in df_table.columns}
+            label_col = next((col for col in available_levels if col in df_table.columns), "KEMENTERIAN/LEMBAGA")
+            total_row[label_col] = "GRAND TOTAL"
             total_row[selected_metric] = grand_total
-            total_row[next((col for col in available_levels if col in df_table.columns), df_table.columns[-2])] = "TOTAL"
         
             df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
         
-            # Display with Rupiah formatting
+            # Display with Streamlit's formatting
             st.dataframe(
                 df_table,
                 use_container_width=True,
@@ -685,11 +689,12 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                 column_config={
                     selected_metric: st.column_config.NumberColumn(
                         selected_metric,
-                        help="Total nilai pada level ini",
-                        format="Rp {0:,.0f}",   # Rupiah formatting
+                        format="Rp {0:,.0f}",
+                        help="Nilai dalam Rupiah"
                     )
                 }
             )
+
         
         # === Handle click events for drill-down ===
         if events:
@@ -770,6 +775,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
