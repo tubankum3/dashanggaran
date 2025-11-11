@@ -364,21 +364,32 @@ def generate_table(df, year, selected_kls, selected_metric, col_start, col_end):
 
     # Calculate derived columns
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
-    agg["PERSEN_REALISASI"] = agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end] * 100
 
-    # Create display version
+    # Avoid division by zero → result NaN
+    agg["PERSEN_REALISASI"] = np.where(
+        agg[col_end] == 0,
+        np.nan,
+        (agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end]) * 100
+    )
+
+    # Display version (friendly formatting)
     display_df = agg.copy()
+
     for c in ["REALISASI BELANJA KL (SAKTI)", col_start, col_end, "VARIANS"]:
         display_df[c] = display_df[c].apply(rupiah_separator)
-    display_df["PERSEN_REALISASI"] = display_df["PERSEN_REALISASI"].apply(lambda x: f"{x:.1f}%")
 
-    # Rename columns for clarity
+    # Format percentage; replace NaN with "-"
+    display_df["PERSEN_REALISASI"] = display_df["PERSEN_REALISASI"].apply(
+        lambda x: "-" if pd.isna(x) else f"{x:.1f}%"
+    )
+
+    # Rename columns for final display
     display_df = display_df.rename(columns={
-        "REALISASI BELANJA KL (SAKTI)": "REALISASI BELANJA (SAKTI) [A]",
+        "REALISASI BELANJA KL (SAKTI)": "Realisasi Belanja (SAKTI) [A]",
         col_start: f"{col_start} [B]",
         col_end: f"{col_end} [C]",
-        "VARIANS": "VARIANS [C-A]",
-        "PERSEN_REALISASI": "Persen Realisasi [A/C]"
+        "VARIANS": "Varians [C - A]",
+        "PERSEN_REALISASI": "% Realisasi [A/C]"
     })
 
     return agg, display_df
@@ -722,7 +733,7 @@ def main():
             )
             st.plotly_chart(fig11, use_container_width=True)
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
-        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("**Persentase Realisasi Belanja *terhadap* Pagu DIPA Revisi Efektif")
         st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
 
         with st.expander("Tabel Rincian Data"):
@@ -760,7 +771,7 @@ def main():
             )
             st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
-        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
+        st.caption("**Persentase Realisasi Belanja *terhadap* Pagu DIPA Awal Efektif")
         st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
         
         with st.expander("Tabel Rincian Data"):
@@ -798,7 +809,7 @@ def main():
             )
             st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
-        st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("**Persentase Realisasi Belanja *terhadap* Pagu DIPA Revisi Efektif")
         st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
         
         with st.expander("Tabel Rincian Data"):
@@ -828,6 +839,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
