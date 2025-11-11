@@ -562,7 +562,7 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
-    # ✅ If user selected K/Ls, filter by them. Otherwise use all data (aggregate nationally)
+    # If user selected K/Ls, filter by them. Otherwise use all data (aggregate nationally)
     if selected_kls:
         df_filtered = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
     else:
@@ -641,7 +641,7 @@ def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
         hovertemplate=(
             "Realisasi: %{x:,.0f} "
             "(%{customdata[1]:.1f}%)<br>"
-            "Varian (Pagu Efektif-Realisasi): %{customdata[0]:,.0f}<extra></extra>"
+            "Varian: %{customdata[0]:,.0f}<extra></extra>"
         ),
         customdata=np.stack((agg["VARIANS"], agg["PERSEN_REALISASI"]), axis=-1)
     ))
@@ -713,25 +713,25 @@ def main():
             st.plotly_chart(fig11, use_container_width=True)
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
         st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
 
-        # === TABLE for Tab 1 ===
-        st.subheader("Tabel Rincian Data")
-        raw_table, display_table = generate_table(
-            df, selected_year, selected_kls, selected_metric,
-            "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF"
-        )
-        
-        st.dataframe(display_table, use_container_width=True)
-        
-        excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_awal_revisi.xlsx")
-        st.download_button(
-            label="📥 Download Tabel Excel",
-            data=excel_data,
-            file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_tab1_{selected_year}_{selected_metric}"
-        )
-
+        with st.expander("Tabel Rincian Data"):
+            raw_table, display_table = generate_table(
+                df, selected_year, selected_kls, selected_metric,
+                "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF"
+            )
+    
+            st.dataframe(display_table, use_container_width=True, hide_index=True)
+    
+            excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_awal_revisi.xlsx")
+            st.download_button(
+                label="Download Excel",
+                data=excel_data,
+                file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"download_tab1_{selected_year}_{selected_metric}"
+            )
+            
     with tab2:
         fig2 = comparison_chart(
             df, selected_year, top_n,
@@ -751,24 +751,24 @@ def main():
             st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
         st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
+        st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
         
-        # === TABLE for Tab 2 ===
-        st.subheader("Tabel Rincian Data")
-        raw_table, display_table = generate_table(
-            df, selected_year, selected_kls, selected_metric,
-            "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF"
-        )
-        
-        st.dataframe(display_table, use_container_width=True)
-        
-        excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_awal_efektif.xlsx")
-        st.download_button(
-            label="📥 Download Tabel Excel",
-            data=excel_data,
-            file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_tab2_{selected_year}_{selected_metric}"
-        )
+         with st.expander("Tabel Rincian Data"):
+            raw_table, display_table = generate_table(
+                df, selected_year, selected_kls, selected_metric,
+                "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF"
+            )
+            
+            st.dataframe(display_table, use_container_width=True, hide_index=True)
+            
+            excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_awal_efektif.xlsx")
+            st.download_button(
+                label="Download Excel",
+                data=excel_data,
+                file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"download_tab2_{selected_year}_{selected_metric}"
+            )
 
     with tab3:
         fig3 = comparison_chart(
@@ -789,24 +789,24 @@ def main():
             st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
         st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Revisi Efektif")
+        st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
         
-        # === TABLE for Tab 3 ===
-        st.subheader("Tabel Rincian Data")
-        raw_table, display_table = generate_table(
-            df, selected_year, selected_kls, selected_metric,
-            "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF"
-        )
-        
-        st.dataframe(display_table, use_container_width=True)
-        
-        excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_revisi_efektif.xlsx")
-        st.download_button(
-            label="📥 Download Tabel Excel",
-            data=excel_data,
-            file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_tab3_{selected_year}_{selected_metric}"
-        )
+        with st.expander("Tabel Rincian Data"):
+            raw_table, display_table = generate_table(
+                df, selected_year, selected_kls, selected_metric,
+                "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF"
+            )
+            
+            st.dataframe(display_table, use_container_width=True, hide_index=True)
+            
+            excel_data = download_excel(raw_table, "tabel_realisasi_vs_pagu_revisi_efektif.xlsx")
+            st.download_button(
+                label="Download Excel",
+                data=excel_data,
+                file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"download_tab3_{selected_year}_{selected_metric}"
+            )
         
 # =============================================================================
 # Error Handling & Entry Point
@@ -818,6 +818,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
