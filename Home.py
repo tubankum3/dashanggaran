@@ -399,6 +399,13 @@ def format_rupiah(value: float) -> str:
     else:
         return f"Rp {value:,.0f}"
 
+def rupiah_separator(x):
+    try:
+        x = float(x)
+    except:
+        return x
+    return f"Rp {x:,.0f}".replace(",", ".")
+
 def calculate_financial_metrics(df: pd.DataFrame) -> dict:
     """
     Calculate comprehensive financial metrics including totals, 
@@ -834,8 +841,8 @@ def main():
                                 if grouped_df is not None and not grouped_df.empty:
                                     display_col = col
                                     df_display = grouped_df[["Tahun", display_col, "Nilai"]].copy()
-    
-                                    # Pivot to wide format: rows=metric, cols=years
+                            
+                                    # Pivot data
                                     df_pivot = (
                                         df_display
                                         .pivot_table(
@@ -847,22 +854,31 @@ def main():
                                         .fillna(0)
                                         .reset_index()
                                     )
-    
-                                    # Sort columns: Tahun ascending
+                            
+                                    # Sort year columns
                                     tahun_cols = sorted([c for c in df_pivot.columns if c != display_col])
                                     df_pivot = df_pivot[[display_col] + tahun_cols]
-    
-                                    # Format numeric values as currency
+                            
+                                    # Keep numeric copy for Excel export
+                                    df_excel = df_pivot.copy()
+                            
+                                    # Apply Rupiah formatting for display
                                     for c in tahun_cols:
-                                        df_pivot[c] = df_pivot[c].apply(lambda x: f"Rp {x:,.0f}")
-    
-                                    # Rename first column to show selected metric
+                                        df_pivot[c] = df_pivot[c].apply(rupiah_separator)
+                            
                                     df_pivot = df_pivot.rename(columns={display_col: selected_metric})
-    
-                                    st.dataframe(
-                                        df_pivot,
-                                        use_container_width=True,
-                                        hide_index=True
+                            
+                                    st.dataframe(df_pivot, use_container_width=True, hide_index=True)
+                            
+                                    # Download button (numeric values, not formatted strings)
+                                    excel_buffer = io.BytesIO()
+                                    with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+                                        df_excel.to_excel(writer, sheet_name="Data", index=False)
+                                    st.download_button(
+                                        label="⬇️ Download Excel",
+                                        data=excel_buffer.getvalue(),
+                                        file_name=f"{selected_metric}_{col}_{selected_kl}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                     )
                                 else:
                                     st.info("Tidak ada data untuk ditampilkan dalam tabel")
@@ -895,6 +911,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
