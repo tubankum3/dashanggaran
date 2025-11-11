@@ -12,7 +12,7 @@ from datetime import datetime
 # Page Configuration & Global Settings
 # =============================================================================
 st.set_page_config(
-    page_title="Tren Analisis Anggaran dan Realisasi Belanja Negara",
+    page_title="Analisis Tren Anggaran dan Realisasi Belanja Negara",
     page_icon=":material/line_axis:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -458,7 +458,7 @@ def header(selected_kl: str | None = None, selected_metric: str | None = None):
     st.markdown(f"""
     <div class="dashboard-header">
         <div class="breadcrumb">DASHBOARD / ANALISIS {metric_text} / {kl_text}</div>
-        <h1 class="dashboard-title">📊 Tren Analisis Anggaran & Realisasi Belanja Negara</h1>
+        <h1 class="dashboard-title">Analisis Tren Anggaran & Realisasi Belanja Negara</h1>
     </div>
     """, unsafe_allow_html=True)
 
@@ -912,4 +912,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
