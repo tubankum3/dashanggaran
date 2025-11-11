@@ -686,7 +686,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                     selected_metric: st.column_config.NumberColumn(
                         selected_metric,
                         help="Total nilai pada level ini",
-                        format="Rp {:.}",   # Rupiah formatting
+                        format="Rp {:,}",   # Rupiah formatting
                     )
                 }
             )
@@ -770,6 +770,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
