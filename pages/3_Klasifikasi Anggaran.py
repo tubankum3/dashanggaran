@@ -13,8 +13,8 @@ from io import BytesIO
 # Page Configuration
 # =============================================================================
 st.set_page_config(
-    page_title="Dashboard Klasifikasi Anggaran",
-    page_icon=":analytics:",
+    page_title="Analisis Klasifikasi Anggaran",
+    page_icon=":material/category:",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -532,7 +532,7 @@ def header(selected_year: str | None = None, selected_metric: str | None = None,
     st.markdown(f"""
     <div class="dashboard-header" role="banner" aria-label="Header Dashboard Klasifikasi Anggaran">
         <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
-        <h1 class="dashboard-title">Dashboard Klasifikasi Anggaran</h1>
+        <h1 class="dashboard-title">Analisis Klasifikasi Anggaran</h1>
     </div>
     """, unsafe_allow_html=True)
 
@@ -795,6 +795,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
