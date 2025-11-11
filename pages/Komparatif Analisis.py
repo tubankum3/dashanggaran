@@ -362,14 +362,24 @@ def generate_table(df, year, selected_kls, selected_metric, col_start, col_end):
         ].sum()
     )
 
+    # Calculate derived columns
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
-    agg["PERSEN_REALISASI"] = (agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end]) * 100
+    agg["PERSEN_REALISASI"] = agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end] * 100
 
-    # Make a display copy with Rupiah separator
+    # Create display version
     display_df = agg.copy()
     for c in ["REALISASI BELANJA KL (SAKTI)", col_start, col_end, "VARIANS"]:
         display_df[c] = display_df[c].apply(rupiah_separator)
     display_df["PERSEN_REALISASI"] = display_df["PERSEN_REALISASI"].apply(lambda x: f"{x:.1f}%")
+
+    # Rename columns for clarity
+    display_df = display_df.rename(columns={
+        "REALISASI BELANJA KL (SAKTI)": "REALISASI BELANJA (SAKTI) [A]",
+        col_start: f"{col_start} [B]",
+        col_end: f"{col_end} [C]",
+        "VARIANS": "VARIANS [C-A]",
+        "PERSEN_REALISASI": "Persen Realisasi [A/C]"
+    })
 
     return agg, display_df
 
@@ -818,6 +828,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
