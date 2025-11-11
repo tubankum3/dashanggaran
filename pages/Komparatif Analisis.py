@@ -753,7 +753,7 @@ def main():
         st.caption("**Persentase Realisasi Belanja terhadap Pagu DIPA Awal Efektif")
         st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
         
-         with st.expander("Tabel Rincian Data"):
+        with st.expander("Tabel Rincian Data"):
             raw_table, display_table = generate_table(
                 df, selected_year, selected_kls, selected_metric,
                 "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF"
@@ -818,6 +818,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
