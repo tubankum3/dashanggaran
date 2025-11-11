@@ -666,7 +666,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
         # === Display Detailed Table with Grand Total & Rupiah Formatting ===
-        with st.expander("Tabel Rincian Data"):
+        with st.expander(f"Tabel Rincian Data {view_row}"):
             display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
             display_cols = [c for c in display_cols if c in df_view.columns]
         
@@ -795,6 +795,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
