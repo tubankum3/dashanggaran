@@ -729,6 +729,7 @@ def main():
             data=excel_data,
             file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_tab1_{selected_year}_{selected_metric}"
         )
 
     with tab2:
@@ -766,8 +767,9 @@ def main():
             data=excel_data,
             file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_tab2_{selected_year}_{selected_metric}"
         )
-        
+
     with tab3:
         fig3 = comparison_chart(
             df, selected_year, top_n,
@@ -803,6 +805,7 @@ def main():
             data=excel_data,
             file_name=f"Tabel_Realisasi_vs_Pagu_{selected_year}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_tab3_{selected_year}_{selected_metric}"
         )
         
 # =============================================================================
@@ -815,6 +818,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
