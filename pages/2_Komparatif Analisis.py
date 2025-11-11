@@ -13,8 +13,8 @@ from datetime import datetime
 # Page Configuration
 # =============================================================================
 st.set_page_config(
-    page_title="Dashboard Komparasi Realisasi vs Pagu DIPA",
-    page_icon=":analytics:",
+    page_title="Komparasi Analisis Realisasi vs Pagu DIPA",
+    page_icon=":material/split_scene:",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -422,7 +422,7 @@ def header(selected_year: str | None = None, selected_metric: str | None = None,
     st.markdown(f"""
     <div class="dashboard-header">
         <div class="breadcrumb">DASHBOARD / KOMPARASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
-        <h1 class="dashboard-title">Dashboard Komparasi Realisasi vs Pagu DIPA</h1>
+        <h1 class="dashboard-title">Komparasi Analisis Realisasi vs Pagu DIPA</h1>
     </div>
     """, unsafe_allow_html=True)
     
@@ -839,6 +839,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
