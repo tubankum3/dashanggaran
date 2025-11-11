@@ -872,10 +872,10 @@ def main():
                             
                                     # Download button (numeric values, not formatted strings)
                                     excel_buffer = io.BytesIO()
-                                    with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+                                    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
                                         df_excel.to_excel(writer, sheet_name="Data", index=False)
                                     st.download_button(
-                                        label="⬇️ Download Excel",
+                                        label="Download Excel",
                                         data=excel_buffer.getvalue(),
                                         file_name=f"{selected_metric}_{col}_{selected_kl}.xlsx",
                                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -911,6 +911,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
