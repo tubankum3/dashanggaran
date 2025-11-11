@@ -658,7 +658,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
         # === Display Detailed Table for Explanation ===
-        with st.expander("Lihat Tabel Rincian Data"):
+        with st.expander("Tabel Rincian Data"):
             # Keep only useful columns
             display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
             display_cols = [c for c in display_cols if c in df_view.columns]
@@ -668,15 +668,28 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
             # Sort so the largest values appear first
             df_table = df_table.sort_values(by=selected_metric, ascending=False)
         
-            # Format Rupiah column nicely for display
-            df_table[selected_metric + " (Format)"] = df_table[selected_metric].apply(format_rupiah)
+            # === Add Grand Total Row ===
+            grand_total = df_table[selected_metric].sum()
         
+            total_row = {col: "" for col in df_table.columns}
+            total_row[selected_metric] = grand_total
+            total_row[next((col for col in available_levels if col in df_table.columns), df_table.columns[0])] = "TOTAL"
+        
+            df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
+        
+            # Display with Rupiah formatting
             st.dataframe(
                 df_table,
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                column_config={
+                    selected_metric: st.column_config.NumberColumn(
+                        selected_metric,
+                        help="Total nilai pada level ini",
+                        format="Rp {:.}",   # Rupiah formatting
+                    )
+                }
             )
-
         
         # === Handle click events for drill-down ===
         if events:
@@ -757,6 +770,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
