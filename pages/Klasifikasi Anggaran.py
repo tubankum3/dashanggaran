@@ -657,6 +657,27 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
 
+        # === Display Detailed Table for Explanation ===
+        with st.expander("Lihat Tabel Rincian Data"):
+            # Keep only useful columns
+            display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
+            display_cols = [c for c in display_cols if c in df_view.columns]
+        
+            df_table = df_view[display_cols].copy()
+        
+            # Sort so the largest values appear first
+            df_table = df_table.sort_values(by=selected_metric, ascending=False)
+        
+            # Format Rupiah column nicely for display
+            df_table[selected_metric + " (Format)"] = df_table[selected_metric].apply(format_rupiah)
+        
+            st.dataframe(
+                df_table,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        
         # === Handle click events for drill-down ===
         if events:
             ev = events[0]
@@ -736,6 +757,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
