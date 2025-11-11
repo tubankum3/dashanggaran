@@ -638,7 +638,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         # === Filter data by ancestor selections ===
         df_view = df_filtered.copy()
         
-        # ✅ Ensure selected_metric is numeric in the filtered dataframe
+        # === Ensure selected_metric is numeric in the filtered dataframe ===
         if selected_metric in df_view.columns:
             df_view[selected_metric] = pd.to_numeric(df_view[selected_metric], errors="coerce").fillna(0.0)
         else:
@@ -698,17 +698,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         
             # Display table (drop hidden numeric column)
             df_display = df_table.drop(columns=[hidden_numeric_col])
-            
-            # Make GRAND TOTAL bold
-            def highlight_grand_total(row):
-                if "TOTAL" in row.values:
-                    return ["font-weight: bold"] * len(row)
-                return [""] * len(row)
-            
-            styled_df = df_display.style.apply(highlight_grand_total, axis=1)
-            
-            st.table(styled_df)
-
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
         
             # —— EXCEL DOWNLOAD ——
             buffer = BytesIO()
@@ -805,6 +795,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
