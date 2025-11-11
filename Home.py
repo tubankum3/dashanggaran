@@ -618,7 +618,7 @@ def short_label_from_code(value, col_type):
     elif col_type == "SUB FUNGSI":
         return value[:2] + " " + value[3:5]  # 2 digit + space + 2 digit
     elif col_type == "PROGRAM":
-        return value[:3] + " " + value[4:6] + " " + value[7:9]  # 3 2 WA
+        return value[:2] + " " + value[3:5] # 2 digit 2 letters
     elif col_type == "KEGIATAN":
         return value[:4]  # first 4 digits
     elif col_type == "OUTPUT (KRO)":
@@ -911,48 +911,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
