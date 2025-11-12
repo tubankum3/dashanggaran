@@ -571,7 +571,7 @@ def main():
         with colA:
             # Primary metric selector
             primary = st.selectbox(
-                "Primer",
+                "Pilih metric pertama",
                 numeric_cols,
                 index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
                 key="primary_metric",
@@ -581,7 +581,7 @@ def main():
         with colB:
             # Secondary metric selector
             secondary = st.selectbox(
-                "Sekunder",
+                "Pilih metric kedua",
                 numeric_cols,
                 index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
                 key="secondary_metric",
@@ -632,5 +632,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
