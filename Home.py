@@ -648,7 +648,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     
     # Calculate dynamic height based on number of nodes
     total_nodes = 1 + len(parent_list) + len(child_list)
-    chart_height = max(500, total_nodes * 10)
+    chart_height = max(500, total_nodes * 30)
     
     fig.update_layout(
         title=dict(
@@ -905,6 +905,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
