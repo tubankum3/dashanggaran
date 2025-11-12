@@ -480,8 +480,6 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     
     return fig
 
-# Add this function after the create_placeholder_chart function
-
 def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     """Create Sankey diagram for budget flow visualization"""
     
@@ -644,7 +642,12 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         height=500,
         margin=dict(l=20, r=20, t=100, b=20)
     )
-    
+    fig.update_traces(
+        textfont_shadow=False,
+        node=dict(
+            align='right'
+        )
+    )
     return fig
     
 def create_placeholder_chart(title, chart_type="bar"):
@@ -884,6 +887,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
