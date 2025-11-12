@@ -601,19 +601,19 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     node_y = []
     
     # Total node
-    node_x.append(0)
+    node_x.append(0.01)
     node_y.append(0.5)
     
     # Parent nodes
     parent_y_positions = distribute_y(len(parent_list))
     for y_pos in parent_y_positions:
-        node_x.append(0.35)
+        node_x.append(0.25)
         node_y.append(y_pos)
     
     # Child nodes - large x gap from parent
     child_y_positions = distribute_y(len(child_list))
     for y_pos in child_y_positions:
-        node_x.append(1)
+        node_x.append(0.99)
         node_y.append(y_pos)
     
     # Clamp values to avoid edge issues (as in the example)
@@ -645,6 +645,11 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         )
     )
     fig = go.Figure(sankey)
+    
+    # Calculate dynamic height based on number of nodes
+    total_nodes = 1 + len(parent_list) + len(child_list)
+    chart_height = max(500, total_nodes * 10)
+    
     fig.update_layout(
         title=dict(
             text=f"ALOKASI {metric}<br>{parent_col} → {child_col}<br>TAHUN {selected_year}",
@@ -653,7 +658,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             font=dict(size=10)
         ),
         font=dict(size=9), 
-        height=500,
+        height=chart_height,
         margin=dict(l=20, r=20, t=100, b=20)
     )
     fig.update_traces(
@@ -900,6 +905,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
