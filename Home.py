@@ -539,14 +539,15 @@ def main():
         df_filtered = df.copy()
     else:
         df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+       
+    # Display 4 charts
+    st.markdown("### 📈 Visualisasi Data")
     
-    # Main area controls
-    st.markdown('<div class="material-card">', unsafe_allow_html=True)
-    st.markdown("### ⚙️ Pengaturan Visualisasi")
-    
-    col1, col2, col3 = st.columns(3)
+    # First row - 2 charts
+    col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         # Year range slider
         year_options = sorted(df_filtered["Tahun"].dropna().unique())
         if len(year_options) >= 2:
@@ -566,35 +567,25 @@ def main():
     numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
     if "Tahun" in numeric_cols:
         numeric_cols.remove("Tahun")
-    
-    with col2:
-        # Primary metric selector
-        primary = st.selectbox(
-            "Metrik Primer (Bar)",
-            numeric_cols,
-            index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
-            key="primary_metric"
-        )
-    
-    with col3:
-        # Secondary metric selector
-        secondary = st.selectbox(
-            "Metrik Sekunder (Scatter)",
-            numeric_cols,
-            index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
-            key="secondary_metric"
-        )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Display 4 charts
-    st.markdown("### 📈 Visualisasi Data")
-    
-    # First row - 2 charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        
+        colA, colB = st.columns(2)
+        with colA:
+            # Primary metric selector
+            primary = st.selectbox(
+                "Metrik Primer (Bar)",
+                numeric_cols,
+                index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
+                key="primary_metric"
+            )
+        
+        with colB:
+            # Secondary metric selector
+            secondary = st.selectbox(
+                "Metrik Sekunder (Scatter)",
+                numeric_cols,
+                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                key="secondary_metric"
+            )
         fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
         st.plotly_chart(fig1, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -637,4 +628,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
