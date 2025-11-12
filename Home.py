@@ -390,6 +390,9 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     agg["Persentase Realisasi"] = (agg[secondary] / agg[primary] * 100)
     agg = agg.sort_values("Tahun")
     
+    # Convert Tahun to string for x-axis
+    agg["Tahun"] = agg["Tahun"].astype(str)
+    
     # Create figure with secondary y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
@@ -436,7 +439,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     fig.update_traces(
         selector=dict(type="scatter"),
         text=scatter_texts,
-        textposition="bottom center",
+        textposition="top center",
         textfont=dict(size=10),
         mode="markers+lines+text"
     )
@@ -653,6 +656,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
