@@ -420,6 +420,27 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
         secondary_y=True
     )
     
+    # Add data labels for the bar (primary) trace
+    fig.update_traces(
+        selector=dict(type="bar"),
+        text=agg[primary].apply(lambda v: format_rupiah(v)),
+        textposition="outside",
+        textfont=dict(size=11)
+    )
+    
+    # Add data labels for the scatter (secondary) trace - percentage
+    scatter_texts = [
+        f"({pct:.1f}%)" 
+        for val, pct in zip(agg[secondary], agg["Persentase Realisasi"])
+    ]
+    fig.update_traces(
+        selector=dict(type="scatter"),
+        text=scatter_texts,
+        textposition="top center",
+        textfont=dict(size=10),
+        mode="markers+lines+text"
+    )
+    
     # Calculate max value for synchronized y-axes
     max_value = max(agg[primary].max(), agg[secondary].max())
     
@@ -632,6 +653,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
