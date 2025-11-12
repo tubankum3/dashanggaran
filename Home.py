@@ -597,25 +597,23 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         return [0.1 + (0.8 * i / (n - 1)) for i in range(n)]
     
     # Build node positions
-    # X positions: Total (0.05) -> Parent (0.20) -> Child (0.85)
-    # Small gap between Total and Parent, large gap between Parent and Child
     node_x = []
     node_y = []
     
-    # Total node - centered vertically, small x
-    node_x.append(0.05)
+    # Total node
+    node_x.append(0)
     node_y.append(0.5)
     
-    # Parent nodes - small x gap from total
+    # Parent nodes
     parent_y_positions = distribute_y(len(parent_list))
     for y_pos in parent_y_positions:
-        node_x.append(0.20)
+        node_x.append(0.35)
         node_y.append(y_pos)
     
     # Child nodes - large x gap from parent
     child_y_positions = distribute_y(len(child_list))
     for y_pos in child_y_positions:
-        node_x.append(0.85)
+        node_x.append(1)
         node_y.append(y_pos)
     
     # Clamp values to avoid edge issues (as in the example)
@@ -839,7 +837,7 @@ def main():
                     label_visibility="visible"
                 )
             else:
-                selected_year_sankey = 2023
+                selected_year_sankey = 2025
         
         with colD:
             # Metric selector
@@ -902,6 +900,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
