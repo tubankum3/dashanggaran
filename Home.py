@@ -539,16 +539,23 @@ def main():
         df_filtered = df.copy()
     else:
         df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
+    
+    # Detect numeric columns
+    numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
+    if "Tahun" in numeric_cols:
+        numeric_cols.remove("Tahun")
        
     # Display 4 charts
     st.markdown("### 📈 Visualisasi Data")
     
-    # First row - 2 charts
-    col1, col2 = st.columns(2)
+    # Create 4 columns
+    col1, col2, col3, col4 = st.columns(4)
     
+    # Column 1: Year slider, metric selectors, and chart
     with col1:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        # Year range slider
+        
+        # Row 1: Year range slider (full width of column)
         year_options = sorted(df_filtered["Tahun"].dropna().unique())
         if len(year_options) >= 2:
             selected_years = st.slider(
@@ -561,62 +568,62 @@ def main():
             )
         else:
             st.info("Hanya satu tahun tersedia dalam data")
-            selected_years = (int(year_options[0]), int(year_options[0])) if year_options else (2023, 2023)
-    
-    # Detect numeric columns
-    numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
-    if "Tahun" in numeric_cols:
-        numeric_cols.remove("Tahun")
+            selected_years = (int(year_options[0]), int(year_options[0]))
         
+        # Row 2: Two columns for metric selection
         colA, colB = st.columns(2)
         with colA:
             # Primary metric selector
             primary = st.selectbox(
-                "Metrik Primer (Bar)",
+                "Primer",
                 numeric_cols,
                 index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
-                key="primary_metric"
+                key="primary_metric",
+                label_visibility="visible"
             )
         
         with colB:
             # Secondary metric selector
             secondary = st.selectbox(
-                "Metrik Sekunder (Scatter)",
+                "Sekunder",
                 numeric_cols,
                 index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
-                key="secondary_metric"
+                key="secondary_metric",
+                label_visibility="visible"
             )
+        
+        # Row 3: Chart
         fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
         st.plotly_chart(fig1, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # Column 2: Placeholder chart
     with col2:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig2 = create_placeholder_chart("Grafik Perbandingan Tahun ke Tahun", "line")
+        fig2 = create_placeholder_chart("Grafik 2", "line")
         st.plotly_chart(fig2, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Second row - 2 charts
-    col3, col4 = st.columns(2)
-    
+    # Column 3: Placeholder chart
     with col3:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig3 = create_placeholder_chart("Distribusi Anggaran", "pie")
+        fig3 = create_placeholder_chart("Grafik 3", "pie")
         st.plotly_chart(fig3, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # Column 4: Placeholder chart
     with col4:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig4 = create_placeholder_chart("Tren Realisasi", "bar")
+        fig4 = create_placeholder_chart("Grafik 4", "bar")
         st.plotly_chart(fig4, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     # --- Footer ---
     st.markdown("---")
-    col1, col2 = st.columns([3, 1])
-    with col1:
+    footer_col1, footer_col2 = st.columns([3, 1])
+    with footer_col1:
         st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
-    with col2:
+    with footer_col2:
         st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
 
 # =============================================================================
@@ -628,5 +635,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
