@@ -497,19 +497,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         )
         fig.update_layout(height=500)
         return fig
-    
-    # # Format Rupiah function
-    # def format_rupiah_sankey(value):
-    #     value = float(value)
-    #     if value >= 1e12:
-    #         return f'Rp {value/1e12:.1f}T'
-    #     elif value >= 1e9:
-    #         return f'Rp {value/1e9:.1f}M'
-    #     elif value >= 1e6:
-    #         return f'Rp {value/1e6:.1f}Jt'
-    #     else:
-    #         return f'Rp {value:,.0f}'
-    
+        
     # Aggregations
     agg_parent = df_year.groupby(parent_col, as_index=False)[metric].sum().query(f"`{metric}`>0")
     agg_parent_child = df_year.groupby([parent_col, child_col], as_index=False)[metric].sum().query(f"`{metric}`>0")
@@ -600,7 +588,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     
     # Adjust node positions
     node_x = []
-    x_positions = [0, 0.3, 0.9]  # Total, Parent, Child
+    x_positions = [0, 0.1, 0.8]  # Total, Parent, Child
     
     node_x.append(x_positions[0])  # Total node
     node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
@@ -625,7 +613,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             value=values, 
             customdata=link_labels, 
             hovertemplate="%{customdata}<extra></extra>",
-            color="rgba(0, 95, 172, 0.2)",
+            color="rgba(0, 95, 172, 0.1)",
             hovercolor="gold",
         )
     )
@@ -643,6 +631,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         margin=dict(l=20, r=20, t=100, b=20)
     )
     fig.update_traces(
+        textfont_color="#005FAC",
         textfont_shadow=False,
         node=dict(
             align='right'
@@ -887,6 +876,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
