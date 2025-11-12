@@ -544,17 +544,13 @@ def main():
     numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
     if "Tahun" in numeric_cols:
         numeric_cols.remove("Tahun")
-       
-    # Display 4 charts
-    st.markdown("### 📈 Visualisasi Data")
     
-    # Create 4 columns
+    
+    # === Dispay Charts ===
     col1, col2 = st.columns(2)
     
     # Column 1: Year slider, metric selectors, and chart
-    with col1:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        
+    with col1:      
         # Row 1: Year range slider (full width of column)
         year_options = sorted(df_filtered["Tahun"].dropna().unique())
         if len(year_options) >= 2:
@@ -595,7 +591,6 @@ def main():
         # Row 3: Chart
         fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
         st.plotly_chart(fig1, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
     
     # Column 2: Placeholder chart
     with col2:
@@ -637,4 +632,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
