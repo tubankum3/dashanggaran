@@ -439,7 +439,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     fig.update_traces(
         selector=dict(type="scatter"),
         text=scatter_texts,
-        textposition="top center",
+        textposition="bottom center",
         textfont=dict(size=10),
         mode="markers+lines+text"
     )
@@ -448,12 +448,18 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     max_value = max(agg[primary].max(), agg[secondary].max())
     
     # Update layout
-    title_kl = f" - {selected_kls}" if selected_kls != "Semua" else ""
+    title_kl = f" {selected_kls}" if selected_kls != "Semua" else ""
     fig.update_layout(
-        title=f"Pagu DIPA Revisi (Efektif) dan Realisasi Belanja per Tahun{title_kl}",
+        title=dict(
+            text=f"PERBANDINGAN {primary}<br>TERHADAP {secondary}<br>PERIODE {selected_years[0]} - {selected_years[1]}<br>{title_kl}",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=12)
+        ),
         xaxis_title="Tahun",
         template="plotly_white",
         height=500,
+        margin=dict(t=120, b=50, l=50, r=50),  # Add top margin for title space
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         hovermode="x unified"
     )
@@ -656,6 +662,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
