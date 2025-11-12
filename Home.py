@@ -588,11 +588,12 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     
     # Adjust node positions
     node_x = []
-    x_positions = [0, 0.1, 0.8]  # Total, Parent, Child
+    x_positions = [0, 0.3, 0.8]  # Total, Parent, Child
+    node_x = x_positions
     
-    node_x.append(x_positions[0])  # Total node
-    node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
-    node_x += [x_positions[2]] * len(child_list)  # Child nodes
+    # node_x.append(x_positions[0])  # Total node
+    # node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
+    # node_x += [x_positions[2]] * len(child_list)  # Child nodes
     
     # Build sankey
     sankey = go.Sankey(
@@ -613,7 +614,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             value=values, 
             customdata=link_labels, 
             hovertemplate="%{customdata}<extra></extra>",
-            color="rgba(0, 95, 172, 0.1)",
+            color="rgba(0, 95, 172, 0.2)",
             hovercolor="gold",
         )
     )
@@ -876,6 +877,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
