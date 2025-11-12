@@ -440,10 +440,10 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
         selector=dict(type="scatter"),
         text=scatter_texts,
         textposition="bottom center",
-        textfont=dict(size=10, color="white")),
+        textfont=dict(size=10, color="white"),
         mode="markers+lines+text"
     )
-    
+        
     # Calculate max value for synchronized y-axes
     max_value = max(agg[primary].max(), agg[secondary].max())
     
@@ -662,6 +662,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
