@@ -549,7 +549,7 @@ def main():
     st.markdown("### 📈 Visualisasi Data")
     
     # Create 4 columns
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     
     # Column 1: Year slider, metric selectors, and chart
     with col1:
@@ -603,6 +603,8 @@ def main():
         fig2 = create_placeholder_chart("Grafik 2", "line")
         st.plotly_chart(fig2, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
+
+    col3, col4 = st.columns(2)
     
     # Column 3: Placeholder chart
     with col3:
@@ -635,3 +637,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
