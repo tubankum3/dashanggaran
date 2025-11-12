@@ -586,27 +586,55 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         else:
             node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah(value)}<br>{percentage:.1f}% dari {metric}")
     
-    # Adjust node positions
-    # node_x = []
-    # x_positions = [0, 0.3, 0.8]  # Total, Parent, Child
-    # node_x = x_positions
+    # Helper function to distribute nodes vertically
+    def distribute_y(n):
+        """Distribute n nodes evenly in y-axis from 0.1 to 0.9"""
+        if n == 0:
+            return []
+        if n == 1:
+            return [0.5]  # Center single node
+        # Evenly distribute nodes with padding at top and bottom
+        return [0.1 + (0.8 * i / (n - 1)) for i in range(n)]
     
-    # node_x.append(x_positions[0])  # Total node
-    # node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
-    # node_x += [x_positions[2]] * len(child_list)  # Child nodes
+    # Build node positions
+    # X positions: Total (0.05) -> Parent (0.20) -> Child (0.85)
+    # Small gap between Total and Parent, large gap between Parent and Child
+    node_x = []
+    node_y = []
+    
+    # Total node - centered vertically, small x
+    node_x.append(0.05)
+    node_y.append(0.5)
+    
+    # Parent nodes - small x gap from total
+    parent_y_positions = distribute_y(len(parent_list))
+    for y_pos in parent_y_positions:
+        node_x.append(0.20)
+        node_y.append(y_pos)
+    
+    # Child nodes - large x gap from parent
+    child_y_positions = distribute_y(len(child_list))
+    for y_pos in child_y_positions:
+        node_x.append(0.85)
+        node_y.append(y_pos)
+    
+    # Clamp values to avoid edge issues (as in the example)
+    node_x = [0.001 if v == 0 else 0.999 if v == 1 else v for v in node_x]
+    node_y = [0.001 if v == 0 else 0.999 if v == 1 else v for v in node_y]
     
     # Build sankey
     sankey = go.Sankey(
-        arrangement="freeform",
+        arrangement="snap",  # Changed from "freeform"
         node=dict(
             label=labels,
             color=node_colors, 
-            pad=10, 
-            thickness=10,
-            align="left",
+            pad=15,  # Changed from 10
+            thickness=20,  # Changed from 10
+            line=dict(color="white", width=1),  # Added
             customdata=node_hover_texts,
             hovertemplate="%{customdata}<extra></extra>",
-            # x=node_x,
+            x=node_x,
+            y=node_y,
         ),
         link=dict(
             source=sources, 
@@ -618,7 +646,6 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             hovercolor="gold",
         )
     )
-    
     fig = go.Figure(sankey)
     fig.update_layout(
         title=dict(
@@ -634,9 +661,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     fig.update_traces(
         textfont_color="#005FAC",
         textfont_shadow=False,
-        node=dict(
-            align='right'
-        )
+        node_align="center"
     )
     return fig
     
@@ -877,6 +902,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
