@@ -587,9 +587,9 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah(value)}<br>{percentage:.1f}% dari {metric}")
     
     # Adjust node positions
-    node_x = []
-    x_positions = [0, 0.3, 0.8]  # Total, Parent, Child
-    node_x = x_positions
+    # node_x = []
+    # x_positions = [0, 0.3, 0.8]  # Total, Parent, Child
+    # node_x = x_positions
     
     # node_x.append(x_positions[0])  # Total node
     # node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
@@ -603,10 +603,10 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             color=node_colors, 
             pad=10, 
             thickness=10,
-            align="justify",
+            align="left",
             customdata=node_hover_texts,
             hovertemplate="%{customdata}<extra></extra>",
-            x=node_x,
+            # x=node_x,
         ),
         link=dict(
             source=sources, 
@@ -877,6 +877,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
