@@ -451,7 +451,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     title_kl = f" {selected_kls}" if selected_kls != "Semua" else ""
     fig.update_layout(
         title=dict(
-            text=f"PERBANDINGAN {primary}<br>TERHADAP {secondary}<br>PERIODE {selected_years[0]} - {selected_years[1]}<br>{title_kl}",
+            text=f"PERBANDINGAN {primary} TERHADAP {secondary}<br>PERIODE {selected_years[0]} - {selected_years[1]}<br>{title_kl}",
             x=0.5,
             xanchor='center',
             font=dict(size=12)
@@ -662,6 +662,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
