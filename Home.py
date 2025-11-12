@@ -480,6 +480,173 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     
     return fig
 
+# Add this function after the create_placeholder_chart function
+
+def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
+    """Create Sankey diagram for budget flow visualization"""
+    
+    # Filter by year
+    df_year = df[df["Tahun"] == int(selected_year)].copy()
+    
+    if df_year.empty or metric not in df_year.columns:
+        # Return empty figure if no data
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Tidak ada data untuk ditampilkan",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14)
+        )
+        fig.update_layout(height=500)
+        return fig
+    
+    # Format Rupiah function
+    def format_rupiah_sankey(value):
+        value = float(value)
+        if value >= 1e12:
+            return f'Rp {value/1e12:.1f}T'
+        elif value >= 1e9:
+            return f'Rp {value/1e9:.1f}M'
+        elif value >= 1e6:
+            return f'Rp {value/1e6:.1f}Jt'
+        else:
+            return f'Rp {value:,.0f}'
+    
+    # Aggregations
+    agg_parent = df_year.groupby(parent_col, as_index=False)[metric].sum().query(f"`{metric}`>0")
+    agg_parent_child = df_year.groupby([parent_col, child_col], as_index=False)[metric].sum().query(f"`{metric}`>0")
+    agg_child = df_year.groupby(child_col, as_index=False)[metric].sum().query(f"`{metric}`>0")
+    
+    # Calculate total for percentages
+    total_value = df_year[metric].sum()
+    
+    if total_value <= 0:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Tidak ada data untuk ditampilkan",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14)
+        )
+        fig.update_layout(height=500)
+        return fig
+    
+    total_label = f"{metric}"
+    parent_list = agg_parent[parent_col].astype(str).tolist()
+    child_list = agg_child[child_col].astype(str).tolist()
+    
+    labels = [total_label] + [f"{p}" for p in parent_list] + [f"{c}" for c in child_list]
+    index_map = {lab: i for i, lab in enumerate(labels)}
+    
+    sources, targets, values, link_labels = [], [], [], []
+    
+    # Total -> Parent
+    for _, r in agg_parent.iterrows():
+        p = str(r[parent_col])
+        v = float(r[metric])
+        if v <= 0: 
+            continue
+        sources.append(index_map[total_label])
+        targets.append(index_map[f"{p}"])
+        values.append(v)
+        link_labels.append(f"{total_label} → {p}: {format_rupiah_sankey(v)}")
+    
+    # Parent -> Child
+    for _, r in agg_parent_child.iterrows():
+        p = str(r[parent_col])
+        c = str(r[child_col])
+        v = float(r[metric])
+        if v <= 0:
+            continue
+        sources.append(index_map[f"{p}"])
+        targets.append(index_map[f"{c}"])
+        values.append(v)
+        link_labels.append(f"{p} → {c}: {format_rupiah_sankey(v)}")
+    
+    # Color functions
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def rgb_to_hex(rgb):
+        return '#{:02x}{:02x}{:02x}'.format(*rgb)
+    
+    def lighten_color(hex_color, factor=0.3):
+        rgb = hex_to_rgb(hex_color)
+        light_rgb = tuple(min(255, int(c + (255 - c) * factor)) for c in rgb)
+        return rgb_to_hex(light_rgb)
+    
+    # Base color and gradient definitions
+    base_color = "#005FAC"
+    parent_color = base_color
+    child_color = lighten_color(base_color, 0.4)
+    
+    # Build node colors
+    node_colors = ["#005FAC"]  # Total
+    node_colors += [parent_color for p in parent_list]  # Parent nodes
+    node_colors += [child_color for c in child_list]  # Child nodes
+    
+    # Calculate node values for hover information
+    node_values = [total_value]  # Total node value
+    node_values += [float(agg_parent[agg_parent[parent_col] == p][metric].iloc[0]) for p in parent_list]
+    node_values += [float(agg_child[agg_child[child_col] == c][metric].iloc[0]) for c in child_list]
+    
+    # Create node hover texts with percentages
+    node_hover_texts = []
+    for i, (label, value) in enumerate(zip(labels, node_values)):
+        percentage = (value / total_value) * 100
+        if i == 0:
+            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah_sankey(value)}<br>{percentage:.1f}% dari {metric}")
+        else:
+            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah_sankey(value)}<br>{percentage:.1f}% dari {metric}")
+    
+    # Adjust node positions
+    node_x = []
+    x_positions = [0, 0.3, 0.95]  # Total, Parent, Child
+    
+    node_x.append(x_positions[0])  # Total node
+    node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
+    node_x += [x_positions[2]] * len(child_list)  # Child nodes
+    
+    # Build sankey
+    sankey = go.Sankey(
+        arrangement="freeform",
+        node=dict(
+            label=labels,
+            color=node_colors, 
+            pad=10, 
+            thickness=10,
+            align="justify",
+            customdata=node_hover_texts,
+            hovertemplate="%{customdata}<extra></extra>",
+            x=node_x,
+        ),
+        link=dict(
+            source=sources, 
+            target=targets, 
+            value=values, 
+            customdata=link_labels, 
+            hovertemplate="%{customdata}<extra></extra>",
+            color="rgba(0, 95, 172, 0.4)",
+            hovercolor="gold",
+        )
+    )
+    
+    fig = go.Figure(sankey)
+    fig.update_layout(
+        title=dict(
+            text=f"ALOKASI {metric}<br>{parent_col} → {child_col}<br>TAHUN {selected_year}",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=10)
+        ),
+        font=dict(size=9), 
+        height=500,
+        margin=dict(l=20, r=20, t=100, b=20)
+    )
+    
+    return fig
+    
 def create_placeholder_chart(title, chart_type="bar"):
     """Create placeholder charts for the other 3 positions"""
     fig = go.Figure()
@@ -631,10 +798,65 @@ def main():
 
     col3, col4 = st.columns(2)
     
-    # Column 3: Placeholder chart
+    # Column 3: Sankey Chart with selectors
     with col3:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig3 = create_placeholder_chart("Grafik 3", "pie")
+        
+        # Get categorical columns for parent/child selection
+        categorical_cols = df_filtered.select_dtypes(include=['object']).columns.tolist()
+        # Remove some columns that shouldn't be used
+        exclude_cols = ['KEMENTERIAN/LEMBAGA', 'Tahun']
+        categorical_cols = [col for col in categorical_cols if col not in exclude_cols]
+        
+        # Row 1: Year and Metric selectors
+        colC, colD = st.columns(2)
+        with colC:
+            # Year selector
+            year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
+            if year_options_sankey:
+                selected_year_sankey = st.selectbox(
+                    "Tahun",
+                    year_options_sankey,
+                    key="year_sankey",
+                    label_visibility="visible"
+                )
+            else:
+                selected_year_sankey = 2023
+        
+        with colD:
+            # Metric selector
+            selected_metric_sankey = st.selectbox(
+                "Metrik",
+                numeric_cols,
+                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                key="metric_sankey",
+                label_visibility="visible"
+            )
+        
+        # Row 2: Parent and Child selectors
+        colE, colF = st.columns(2)
+        with colE:
+            # Parent selector
+            parent_sankey = st.selectbox(
+                "Parent",
+                categorical_cols,
+                index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
+                key="parent_sankey",
+                label_visibility="visible"
+            )
+        
+        with colF:
+            # Child selector
+            child_sankey = st.selectbox(
+                "Child",
+                categorical_cols,
+                index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
+                key="child_sankey",
+                label_visibility="visible"
+            )
+        
+        # Create and display Sankey chart
+        fig3 = create_sankey_chart(df, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
         st.plotly_chart(fig3, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -662,6 +884,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
