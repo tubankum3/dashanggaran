@@ -498,17 +498,17 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         fig.update_layout(height=500)
         return fig
     
-    # Format Rupiah function
-    def format_rupiah_sankey(value):
-        value = float(value)
-        if value >= 1e12:
-            return f'Rp {value/1e12:.1f}T'
-        elif value >= 1e9:
-            return f'Rp {value/1e9:.1f}M'
-        elif value >= 1e6:
-            return f'Rp {value/1e6:.1f}Jt'
-        else:
-            return f'Rp {value:,.0f}'
+    # # Format Rupiah function
+    # def format_rupiah_sankey(value):
+    #     value = float(value)
+    #     if value >= 1e12:
+    #         return f'Rp {value/1e12:.1f}T'
+    #     elif value >= 1e9:
+    #         return f'Rp {value/1e9:.1f}M'
+    #     elif value >= 1e6:
+    #         return f'Rp {value/1e6:.1f}Jt'
+    #     else:
+    #         return f'Rp {value:,.0f}'
     
     # Aggregations
     agg_parent = df_year.groupby(parent_col, as_index=False)[metric].sum().query(f"`{metric}`>0")
@@ -547,7 +547,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         sources.append(index_map[total_label])
         targets.append(index_map[f"{p}"])
         values.append(v)
-        link_labels.append(f"{total_label} → {p}: {format_rupiah_sankey(v)}")
+        link_labels.append(f"{total_label} → {p}: {format_rupiah(v)}")
     
     # Parent -> Child
     for _, r in agg_parent_child.iterrows():
@@ -559,7 +559,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
         sources.append(index_map[f"{p}"])
         targets.append(index_map[f"{c}"])
         values.append(v)
-        link_labels.append(f"{p} → {c}: {format_rupiah_sankey(v)}")
+        link_labels.append(f"{p} → {c}: {format_rupiah(v)}")
     
     # Color functions
     def hex_to_rgb(hex_color):
@@ -594,13 +594,13 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     for i, (label, value) in enumerate(zip(labels, node_values)):
         percentage = (value / total_value) * 100
         if i == 0:
-            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah_sankey(value)}<br>{percentage:.1f}% dari {metric}")
+            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah(value)}<br>{percentage:.1f}% dari {metric}")
         else:
-            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah_sankey(value)}<br>{percentage:.1f}% dari {metric}")
+            node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah(value)}<br>{percentage:.1f}% dari {metric}")
     
     # Adjust node positions
     node_x = []
-    x_positions = [0, 0.3, 0.95]  # Total, Parent, Child
+    x_positions = [0, 0.3, 0.9]  # Total, Parent, Child
     
     node_x.append(x_positions[0])  # Total node
     node_x += [x_positions[1]] * len(parent_list)  # Parent nodes
@@ -625,7 +625,7 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
             value=values, 
             customdata=link_labels, 
             hovertemplate="%{customdata}<extra></extra>",
-            color="rgba(0, 95, 172, 0.4)",
+            color="rgba(0, 95, 172, 0.2)",
             hovercolor="gold",
         )
     )
@@ -887,6 +887,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
