@@ -402,7 +402,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
             x=agg["Tahun"],
             y=agg[primary],
             name=primary.replace("PAGU DIPA REVISI EFEKTIF", "Pagu DIPA Revisi (Efektif)"),
-            marker=dict(color="#9ecae1"),
+            marker=dict(color="#005FAC"),
             hovertemplate=f"{primary.replace('PAGU DIPA REVISI EFEKTIF', 'Pagu')}: %{{y:,.0f}}<extra></extra>"
         ),
         secondary_y=False
@@ -415,8 +415,8 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
             y=agg[secondary],
             mode="markers+lines",
             name=secondary.replace("REALISASI BELANJA KL (SAKTI)", "Realisasi Belanja"),
-            marker=dict(color="#00897b", size=12, line=dict(color="white", width=1.5)),
-            line=dict(color="#00897b", width=2),
+            marker=dict(color="#FAB715", size=12, line=dict(color="white", width=1.5)),
+            line=dict(color="#FAB715", width=2),
             customdata=agg["Persentase Realisasi"],
             hovertemplate=f"{secondary.replace('REALISASI BELANJA KL (SAKTI)', 'Realisasi')}: %{{y:,.0f}} (%{{customdata:.2f}}%)<extra></extra>"
         ),
@@ -662,6 +662,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
