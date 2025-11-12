@@ -454,12 +454,12 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
             text=f"PERBANDINGAN {primary} TERHADAP {secondary}<br>PERIODE {selected_years[0]} - {selected_years[1]}<br>{title_kl}",
             x=0.5,
             xanchor='center',
-            font=dict(size=12)
+            font=dict(size=14)
         ),
         xaxis_title="Tahun",
         template="plotly_white",
         height=500,
-        margin=dict(t=120, b=50, l=50, r=50),  # Add top margin for title space
+        margin=dict(t=130, b=30, l=30, r=30),  # Add top margin for title space
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         hovermode="x unified"
     )
@@ -662,6 +662,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
