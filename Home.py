@@ -436,7 +436,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     fig.update_traces(
         selector=dict(type="scatter"),
         text=scatter_texts,
-        textposition="top center",
+        textposition="bottom center",
         textfont=dict(size=10),
         mode="markers+lines+text"
     )
@@ -592,7 +592,7 @@ def main():
         with colA:
             # Primary metric selector
             primary = st.selectbox(
-                "Pilih metric pertama",
+                "Pilih metrik pertama",
                 numeric_cols,
                 index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
                 key="primary_metric",
@@ -602,7 +602,7 @@ def main():
         with colB:
             # Secondary metric selector
             secondary = st.selectbox(
-                "Pilih metric kedua",
+                "Pilih metrik kedua",
                 numeric_cols,
                 index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
                 key="secondary_metric",
@@ -653,6 +653,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
