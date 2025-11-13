@@ -489,8 +489,12 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
     
     return fig
 
-def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
+def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, child_col):
     """Create Sankey diagram for budget flow visualization"""
+    
+    # Filter by K/L first
+    if selected_kl != "Semua":
+        df = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl].copy()
     
     # Filter by year
     df_year = df[df["Tahun"] == int(selected_year)].copy()
@@ -659,17 +663,21 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     total_nodes = 1 + len(parent_list) + len(child_list)
     chart_height = max(500, total_nodes * 30)
     
+    # Update the title section
+    kl_text = f"<br>{selected_kl}" if selected_kl != "Semua" else ""
+    
     fig.update_layout(
         title=dict(
-            text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}",
+            text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}<br>{kl_text}",
             x=0.5,
             xanchor='center',
             font=dict(size=14)
         ),
         font=dict(size=9), 
         height=chart_height,
-        margin=dict(l=20, r=20, t=100, b=20)
+        margin=dict(l=20, r=20, t=130, b=20)
     )
+    
     fig.update_traces(
         textfont_color="#005FAC",
         textfont_shadow=False,
@@ -888,9 +896,9 @@ def main():
                 )
             
             # Create and display Sankey chart
-            fig3 = create_sankey_chart(df, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
+            fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
             st.plotly_chart(fig3, use_container_width=True)
-    
+            
     # Column 4: Placeholder chart
     with col4:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
@@ -915,6 +923,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
