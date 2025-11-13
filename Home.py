@@ -273,16 +273,16 @@ st.markdown("""
 
 /* Style for columns containing charts */
 [data-testid="column"] > div {
-    background: black;
+    background: white;
     border-radius: var(--border-radius);
     padding: 1.5rem;
     box-shadow: var(--shadow-1);
-    border: 10px solid #e8eaed;
+    border: 1px solid #e8eaed;
 }
 
 /* Chart container */
 .chart-container {
-    background: var(--surface);
+    background: white;
     border-radius: var(--border-radius);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
@@ -778,8 +778,8 @@ def main():
     
     # Column 1: Year slider, metric selectors, and chart
     # Use st.container
-    with st.container(border=True):
-        with col1:      
+    with col1:
+        with st.container():     
             # Row 1: Year range slider (full width of column)
             year_options = sorted(df_filtered["Tahun"].dropna().unique())
             if len(year_options) >= 2:
@@ -915,6 +915,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
