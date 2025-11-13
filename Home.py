@@ -659,11 +659,6 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     )
     fig = go.Figure(sankey)
     
-    # Calculate dynamic height based on number of nodes
-    total_nodes = 1 + len(parent_list) + len(child_list)
-    chart_height = max(500, total_nodes * 30)
-    
-    # Update the title section
     kl_text = f"<br>{selected_kl}" if selected_kl != "Semua" else ""
     
     fig.update_layout(
@@ -671,10 +666,10 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
             text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}{kl_text}",
             x=0.5,
             xanchor='center',
-            font=dict(size=14)
+            font=dict(size=10)
         ),
         font=dict(size=9), 
-        height=chart_height,
+        height=500,
         margin=dict(l=20, r=20, t=130, b=20)
     )
     
@@ -923,6 +918,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
