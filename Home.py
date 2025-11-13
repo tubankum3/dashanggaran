@@ -896,7 +896,8 @@ def main():
             
             # Create and display Sankey chart
             fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
-            st.plotly_chart(fig3, use_container_width=True, height=500)
+            with st.container(height=500):
+                st.plotly_chart(fig3, use_container_width=True)
             
     # Column 4: Placeholder chart
     with col4:
@@ -922,6 +923,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
