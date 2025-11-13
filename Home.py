@@ -287,7 +287,7 @@ st.markdown("""
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--shadow-1);
-    border: 1px solid #e8eaed;
+    border: 0px solid #e8eaed;
 }
 
 /* Data table */
@@ -660,10 +660,9 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     fig = go.Figure(sankey)
     
     kl_text = f"<br>{selected_kl}" if selected_kl != "Semua" else ""
-    
-    # Calculate dynamic height based on number of nodes
-    total_nodes = 1 + len(parent_list) + len(child_list)
-    chart_height = max(500, total_nodes * 50)
+
+    total_nodes = 1 + len(parent_list) + len(child_list) if parent_sankey in categorical_cols and child_sankey in categorical_cols else 10
+    container_height = min(800, max(500, total_nodes * 25))  # Between 500-800px
     
     fig.update_layout(
         title=dict(
@@ -896,7 +895,8 @@ def main():
             
             # Create and display Sankey chart
             fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
-            with st.container(height=600):
+            
+            with st.container(height=container_height):
                 st.plotly_chart(fig3, use_container_width=True)
             
     # Column 4: Placeholder chart
@@ -923,6 +923,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
