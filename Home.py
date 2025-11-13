@@ -778,7 +778,7 @@ def main():
     
     # Column 1: Year slider, metric selectors, and chart
     # Use st.container
-    with st.container():
+    with st.container(border=True):
         with col1:      
             # Row 1: Year range slider (full width of column)
             year_options = sorted(df_filtered["Tahun"].dropna().unique())
@@ -915,6 +915,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
