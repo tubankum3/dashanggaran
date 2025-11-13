@@ -607,7 +607,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
         if n == 1:
             return [0.5]  # Center single node
         # Evenly distribute nodes with padding at top and bottom
-        return [0.1 + (0.8 * i / (n - 1)) for i in range(n)]
+        return [0.1 + (0.5 * i / (n - 1)) for i in range(n)]
     
     # Build node positions
     node_x = []
@@ -615,7 +615,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     
     # Total node
     node_x.append(0.01)
-    node_y.append(0.1)
+    node_y.append(0.5)
     
     # Parent nodes
     parent_y_positions = distribute_y(len(parent_list))
@@ -661,8 +661,8 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     
     kl_text = f"<br>{selected_kl}" if selected_kl != "Semua" else ""
 
-    total_nodes = 1 + len(parent_list) + len(child_list) if parent_sankey in categorical_cols and child_sankey in categorical_cols else 10
-    container_height = min(800, max(500, total_nodes * 25))  # Between 500-800px
+    total_nodes = 1 + len(parent_list) + len(child_list)
+    chart_height = max(500, total_nodes * 35)
     
     fig.update_layout(
         title=dict(
@@ -838,66 +838,66 @@ def main():
     
     # Column 3: Sankey Chart with selectors
     with col3:       
-        # Get categorical columns for parent/child selection
-        categorical_cols = df_filtered.select_dtypes(include=['object']).columns.tolist()
-        # Remove some columns that shouldn't be used
-        exclude_cols = ['KEMENTERIAN/LEMBAGA', 'Tahun']
-        categorical_cols = [col for col in categorical_cols if col not in exclude_cols]
-
-        # Use st.container
-        with st.container():
-            # Row 1: Year and Metric selectors
-            colC, colD = st.columns(2)
-            with colC:
-                # Year selector
-                year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
-                if year_options_sankey:
-                    selected_year_sankey = st.selectbox(
-                        "Tahun",
-                        year_options_sankey,
-                        key="year_sankey",
-                        label_visibility="visible"
-                    )
-                else:
-                    selected_year_sankey = 2025
-            
-            with colD:
-                # Metric selector
-                selected_metric_sankey = st.selectbox(
-                    "Metrik",
-                    numeric_cols,
-                    index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
-                    key="metric_sankey",
+        # Row 1: Year and Metric selectors
+        colC, colD = st.columns(2)
+        with colC:
+            year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
+            if year_options_sankey:
+                selected_year_sankey = st.selectbox(
+                    "Tahun",
+                    year_options_sankey,
+                    key="year_sankey",
                     label_visibility="visible"
                 )
+            else:
+                selected_year_sankey = 2023
+        
+        with colD:
+            selected_metric_sankey = st.selectbox(
+                "Metrik",
+                numeric_cols,
+                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                key="metric_sankey",
+                label_visibility="visible"
+            )
             
-            # Row 2: Parent and Child selectors
-            colE, colF = st.columns(2)
-            with colE:
-                # Parent selector
-                parent_sankey = st.selectbox(
-                    "Parent",
-                    categorical_cols,
-                    index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
-                    key="parent_sankey",
-                    label_visibility="visible"
-                )
+        # Row 2: Parent and Child selectors
+        colE, colF = st.columns(2)
+        with colE:
+            parent_sankey = st.selectbox(
+                "Parent",
+                categorical_cols,
+                index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
+                key="parent_sankey",
+                label_visibility="visible"
+            )
+        
+        with colF:
+            child_sankey = st.selectbox(
+                "Child",
+                categorical_cols,
+                index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
+                key="child_sankey",
+                label_visibility="visible"
+            )
             
-            with colF:
-                # Child selector
-                child_sankey = st.selectbox(
-                    "Child",
-                    categorical_cols,
-                    index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
-                    key="child_sankey",
-                    label_visibility="visible"
-                )
+        # NOW calculate dynamic container height from data
+        df_temp = df[df["Tahun"] == int(selected_year_sankey)].copy()
+        if selected_kl != "Semua":
+            df_temp = df_temp[df_temp["KEMENTERIAN/LEMBAGA"] == selected_kl]
             
-            # Create and display Sankey chart
-            fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
+        num_parents = df_temp[parent_sankey].nunique() if parent_sankey in df_temp.columns else 0
+        num_children = df_temp[child_sankey].nunique() if child_sankey in df_temp.columns else 0
+        total_nodes = 1 + num_parents + num_children
             
-            with st.container(height=container_height):
-                st.plotly_chart(fig3, use_container_width=True)
+        container_height = min(800, max(500, total_nodes * 25))  # Dynamic height, capped at 800px
+            
+        # Create and display Sankey chart
+        fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
+            
+        # Display in scrollable container with dynamic height
+        with st.container(height=container_height):
+            st.plotly_chart(fig3, use_container_width=True)
             
     # Column 4: Placeholder chart
     with col4:
@@ -923,6 +923,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
