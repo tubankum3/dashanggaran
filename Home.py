@@ -599,15 +599,59 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
         else:
             node_hover_texts.append(f"<b>{label}</b><br>{format_rupiah(value)}<br>{percentage:.1f}% dari {metric}")
     
-    # Helper function to distribute nodes vertically
+    # Helper function to distribute nodes vertically centered at 0.5
     def distribute_y(n):
-        """Distribute n nodes evenly in y-axis from 0.1 to 0.9"""
+        """Distribute n nodes symmetrically around center (0.5)"""
         if n == 0:
             return []
         if n == 1:
-            return [0.5]  # Center single node
-        # Evenly distribute nodes with padding at top and bottom
-        return [(0.5 * i / (n - 1)) for i in range(n)]
+            return [0.5]  # Single node at center
+        
+        # Create gap around center for visual separation
+        gap = 0.02
+        
+        if n % 2 == 0:  # Even number of nodes
+            half = n // 2
+            positions = []
+            
+            # Bottom half: from 0.1 to (0.5 - gap)
+            bottom_range = (0.5 - gap) - 0.1
+            if half > 1:
+                positions += [0.1 + bottom_range * i / (half - 1) for i in range(half)]
+            else:
+                positions.append(0.5 - gap - bottom_range / 2)
+            
+            # Top half: from (0.5 + gap) to 0.9
+            top_range = 0.9 - (0.5 + gap)
+            if half > 1:
+                positions += [0.5 + gap + top_range * i / (half - 1) for i in range(half)]
+            else:
+                positions.append(0.5 + gap + top_range / 2)
+                
+        else:  # Odd number of nodes
+            half = n // 2
+            positions = []
+            
+            # Bottom half
+            if half > 0:
+                bottom_range = (0.5 - gap) - 0.1
+                if half > 1:
+                    positions += [0.1 + bottom_range * i / (half - 1) for i in range(half)]
+                else:
+                    positions.append(0.3)
+            
+            # Center node at 0.5
+            positions.append(0.5)
+            
+            # Top half
+            if half > 0:
+                top_range = 0.9 - (0.5 + gap)
+                if half > 1:
+                    positions += [0.5 + gap + top_range * i / (half - 1) for i in range(half)]
+                else:
+                    positions.append(0.7)
+        
+        return positions
     
     # Build node positions
     node_x = []
@@ -900,7 +944,7 @@ def main():
         # Create and display Sankey chart
         fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
         
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True, height=550)
             
     # Column 4: Placeholder chart
     with col4:
@@ -926,6 +970,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
