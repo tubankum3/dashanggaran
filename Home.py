@@ -668,7 +668,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     
     fig.update_layout(
         title=dict(
-            text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}<br>{kl_text}",
+            text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}{kl_text}",
             x=0.5,
             xanchor='center',
             font=dict(size=14)
@@ -923,6 +923,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
