@@ -607,7 +607,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
         if n == 1:
             return [0.5]  # Center single node
         # Evenly distribute nodes with padding at top and bottom
-        return [0.1 + (0.5 * i / (n - 1)) for i in range(n)]
+        return [(0.5 * i / (n - 1)) for i in range(n)]
     
     # Build node positions
     node_x = []
@@ -926,6 +926,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
