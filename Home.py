@@ -273,7 +273,7 @@ st.markdown("""
 
 /* Style for columns containing charts */
 [data-testid="column"] > div {
-    background: var(--surface);
+    background: white;
     border-radius: var(--border-radius);
     padding: 1.5rem;
     box-shadow: var(--shadow-1);
@@ -915,6 +915,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
