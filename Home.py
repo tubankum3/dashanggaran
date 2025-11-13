@@ -271,6 +271,15 @@ st.markdown("""
     }
 }
 
+/* Style for columns containing charts */
+[data-testid="column"] > div {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-1);
+    border: 1px solid #e8eaed;
+}
+
 /* Chart container */
 .chart-container {
     background: var(--surface);
@@ -652,10 +661,10 @@ def create_sankey_chart(df, selected_year, metric, parent_col, child_col):
     
     fig.update_layout(
         title=dict(
-            text=f"ALOKASI {metric}<br>{parent_col} → {child_col}<br>TAHUN {selected_year}",
+            text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}",
             x=0.5,
             xanchor='center',
-            font=dict(size=10)
+            font=dict(size=14)
         ),
         font=dict(size=9), 
         height=chart_height,
@@ -768,47 +777,49 @@ def main():
     col1, col2 = st.columns(2)
     
     # Column 1: Year slider, metric selectors, and chart
-    with col1:      
-        # Row 1: Year range slider (full width of column)
-        year_options = sorted(df_filtered["Tahun"].dropna().unique())
-        if len(year_options) >= 2:
-            selected_years = st.slider(
-                "Rentang Tahun",
-                min_value=int(min(year_options)),
-                max_value=int(max(year_options)),
-                value=(int(min(year_options)), int(max(year_options))),
-                step=1,
-                key="year_range_main"
-            )
-        else:
-            st.info("Hanya satu tahun tersedia dalam data")
-            selected_years = (int(year_options[0]), int(year_options[0]))
-        
-        # Row 2: Two columns for metric selection
-        colA, colB = st.columns(2)
-        with colA:
-            # Primary metric selector
-            primary = st.selectbox(
-                "Pilih metrik pertama",
-                numeric_cols,
-                index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
-                key="primary_metric",
-                label_visibility="visible"
-            )
-        
-        with colB:
-            # Secondary metric selector
-            secondary = st.selectbox(
-                "Pilih metrik kedua",
-                numeric_cols,
-                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
-                key="secondary_metric",
-                label_visibility="visible"
-            )
-        
-        # Row 3: Chart
-        fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
-        st.plotly_chart(fig1, use_container_width=True)
+    # Use st.container
+    with st.container():
+        with col1:      
+            # Row 1: Year range slider (full width of column)
+            year_options = sorted(df_filtered["Tahun"].dropna().unique())
+            if len(year_options) >= 2:
+                selected_years = st.slider(
+                    "Rentang Tahun",
+                    min_value=int(min(year_options)),
+                    max_value=int(max(year_options)),
+                    value=(int(min(year_options)), int(max(year_options))),
+                    step=1,
+                    key="year_range_main"
+                )
+            else:
+                st.info("Hanya satu tahun tersedia dalam data")
+                selected_years = (int(year_options[0]), int(year_options[0]))
+            
+            # Row 2: Two columns for metric selection
+            colA, colB = st.columns(2)
+            with colA:
+                # Primary metric selector
+                primary = st.selectbox(
+                    "Pilih metrik pertama",
+                    numeric_cols,
+                    index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
+                    key="primary_metric",
+                    label_visibility="visible"
+                )
+            
+            with colB:
+                # Secondary metric selector
+                secondary = st.selectbox(
+                    "Pilih metrik kedua",
+                    numeric_cols,
+                    index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                    key="secondary_metric",
+                    label_visibility="visible"
+                )
+            
+            # Row 3: Chart
+            fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
+            st.plotly_chart(fig1, use_container_width=True)
     
     # Column 2: Placeholder chart
     with col2:
@@ -820,66 +831,65 @@ def main():
     col3, col4 = st.columns(2)
     
     # Column 3: Sankey Chart with selectors
-    with col3:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        
+    with col3:       
         # Get categorical columns for parent/child selection
         categorical_cols = df_filtered.select_dtypes(include=['object']).columns.tolist()
         # Remove some columns that shouldn't be used
         exclude_cols = ['KEMENTERIAN/LEMBAGA', 'Tahun']
         categorical_cols = [col for col in categorical_cols if col not in exclude_cols]
-        
-        # Row 1: Year and Metric selectors
-        colC, colD = st.columns(2)
-        with colC:
-            # Year selector
-            year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
-            if year_options_sankey:
-                selected_year_sankey = st.selectbox(
-                    "Tahun",
-                    year_options_sankey,
-                    key="year_sankey",
+
+        # Use st.container
+        with st.container():
+            # Row 1: Year and Metric selectors
+            colC, colD = st.columns(2)
+            with colC:
+                # Year selector
+                year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
+                if year_options_sankey:
+                    selected_year_sankey = st.selectbox(
+                        "Tahun",
+                        year_options_sankey,
+                        key="year_sankey",
+                        label_visibility="visible"
+                    )
+                else:
+                    selected_year_sankey = 2025
+            
+            with colD:
+                # Metric selector
+                selected_metric_sankey = st.selectbox(
+                    "Metrik",
+                    numeric_cols,
+                    index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                    key="metric_sankey",
                     label_visibility="visible"
                 )
-            else:
-                selected_year_sankey = 2025
-        
-        with colD:
-            # Metric selector
-            selected_metric_sankey = st.selectbox(
-                "Metrik",
-                numeric_cols,
-                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
-                key="metric_sankey",
-                label_visibility="visible"
-            )
-        
-        # Row 2: Parent and Child selectors
-        colE, colF = st.columns(2)
-        with colE:
-            # Parent selector
-            parent_sankey = st.selectbox(
-                "Parent",
-                categorical_cols,
-                index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
-                key="parent_sankey",
-                label_visibility="visible"
-            )
-        
-        with colF:
-            # Child selector
-            child_sankey = st.selectbox(
-                "Child",
-                categorical_cols,
-                index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
-                key="child_sankey",
-                label_visibility="visible"
-            )
-        
-        # Create and display Sankey chart
-        fig3 = create_sankey_chart(df, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
-        st.plotly_chart(fig3, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Row 2: Parent and Child selectors
+            colE, colF = st.columns(2)
+            with colE:
+                # Parent selector
+                parent_sankey = st.selectbox(
+                    "Parent",
+                    categorical_cols,
+                    index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
+                    key="parent_sankey",
+                    label_visibility="visible"
+                )
+            
+            with colF:
+                # Child selector
+                child_sankey = st.selectbox(
+                    "Child",
+                    categorical_cols,
+                    index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
+                    key="child_sankey",
+                    label_visibility="visible"
+                )
+            
+            # Create and display Sankey chart
+            fig3 = create_sankey_chart(df, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
+            st.plotly_chart(fig3, use_container_width=True)
     
     # Column 4: Placeholder chart
     with col4:
@@ -905,6 +915,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
