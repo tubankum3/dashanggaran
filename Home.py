@@ -36,7 +36,7 @@ st.markdown("""
     --secondary: #34a853;
     --warning: #f9ab00;
     --error: #ea4335;
-    --surface: #ffffff;
+    --surface: #f6f6f6;
     --background: #f8f9fa;
     --on-surface: #202124;
     --on-primary: #ffffff;
@@ -915,6 +915,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
