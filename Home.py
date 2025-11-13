@@ -26,7 +26,7 @@ st.set_page_config(
 )
 
 # =============================================================================
-# Material Design Styled CSS (keep your existing CSS)
+# Material Design Styled CSS
 # =============================================================================
 st.markdown("""
 <style>
@@ -834,6 +834,7 @@ def main():
     # Column 1: Year slider, metric selectors, and chart
     # Use st.container
     with col1:
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         with st.container():     
             # Row 1: Year range slider (full width of column)
             year_options = sorted(df_filtered["Tahun"].dropna().unique())
@@ -875,6 +876,7 @@ def main():
             # Row 3: Chart
             fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
             st.plotly_chart(fig1, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # Column 2: Placeholder chart
     with col2:
@@ -886,7 +888,8 @@ def main():
     col3, col4 = st.columns(2)
     
     # Column 3: Sankey Chart with selectors
-    with col3:       
+    with col3:
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         # Row 1: Year and Metric selectors
         colC, colD = st.columns(2)
         with colC:
@@ -899,7 +902,7 @@ def main():
                     label_visibility="visible"
                 )
             else:
-                selected_year_sankey = 2023
+                selected_year_sankey = 2025
         
         with colD:
             selected_metric_sankey = st.selectbox(
@@ -946,7 +949,7 @@ def main():
         
         with st.container(height=600, border=False):
             st.plotly_chart(fig3, use_container_width=True)
-            
+        st.markdown('</div>', unsafe_allow_html=True)
     # Column 4: Placeholder chart
     with col4:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
@@ -971,47 +974,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
