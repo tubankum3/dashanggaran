@@ -661,6 +661,10 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
     
     kl_text = f"<br>{selected_kl}" if selected_kl != "Semua" else ""
     
+    # Calculate dynamic height based on number of nodes
+    total_nodes = 1 + len(parent_list) + len(child_list)
+    chart_height = max(500, total_nodes * 30)
+    
     fig.update_layout(
         title=dict(
             text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}{kl_text}",
@@ -892,7 +896,7 @@ def main():
             
             # Create and display Sankey chart
             fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, use_container_width=True, height=500)
             
     # Column 4: Placeholder chart
     with col4:
@@ -918,6 +922,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
