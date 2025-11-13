@@ -772,12 +772,17 @@ def main():
         df_filtered = df.copy()
     else:
         df_filtered = df[df["KEMENTERIAN/LEMBAGA"] == selected_kl]
-    
+
     # Detect numeric columns
     numeric_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns.tolist()
     if "Tahun" in numeric_cols:
         numeric_cols.remove("Tahun")
     
+    # Get categorical columns for parent/child selection
+    categorical_cols = df_filtered.select_dtypes(include=['object']).columns.tolist()
+    # Remove some columns that shouldn't be used
+    exclude_cols = ['KEMENTERIAN/LEMBAGA', 'Tahun']
+    categorical_cols = [col for col in categorical_cols if col not in exclude_cols]
     
     # === Dispay Charts ===
     col1, col2 = st.columns(2)
@@ -923,6 +928,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
