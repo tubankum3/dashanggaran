@@ -672,7 +672,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
             font=dict(size=10)
         ),
         font=dict(size=9), 
-        height=500,
+        height=chart_height,
         margin=dict(l=20, r=20, t=130, b=20)
     )
     
@@ -899,10 +899,8 @@ def main():
             
         # Create and display Sankey chart
         fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
-            
-        # Display in scrollable container with dynamic height
-        with st.container(height=container_height):
-            st.plotly_chart(fig3, use_container_width=True)
+        
+        st.plotly_chart(fig3, use_container_width=True)
             
     # Column 4: Placeholder chart
     with col4:
@@ -928,6 +926,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
