@@ -468,7 +468,7 @@ def create_time_series_chart(df, selected_kls, selected_years, primary, secondar
         xaxis_title="Tahun",
         template="plotly_white",
         height=500,
-        margin=dict(t=130, b=30, l=30, r=30),  # Add top margin for title space
+        margin=dict(t=130, b=30, l=30, r=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         hovermode="x unified"
     )
@@ -506,7 +506,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
             text="Tidak ada data untuk ditampilkan",
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False,
-            font=dict(size=14)
+            font=dict(size=9)
         )
         fig.update_layout(height=500)
         return fig
@@ -525,7 +525,7 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
             text="Tidak ada data untuk ditampilkan",
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False,
-            font=dict(size=14)
+            font=dict(size=9)
         )
         fig.update_layout(height=500)
         return fig
@@ -713,9 +713,9 @@ def create_sankey_chart(df, selected_kl, selected_year, metric, parent_col, chil
             text=f"ALOKASI {metric}<br>BERDASARKAN {parent_col} & {child_col}<br>TAHUN {selected_year}{kl_text}",
             x=0.5,
             xanchor='center',
-            font=dict(size=10)
+            font=dict(size=14)
         ),
-        font=dict(size=14), 
+        font=dict(size=9), 
         height=chart_height,
         margin=dict(l=20, r=20, t=130, b=20)
     )
@@ -971,6 +971,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
