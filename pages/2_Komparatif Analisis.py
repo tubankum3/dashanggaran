@@ -543,7 +543,9 @@ def sidebar(df):
 # =============================================================================
 def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
                      color_range="#b2dfdb", color_marker="#1a73e8", sort_order="Top"):
-    """Chart builder showing Pagu ranges, Realisasi markers, and Varian lines with end caps."""
+    """Chart builder showing Pagu ranges, Realisasi markers, and Varian lines with end caps.
+       Y axis is numeric positions so we can draw caps reliably; labels are set as ticktext.
+    """
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
@@ -556,7 +558,6 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
         ].sum()
     ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=ascending).head(top_n).reset_index(drop=True)
 
-
     # Calculate variance and realization percentage
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
     agg["PERSEN_REALISASI"] = (agg["REALISASI BELANJA KL (SAKTI)"] / agg[col_end]) * 100
@@ -565,7 +566,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
     y_pos = np.arange(len(agg))
 
     fig = go.Figure()
-                         
+
     # Range Bar (Awal–Revisi)
     fig.add_trace(go.Bar(
         y=y_pos,
@@ -659,11 +660,13 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
 def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
                                  col_start, col_end, title_suffix,
                                  color_range="#b2dfdb", color_marker="#1a73e8", sort_order="Top"):
-    """Chart showing Pagu ranges, Realisasi markers, and Varian lines by selected category."""
+    """Chart showing Pagu ranges, Realisasi markers, and Varian lines by selected category.
+       Automatically aggregates all K/Ls if none selected. Supports top_n limiting.
+    """
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
-    # If user selected K/Ls, filter by them. Otherwise use all data
+    # If user selected K/Ls, filter by them. Otherwise use all data (aggregate nationally)
     if selected_kls:
         df_filtered = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
     else:
@@ -927,6 +930,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
