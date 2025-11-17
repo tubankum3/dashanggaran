@@ -818,6 +818,7 @@ def main():
                 "dengan Rentang Pagu DIPA Efektif",
                 color_range="#aed581", color_marker="#33691e",
                 sort_order=sort_order
+            )
                 
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
         st.caption("**Persentase Realisasi Belanja *terhadap* Pagu DIPA Revisi Efektif")
@@ -856,7 +857,7 @@ def main():
                 "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
                 "dengan Rentang Pagu DIPA Awal Efektif",
                 color_range="#aed581", color_marker="#33691e",
-            sort_order=sort_order
+                sort_order=sort_order
             )
             st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
@@ -896,7 +897,7 @@ def main():
                 "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
                 "dengan Rentang Pagu DIPA Revisi Efektif",
                 color_range="#aed581", color_marker="#33691e",
-            sort_order=sort_order
+                sort_order=sort_order
             )
             st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
@@ -930,6 +931,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
