@@ -496,20 +496,29 @@ def header(selected_year: str | None = None, selected_metric: str | None = None,
         <h1 class="dashboard-title">Analisis Komparasi Realisasi vs Pagu DIPA</h1>
     </div>
     """, unsafe_allow_html=True)
-    
+
 def sidebar(df):
     with st.sidebar:
         years = sorted(df["Tahun"].astype(int).unique())
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", options=years, index=default_year_index)
         
+        # Add Top/Bottom selector
+        sort_order = st.radio(
+            "Tampilkan Data",
+            options=["Top", "Bottom"],
+            index=0,
+            horizontal=True,
+            help="Top: Data tertinggi | Bottom: Data terendah"
+        )
+        
         top_n = st.number_input(
-            "Tampilkan Top-N Data",
+            f"Tampilkan {sort_order}-N Data",
             min_value=1,
             max_value=50,
             value=10,
             step=1,
-            help="Jumlah Data yang ditampilkan pada grafik berdasarkan Realisasi Belanja."
+            help=f"Jumlah Data {'tertinggi' if sort_order == 'Top' else 'terendah'} yang ditampilkan pada grafik berdasarkan Realisasi Belanja."
         )
         
         category_cols = [col for col in df.select_dtypes(include="object").columns if col != "Tahun"]
@@ -527,24 +536,26 @@ def sidebar(df):
             default=[]
         )
 
-    return selected_year, selected_kls, top_n, selected_metric
-
+    return selected_year, selected_kls, top_n, selected_metric, sort_order
+    
 # =============================================================================
 # Chart
 # =============================================================================
 def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
-                     color_range="#b2dfdb", color_marker="#1a73e8"):
-    """Chart builder showing Pagu ranges, Realisasi markers, and Varian lines with end caps.
-       Y axis is numeric positions so we can draw caps reliably; labels are set as ticktext.
-    """
+                     color_range="#b2dfdb", color_marker="#1a73e8", sort_order="Top"):
+    """Chart builder showing Pagu ranges, Realisasi markers, and Varian lines with end caps."""
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
+    # Determine ascending order based on sort_order
+    ascending = (sort_order == "Bottom")
+    
     agg = (
         df_year.groupby("KEMENTERIAN/LEMBAGA", as_index=False)[
             ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
         ].sum()
-    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).head(top_n).reset_index(drop=True)
+    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=ascending).head(top_n).reset_index(drop=True)
+
 
     # Calculate variance and realization percentage
     agg["VARIANS"] = agg[col_end] - agg["REALISASI BELANJA KL (SAKTI)"]
@@ -554,7 +565,7 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
     y_pos = np.arange(len(agg))
 
     fig = go.Figure()
-
+                         
     # Range Bar (Awal–Revisi)
     fig.add_trace(go.Bar(
         y=y_pos,
@@ -647,25 +658,26 @@ def comparison_chart(df, year, top_n, col_start, col_end, title_suffix,
 
 def comparison_chart_by_category(df, year, selected_kls, selected_metric, top_n,
                                  col_start, col_end, title_suffix,
-                                 color_range="#b2dfdb", color_marker="#1a73e8"):
-    """Chart showing Pagu ranges, Realisasi markers, and Varian lines by selected category.
-       Automatically aggregates all K/Ls if none selected. Supports top_n limiting.
-    """
+                                 color_range="#b2dfdb", color_marker="#1a73e8", sort_order="Top"):
+    """Chart showing Pagu ranges, Realisasi markers, and Varian lines by selected category."""
     df_year = df[df["Tahun"].astype(int) == year].copy()
     df_year = df_year[df_year["KEMENTERIAN/LEMBAGA"] != "999 BAGIAN ANGGARAN BENDAHARA UMUM NEGARA"]
 
-    # If user selected K/Ls, filter by them. Otherwise use all data (aggregate nationally)
+    # If user selected K/Ls, filter by them. Otherwise use all data
     if selected_kls:
         df_filtered = df_year[df_year["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
     else:
         df_filtered = df_year.copy()
+
+    # Determine ascending order based on sort_order
+    ascending = (sort_order == "Bottom")
 
     # Group by selected category
     agg = (
         df_filtered.groupby(selected_metric, as_index=False)[
             ["REALISASI BELANJA KL (SAKTI)", col_start, col_end]
         ].sum()
-    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=False).head(top_n).reset_index(drop=True)
+    ).sort_values("REALISASI BELANJA KL (SAKTI)", ascending=ascending).head(top_n).reset_index(drop=True)
 
     if agg.empty:
         st.warning(f"Tidak ada data untuk kategori '{selected_metric}' di tahun {year}.")
@@ -769,8 +781,8 @@ def main():
         st.error("Data gagal dimuat.")
         return
 
-    # Sidebar selections
-    selected_year, selected_kls, top_n, selected_metric = sidebar(df)
+    # Sidebar selections - now includes sort_order
+    selected_year, selected_kls, top_n, selected_metric, sort_order = sidebar(df)
     
     # Header displayed at the top
     header(str(selected_year), selected_metric, selected_kls)
@@ -791,7 +803,8 @@ def main():
             df, selected_year, top_n,
             "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
             "dengan Rentang Pagu DIPA Awal dan Revisi (Efektif)",
-            color_range="#b2dfdb", color_marker="#00897b"
+            color_range="#b2dfdb", color_marker="#00897b",
+            sort_order=sort_order 
         )
         st.plotly_chart(fig1, use_container_width=True)
                
@@ -800,9 +813,9 @@ def main():
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA AWAL EFEKTIF", "PAGU DIPA REVISI EFEKTIF",
                 "dengan Rentang Pagu DIPA Efektif",
-                color_range="#aed581", color_marker="#33691e"
-            )
-            st.plotly_chart(fig11, use_container_width=True)
+                color_range="#aed581", color_marker="#33691e",
+                sort_order=sort_order
+                
         st.caption("*Rentang merupakan _selisih_ antara Pagu Revisi Efektif dan Pagu Awal Efektif")
         st.caption("**Persentase Realisasi Belanja *terhadap* Pagu DIPA Revisi Efektif")
         st.caption("***Varian adalah Pagu Efektif *dikurangi* Realisasi Belanja")
@@ -823,13 +836,14 @@ def main():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"download_tab1_{selected_year}_{selected_metric}"
             )
-            
+           
     with tab2:
         fig2 = comparison_chart(
             df, selected_year, top_n,
             "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
             "dengan Rentang Pagu DIPA Awal dikurangi Blokir DIPA Awal",
-            color_range="#c5cae9", color_marker="#1a73e8"
+            color_range="#c5cae9", color_marker="#1a73e8",
+            sort_order=sort_order
         )
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -838,7 +852,8 @@ def main():
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA AWAL", "PAGU DIPA AWAL EFEKTIF",
                 "dengan Rentang Pagu DIPA Awal Efektif",
-                color_range="#aed581", color_marker="#33691e"
+                color_range="#aed581", color_marker="#33691e",
+            sort_order=sort_order
             )
             st.plotly_chart(fig22, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Awal")
@@ -867,7 +882,8 @@ def main():
             df, selected_year, top_n,
             "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
             "dengan Rentang Pagu DIPA Revisi dikurangi Blokir DIPA Revisi",
-            color_range="#ffe082", color_marker="#e53935"
+            color_range="#ffe082", color_marker="#e53935",
+            sort_order=sort_order
         )
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -876,7 +892,8 @@ def main():
                 df, selected_year, selected_kls, selected_metric, top_n,
                 "PAGU DIPA REVISI", "PAGU DIPA REVISI EFEKTIF",
                 "dengan Rentang Pagu DIPA Revisi Efektif",
-                color_range="#aed581", color_marker="#33691e"
+                color_range="#aed581", color_marker="#33691e",
+            sort_order=sort_order
             )
             st.plotly_chart(fig33, use_container_width=True)
         st.caption("*Rentang merupakan besaran :red[Blokir] DIPA Revisi")
@@ -910,6 +927,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
