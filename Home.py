@@ -926,13 +926,13 @@ def main():
                 )
             else:
                 st.info("Hanya satu tahun tersedia dalam data")
-                selected_years = (int(year_options[0]), int(year_options[0]))
+                selected_years_ts = (int(year_options[0]), int(year_options[0]))
             
             # Row 2: Two columns for metric selection
             colA, colB = st.columns(2)
             with colA:
                 # Primary metric selector
-                primary = st.selectbox(
+                primary_ts = st.selectbox(
                     "Pilih metrik pertama",
                     numeric_cols,
                     index=numeric_cols.index("PAGU DIPA REVISI EFEKTIF") if "PAGU DIPA REVISI EFEKTIF" in numeric_cols else 0,
@@ -942,7 +942,7 @@ def main():
             
             with colB:
                 # Secondary metric selector
-                secondary = st.selectbox(
+                secondary_ts = st.selectbox(
                     "Pilih metrik kedua",
                     numeric_cols,
                     index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
@@ -951,7 +951,7 @@ def main():
                 )
             
             # Row 3: Chart
-            fig1 = create_time_series_chart(df, selected_kl, selected_years, primary, secondary)
+            fig1 = create_time_series_chart(df, selected_kl, selected_years_ts, primary_ts, secondary_ts)
             st.plotly_chart(fig1, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -1052,6 +1052,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
