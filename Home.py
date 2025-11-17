@@ -916,7 +916,7 @@ def main():
             # Row 1: Year range slider (full width of column)
             year_options = sorted(df_filtered["Tahun"].dropna().unique())
             if len(year_options) >= 2:
-                selected_years = st.slider(
+                selected_years_ts = st.slider(
                     "Rentang Tahun",
                     min_value=int(min(year_options)),
                     max_value=int(max(year_options)),
@@ -1052,6 +1052,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
