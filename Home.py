@@ -955,11 +955,68 @@ def main():
             st.plotly_chart(fig1, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Column 2: Placeholder chart
+    # Column 2: Sankey Chart with selectors
     with col2:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig2 = create_placeholder_chart("Grafik 2", "line")
-        st.plotly_chart(fig2, use_container_width=True)
+        # Row 1: Year and Metric selectors
+        colC, colD = st.columns(2)
+        with colC:
+            year_options_sankey = sorted(df_filtered["Tahun"].dropna().unique())
+            if year_options_sankey:
+                selected_year_sankey = st.selectbox(
+                    "Tahun",
+                    year_options_sankey,
+                    key="year_sankey",
+                    label_visibility="visible"
+                )
+            else:
+                selected_year_sankey = 2025
+        
+        with colD:
+            selected_metric_sankey = st.selectbox(
+                "Metrik",
+                numeric_cols,
+                index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+                key="metric_sankey",
+                label_visibility="visible"
+            )
+            
+        # Row 2: Parent and Child selectors
+        colE, colF = st.columns(2)
+        with colE:
+            parent_sankey = st.selectbox(
+                "Parent",
+                categorical_cols,
+                index=categorical_cols.index("JENIS BELANJA") if "JENIS BELANJA" in categorical_cols else 0,
+                key="parent_sankey",
+                label_visibility="visible"
+            )
+        
+        with colF:
+            child_sankey = st.selectbox(
+                "Child",
+                categorical_cols,
+                index=categorical_cols.index("FUNGSI") if "FUNGSI" in categorical_cols else 0,
+                key="child_sankey",
+                label_visibility="visible"
+            )
+            
+        # NOW calculate dynamic container height from data
+        df_temp = df[df["Tahun"] == int(selected_year_sankey)].copy()
+        if selected_kl != "Semua":
+            df_temp = df_temp[df_temp["KEMENTERIAN/LEMBAGA"] == selected_kl]
+            
+        num_parents = df_temp[parent_sankey].nunique() if parent_sankey in df_temp.columns else 0
+        num_children = df_temp[child_sankey].nunique() if child_sankey in df_temp.columns else 0
+        total_nodes = 1 + num_parents + num_children
+            
+        container_height = min(800, max(500, total_nodes * 25))  # Dynamic height, capped at 800px
+            
+        # Create and display Sankey chart
+        fig3 = create_sankey_chart(df, selected_kl, selected_year_sankey, selected_metric_sankey, parent_sankey, child_sankey)
+        
+        with st.container(height=600, border=False):
+            st.plotly_chart(fig3, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     col3, col4 = st.columns(2)
@@ -1027,6 +1084,7 @@ def main():
         with st.container(height=600, border=False):
             st.plotly_chart(fig3, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
+        
     # Column 4: Placeholder chart
     with col4:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
@@ -1051,4 +1109,5 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
