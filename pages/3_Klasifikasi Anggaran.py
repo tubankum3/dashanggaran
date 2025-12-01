@@ -421,22 +421,19 @@ def rupiah_separator(x):
         return x
     return f"Rp {x:,.0f}".replace(",", ".")
     
-def aggregate_level(df, group_cols, metric, top_n=None, sort_order="Top"):
+def aggregate_level(df, group_cols, metric, top_n=None):
+    """Aggregate data by grouping columns and return top N"""
     group_cols = [c for c in group_cols if c in df.columns]
     if not group_cols:
         return pd.DataFrame()
     agg = df.groupby(group_cols, as_index=False)[metric].sum()
     agg = agg.dropna(subset=[group_cols[-1]])
     if top_n:
-        if sort_order == "Top":
-            sample = agg.nlargest(top_n, metric)
-        else:
-            sample = agg.nsmallest(top_n, metric)
-        agg = agg[agg[group_cols[-1]].isin(sample[group_cols[-1]])]
+        top = agg.nlargest(top_n, metric)
+        agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
     return agg
 
-def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None, sort_order="Top"):
-
+def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
     """
     Create horizontal bar chart with:
     - X-axis: numeric/continuous float metric values (Rupiah)
@@ -466,8 +463,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
     
     # Sort ascending by metric
-    ascending = True if sort_order == "Bottom" else False
-    df_plot = df_plot.sort_values(metric, ascending=ascending).reset_index(drop=True)
+    df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
     
     # Wrap long y-axis labels (wrap at spaces)
     import textwrap
@@ -646,23 +642,7 @@ def sidebar(df):
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
 
-        # Add Top/Bottom selector
-        sort_order = st.radio(
-            "Tampilkan Data",
-            options=["Top", "Bottom"],
-            index=0,
-            horizontal=True,
-            help="Top: Data tertinggi | Bottom: Data terendah"
-        )
-        
-        top_n = st.number_input(
-            f"Tampilkan {sort_order}-N Data",
-            min_value=1,
-            max_value=500,
-            value=11,
-            step=1,
-            help=f"Jumlah Data {'tertinggi' if sort_order == 'Top' else 'terendah'} yang ditampilkan pada grafik berdasarkan Metrik yang dipilih."
-        )
+        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=11, step=1)
 
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
@@ -682,13 +662,12 @@ def sidebar(df):
         if "Semua" in selected_kls:
             selected_kls = []
 
-    return selected_year, selected_kls, top_n, selected_metric, sort_order
+    return selected_year, selected_kls, top_n, selected_metric
 
 # =============================================================================
 # Drill-down UI
 # =============================================================================
-def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order="Top"):
-
+def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n):
     """
     Main drill-down interface with breadcrumb navigation and interactive chart
     
@@ -764,7 +743,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                 df_view = df_view[df_view[anc_row] == anc_val]
 
         # === Aggregate data for current level ===
-        agg = aggregate_level(df_view, [view_row], selected_metric, top_n, sort_order=sort_order)
+        agg = aggregate_level(df_view, [view_row], selected_metric, top_n)
         
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
@@ -772,8 +751,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
 
         # === Create and display chart ===
         title = f"TOP {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
-        agg_df = aggregate_level(df, ["KEMENTERIAN/LEMBAGA"], selected_metric, top_n=top_n, sort_order=sort_order)
-        fig = create_bar_chart(agg_df, selected_metric, view_row, title=title, max_height=600, sort_order=sort_order)
+        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600)
 
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
@@ -866,7 +844,7 @@ def main():
         st.error("Kolom 'Tahun' atau 'KEMENTERIAN/LEMBAGA' tidak ditemukan.")
         return
 
-    selected_year, selected_kls, top_n, selected_metric, sort_order = sidebar(df)
+    selected_year, selected_kls, top_n, selected_metric = sidebar(df)
     header(selected_year, selected_metric, selected_kls)
 
     # Filter base data by year + K/L
@@ -881,7 +859,7 @@ def main():
         return
 
     # Run the drill-down interface
-    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order=sort_order)
+    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n)
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
@@ -908,13 +886,6 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
 
 
 
