@@ -642,7 +642,23 @@ def sidebar(df):
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
 
-        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=11, step=1)
+        # Add Top/Bottom selector
+        sort_order = st.radio(
+            "Tampilkan Data",
+            options=["Top", "Bottom"],
+            index=0,
+            horizontal=True,
+            help="Top: Data tertinggi | Bottom: Data terendah"
+        )
+        
+        top_n = st.number_input(
+            f"Tampilkan {sort_order}-N Data",
+            min_value=1,
+            max_value=500,
+            value=11,
+            step=1,
+            help=f"Jumlah Data {'tertinggi' if sort_order == 'Top' else 'terendah'} yang ditampilkan pada grafik berdasarkan Metrik yang dipilih."
+        )
 
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
@@ -886,6 +902,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
