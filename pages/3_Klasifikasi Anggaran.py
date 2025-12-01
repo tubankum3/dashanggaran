@@ -772,7 +772,8 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
 
         # === Create and display chart ===
         title = f"TOP {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
-        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600, sort_order=sort_order)
+        agg_df = aggregate_level(df, ["KEMENTERIAN/LEMBAGA"], selected_metric, top_n=top_n, sort_order=sort_order)
+        fig = create_bar_chart(agg_df, selected_metric, view_row, title=title, max_height=600, sort_order=sort_order)
 
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
@@ -907,6 +908,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
