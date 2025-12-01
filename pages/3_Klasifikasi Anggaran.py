@@ -764,7 +764,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
                 df_view = df_view[df_view[anc_row] == anc_val]
 
         # === Aggregate data for current level ===
-        aagg = aggregate_level(df_view, [view_row], selected_metric, top_n, sort_order=sort_order)
+        agg = aggregate_level(df_view, [view_row], selected_metric, top_n, sort_order=sort_order)
         
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
@@ -908,6 +908,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
