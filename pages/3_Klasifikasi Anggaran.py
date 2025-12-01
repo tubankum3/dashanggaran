@@ -422,22 +422,17 @@ def rupiah_separator(x):
     return f"Rp {x:,.0f}".replace(",", ".")
     
 def aggregate_level(df, group_cols, metric, top_n=None, sort_order="Top"):
-    """Aggregate data by grouping columns and return top/bottom N"""
     group_cols = [c for c in group_cols if c in df.columns]
     if not group_cols:
         return pd.DataFrame()
-
     agg = df.groupby(group_cols, as_index=False)[metric].sum()
     agg = agg.dropna(subset=[group_cols[-1]])
-
     if top_n:
         if sort_order == "Top":
             sample = agg.nlargest(top_n, metric)
-        else:  # Bottom
+        else:
             sample = agg.nsmallest(top_n, metric)
-
         agg = agg[agg[group_cols[-1]].isin(sample[group_cols[-1]])]
-
     return agg
 
 def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None, sort_order="Top"):
@@ -885,7 +880,7 @@ def main():
         return
 
     # Run the drill-down interface
-    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n)
+    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order=sort_order)
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
@@ -912,6 +907,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
