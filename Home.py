@@ -1019,21 +1019,21 @@ def main():
             st.plotly_chart(fig3, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    col3, col4 = st.columns(2)
+    # col3, col4 = st.columns(2)
     
-    # Column 3: Placeholder chart
-    with col3:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig4 = create_placeholder_chart("Grafik 3", "bar")
-        st.plotly_chart(fig4, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # # Column 3: Placeholder chart
+    # with col3:
+    #     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    #     fig4 = create_placeholder_chart("Grafik 3", "bar")
+    #     st.plotly_chart(fig4, use_container_width=True)
+    #     st.markdown('</div>', unsafe_allow_html=True)
         
-    # Column 4: Placeholder chart
-    with col4:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig4 = create_placeholder_chart("Grafik 4", "bar")
-        st.plotly_chart(fig4, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # # Column 4: Placeholder chart
+    # with col4:
+    #     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    #     fig4 = create_placeholder_chart("Grafik 4", "bar")
+    #     st.plotly_chart(fig4, use_container_width=True)
+    #     st.markdown('</div>', unsafe_allow_html=True)
     
     # --- Footer ---
     st.markdown("---")
@@ -1052,6 +1052,7 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
