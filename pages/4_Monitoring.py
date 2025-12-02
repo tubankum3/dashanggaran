@@ -738,7 +738,7 @@ class SidebarController:
             min_value=self.config.date_start,
             max_value=self.config.date_end,
             key=f"{key_prefix}primary_date",
-            help="Pilih tanggal update data"
+            help="Tanggal Update Data Tersedia:.join(f"- {d}" for d in AVAILABLE_DATES)"
         )
         primary_date = primary_dt.strftime("%Y-%m-%d")
         
@@ -784,9 +784,9 @@ class SidebarController:
                 unsafe_allow_html=True
             )
         
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
-        st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
+        # st.sidebar.markdown("---")
+        # st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
+        # st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
         
         return (
             primary_date, 
@@ -1214,5 +1214,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
