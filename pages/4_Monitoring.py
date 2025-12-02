@@ -1,3 +1,10 @@
+# =============================================================================
+# Monitoring Anggaran - Revised Version v2
+# Changes:
+# 1. Ringkasan Perbandingan moved to main area (replaces metrics row)
+# 2. Removed tab1 (Agregasi Data) - only Perbandingan tab remains
+# 3. When no date comparison: show numeric columns comparison if > 1 selected
+# =============================================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -534,13 +541,6 @@ def format_dataframe_for_display(df: pd.DataFrame, numeric_cols: List[str]) -> p
 def filter_dataframe(df: pd.DataFrame, filters: Dict[str, List]) -> pd.DataFrame:
     """
     Filter dataframe based on selected filter values.
-    
-    Args:
-        df: DataFrame to filter
-        filters: Dict with column names as keys and list of selected values as values
-        
-    Returns:
-        Filtered DataFrame
     """
     if df.empty:
         return df
@@ -549,7 +549,6 @@ def filter_dataframe(df: pd.DataFrame, filters: Dict[str, List]) -> pd.DataFrame
     
     for col, values in filters.items():
         if col in filtered_df.columns and values:
-            # Convert column to string for comparison if needed
             filtered_df = filtered_df[filtered_df[col].astype(str).isin([str(v) for v in values])]
     
     return filtered_df
@@ -578,12 +577,6 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
         
         st.markdown(render_availability_badge(primary_available, primary_size), unsafe_allow_html=True)
         
-        with st.expander("🔗 Info URL", expanded=False):
-            url = build_url(primary_dt)
-            st.code(url, language=None)
-            if primary_available:
-                st.success(f"✓ File size: {format_file_size(primary_size)}")
-    
     st.sidebar.markdown("---")
     
     enable_comparison = st.sidebar.checkbox(
@@ -635,7 +628,6 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
         key=f"{key_prefix}group_cols"
     )
     
-    # Minimum 1 selection validation
     if len(group_cols) < 1:
         st.sidebar.error("⚠️ Pilih minimal 1 kolom string")
     
@@ -647,7 +639,6 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
         key=f"{key_prefix}numeric_cols"
     )
     
-    # Minimum 1 selection validation
     if len(numeric_cols) < 1:
         st.sidebar.error("⚠️ Pilih minimal 1 kolom numerik")
     
@@ -667,17 +658,20 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
     return group_cols, numeric_cols, agg_func
 
 
+def render_data_info(df: pd.DataFrame, label: str, key_prefix: str = ""):
+    """Render data info expander in sidebar."""
+    with st.sidebar.expander(f"📋 Info Data - {label}", expanded=False):
+        col1, col2, col3 = st.columns(3)
+        col1.metric("📊 Baris", f"{len(df):,}")
+        col2.metric("📋 Kolom", len(df.columns))
+        if "Tahun" in df.columns:
+            tahun_list = df["Tahun"].dropna().unique()
+            col3.metric("📆 Tahun", ", ".join(map(str, sorted(tahun_list))))
+
+
 def render_comparison_filters(df: pd.DataFrame, group_cols: List[str], key_prefix: str = "") -> Dict[str, List]:
     """
     Render filter selectors for comparison table.
-    
-    Args:
-        df: DataFrame with data
-        group_cols: List of group columns to create filters for
-        key_prefix: Prefix for widget keys
-        
-    Returns:
-        Dict of column -> selected values
     """
     filters = {}
     
@@ -687,32 +681,27 @@ def render_comparison_filters(df: pd.DataFrame, group_cols: List[str], key_prefi
     </div>
     """, unsafe_allow_html=True)
     
-    # Create columns for filters (max 4 per row)
     available_cols = [col for col in group_cols if col in df.columns]
     
     if not available_cols:
         return filters
     
-    # Calculate number of columns per row
     n_filters = len(available_cols)
     cols_per_row = min(n_filters, 4)
     
-    # Create filter widgets
     filter_cols = st.columns(cols_per_row)
     
     for idx, col in enumerate(available_cols):
         col_idx = idx % cols_per_row
         
         with filter_cols[col_idx]:
-            # Get unique values for the column
             unique_values = df[col].dropna().unique().tolist()
             unique_values = sorted([str(v) for v in unique_values])
             
-            # Create multiselect for filter
             selected = st.multiselect(
                 f"Filter: {col}",
                 options=unique_values,
-                default=[],  # No default selection = show all
+                default=[],
                 key=f"{key_prefix}filter_{col}",
                 help=f"Pilih nilai untuk filter {col}. Kosongkan untuk tampilkan semua."
             )
@@ -720,7 +709,6 @@ def render_comparison_filters(df: pd.DataFrame, group_cols: List[str], key_prefi
             if selected:
                 filters[col] = selected
     
-    # Show active filters count
     if filters:
         active_filters = sum(1 for v in filters.values() if v)
         st.caption(f"🔹 {active_filters} filter aktif")
@@ -777,18 +765,10 @@ def main():
     
     st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {format_date_label(parse_date_string(primary_date))}")
     
-    # Metrics row
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📊 Total Baris", f"{len(df_primary):,}")
-    col2.metric("📋 Total Kolom", len(df_primary.columns))
-    col3.metric("📅 Tanggal Data", primary_date)
-    if "Tahun" in df_primary.columns:
-        tahun_list = df_primary["Tahun"].dropna().unique()
-        col4.metric("📆 Tahun Anggaran", ", ".join(map(str, sorted(tahun_list))))
+    # Render Info Data in sidebar for primary data
+    render_data_info(df_primary, format_date_label(parse_date_string(primary_date)), "primary_")
     
-    st.divider()
-    
-    # Validate minimum selections (changed from 2 to 1)
+    # Validate minimum selections
     if len(group_cols) < 1 or len(numeric_cols) < 1:
         st.info("👆 Pilih minimal 1 kolom string dan 1 kolom numerik di sidebar")
         with st.expander("📋 Preview Data Mentah"):
@@ -800,11 +780,12 @@ def main():
     # Format for display with rupiah separator
     agg_primary_display = format_dataframe_for_display(agg_primary, numeric_cols)
     
-    # Comparison mode
+    # =========================================================================
+    # Comparison mode - comparing between dates
+    # =========================================================================
     if enable_comparison and comparison_date and comparison_available:
         if comparison_date == primary_date:
             st.error("⚠️ **Tanggal sama!** Pilih tanggal pembanding yang berbeda dari tanggal utama.")
-            st.markdown(f"### Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
             st.dataframe(agg_primary_display, width="stretch", hide_index=True)
             return
         
@@ -813,6 +794,9 @@ def main():
         
         if not df_comparison.empty:
             st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
+            
+            # Render Info Data in sidebar for comparison data
+            render_data_info(df_comparison, format_date_label(parse_date_string(comparison_date)), "comparison_")
             
             comparison_df = compare_datasets(
                 df_primary, df_comparison,
@@ -824,82 +808,120 @@ def main():
                 st.dataframe(agg_primary_display, width="stretch", hide_index=True)
                 return
             
-            # Tabs
-            tab1, tab2, tab3 = st.tabs([
-                f"📊 Data {format_date_label(parse_date_string(primary_date))}",
-                "🔄 Perbandingan",
-                "📈 Ringkasan"
-            ])
+            # Ringkasan Perbandingan - Show at top
+            st.markdown("### 📈 Ringkasan Perbandingan Antar Tanggal")
             
-            with tab1:
-                st.markdown(f"### Agregasi Data - {format_date_label(parse_date_string(primary_date))}")
-                st.dataframe(agg_primary_display, width="stretch", hide_index=True)
-                csv1 = agg_primary.to_csv(index=False)
-                st.download_button("📥 Download CSV", csv1, f"agregasi_{primary_date}.csv", "text/csv", key="dl1")
+            for col in numeric_cols:
+                if col in df_primary.columns and col in df_comparison.columns:
+                    st.markdown(f"**{col}**")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    
+                    val1 = df_primary[col].sum()
+                    val2 = df_comparison[col].sum()
+                    diff = val2 - val1
+                    pct = (diff / abs(val1) * 100) if val1 != 0 else 0
+                    
+                    c1.metric(format_date_label(parse_date_string(primary_date)), format_rupiah(val1))
+                    c2.metric(format_date_label(parse_date_string(comparison_date)), format_rupiah(val2))
+                    c3.metric("Selisih", format_rupiah(diff), f"{pct:+.2f}%")
             
-            with tab2:
-                st.markdown("### Perbandingan Data")
+            st.divider()
+            
+            # Perbandingan Detail (No tabs - direct display)
+            st.markdown("### 🔄 Perbandingan Detail")
+            st.markdown(f"""
+            <div class="comparison-header">
+                <strong>{format_date_label(parse_date_string(primary_date))}</strong> vs 
+                <strong>{format_date_label(parse_date_string(comparison_date))}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Filter section
+            filters = render_comparison_filters(comparison_df, group_cols, key_prefix="comp_")
+            
+            # Apply filters if any
+            filtered_comparison_df = filter_dataframe(comparison_df, filters)
+            
+            # Show filter result info
+            if filters:
+                st.info(f"Menampilkan **{len(filtered_comparison_df):,}** dari **{len(comparison_df):,}** baris")
+            
+            with st.expander("ℹ️ Keterangan Kolom", expanded=False):
                 st.markdown(f"""
-                <div class="comparison-header">
-                    <strong>{format_date_label(parse_date_string(primary_date))}</strong> vs 
-                    <strong>{format_date_label(parse_date_string(comparison_date))}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Filter section for comparison tab
-                filters = render_comparison_filters(comparison_df, group_cols, key_prefix="comp_")
-                
-                # Apply filters if any
-                filtered_comparison_df = filter_dataframe(comparison_df, filters)
-                
-                # Show filter result info
-                if filters:
-                    st.info(f"Menampilkan **{len(filtered_comparison_df):,}** dari **{len(comparison_df):,}** baris")
-                
-                st.markdown(f"""
-                **Keterangan Kolom:**
                 - `[kolom]_{primary_date}` = Nilai tanggal utama
                 - `[kolom]_{comparison_date}` = Nilai tanggal pembanding
                 - `SELISIH_[kolom]` = Selisih (pembanding - utama)
                 - `PCT_[kolom]` = Persentase perubahan
                 """)
-                
-                # Format comparison dataframe for display
-                comparison_display = format_dataframe_for_display(filtered_comparison_df, numeric_cols)
-                st.dataframe(comparison_display, width="stretch", hide_index=True)
-                
-                # Download button (original unformatted data)
-                csv2 = filtered_comparison_df.to_csv(index=False)
-                st.download_button(
-                    "📥 Download Perbandingan", 
-                    csv2, 
-                    f"perbandingan_{primary_date}_vs_{comparison_date}.csv", 
-                    "text/csv", 
-                    key="dl2"
-                )
             
-            with tab3:
-                st.markdown("### Ringkasan Perbandingan")
-                
-                for col in numeric_cols:
-                    if col in df_primary.columns and col in df_comparison.columns:
-                        st.markdown(f"#### {col}")
-                        
-                        c1, c2, c3 = st.columns(3)
-                        
-                        val1 = df_primary[col].sum()
-                        val2 = df_comparison[col].sum()
-                        diff = val2 - val1
-                        pct = (diff / abs(val1) * 100) if val1 != 0 else 0
-                        
-                        c1.metric(format_date_label(parse_date_string(primary_date)), format_rupiah(val1))
-                        c2.metric(format_date_label(parse_date_string(comparison_date)), format_rupiah(val2))
-                        c3.metric("Selisih", format_rupiah(diff), f"{pct:+.2f}%")
-                        st.divider()
+            # Format comparison dataframe for display
+            comparison_display = format_dataframe_for_display(filtered_comparison_df, numeric_cols)
+            st.dataframe(comparison_display, width="stretch", hide_index=True)
+            
+            # Download button
+            csv2 = filtered_comparison_df.to_csv(index=False)
+            st.download_button(
+                "📥 Download Perbandingan", 
+                csv2, 
+                f"perbandingan_{primary_date}_vs_{comparison_date}.csv", 
+                "text/csv", 
+                key="dl2"
+            )
         else:
             st.dataframe(agg_primary_display, width="stretch", hide_index=True)
+    
+    # =========================================================================
+    # No date comparison mode
+    # =========================================================================
     else:
-        st.markdown(f"### Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
+        # If more than 1 numeric column selected, show comparison between columns
+        if len(numeric_cols) > 1:
+            st.markdown("### 📈 Ringkasan Kolom Numerik")
+            
+            # Create metrics for each numeric column (display in rows of 3)
+            cols_per_row = 3
+            for i in range(0, len(numeric_cols), cols_per_row):
+                chunk = numeric_cols[i:i + cols_per_row]
+                cols = st.columns(len(chunk))
+                
+                for idx, col in enumerate(chunk):
+                    if col in df_primary.columns:
+                        val = df_primary[col].sum()
+                        cols[idx].metric(col, format_rupiah(val))
+            
+            # Show comparison table between numeric columns
+            st.divider()
+            st.markdown("### 📊 Perbandingan Antar Kolom Numerik")
+            
+            # Create summary dataframe for numeric columns comparison
+            summary_data = []
+            for col in numeric_cols:
+                if col in df_primary.columns:
+                    summary_data.append({
+                        'Kolom': col,
+                        'Total': df_primary[col].sum(),
+                        'Rata-rata': df_primary[col].mean(),
+                        'Min': df_primary[col].min(),
+                        'Max': df_primary[col].max(),
+                        'Count': df_primary[col].count()
+                    })
+            
+            if summary_data:
+                summary_df = pd.DataFrame(summary_data)
+                
+                # Format for display
+                summary_display = summary_df.copy()
+                for col in ['Total', 'Rata-rata', 'Min', 'Max']:
+                    summary_display[col] = summary_display[col].apply(rupiah_separator)
+                summary_display['Count'] = summary_display['Count'].apply(lambda x: f"{x:,}")
+                
+                st.dataframe(summary_display, width="stretch", hide_index=True)
+            
+            st.divider()
+        
+        # Always show the aggregated data table
+        st.markdown(f"### 📋 Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
         st.dataframe(agg_primary_display, width="stretch", hide_index=True)
         csv = agg_primary.to_csv(index=False)
         st.download_button("📥 Download CSV", csv, f"agregasi_{primary_date}.csv", "text/csv")
