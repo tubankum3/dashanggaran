@@ -25,7 +25,7 @@ DATE_START = date(2024, 1, 1)    # Earliest available date
 DATE_END = date.today()          # Latest available date
 
 # Date selection mode: 'picker', 'list', or 'both'
-DATE_SELECTION_MODE = 'both'
+DATE_SELECTION_MODE = 'picker'
 
 # If using 'list' mode, define available dates here
 AVAILABLE_DATES = [
@@ -603,3 +603,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
