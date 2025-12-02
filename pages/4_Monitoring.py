@@ -59,21 +59,59 @@ class AppConfig:
     metrics_per_row: int = 3
 
 
-@dataclass(frozen=True)
+@dataclass
 class ColumnConfig:
     """Column definitions for the budget dataset."""
-    STRING_COLUMNS: Tuple[str, ...] = (
+    
+    # Potential columns - actual columns determined from data
+    POTENTIAL_STRING_COLUMNS: Tuple[str, ...] = (
         'KEMENTERIAN/LEMBAGA', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
         'PROGRAM', 'KEGIATAN', 'OUTPUT (KRO)', 'SUB OUTPUT (RO)',
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
-    NUMERIC_COLUMNS: Tuple[str, ...] = (
+    POTENTIAL_NUMERIC_COLUMNS: Tuple[str, ...] = (
         'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI',
         'PAGU DIPA AWAL', 'BLOKIR DIPA AWAL', 'PAGU DIPA AWAL EFEKTIF',
         'PAGU DIPA REVISI EFEKTIF'
     )
+    
+    # Defaults
     DEFAULT_GROUP_COLS: Tuple[str, ...] = ('Tahun', 'KEMENTERIAN/LEMBAGA')
-    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI')
+    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
+    
+    # Actual available columns (set after loading data)
+    string_columns: List[str] = field(default_factory=list)
+    numeric_columns: List[str] = field(default_factory=list)
+    available_years: List[int] = field(default_factory=list)
+    
+    def update_from_dataframe(self, df: pd.DataFrame) -> None:
+        """Update available columns based on actual DataFrame columns."""
+        if df.empty:
+            return
+        
+        # Find string columns that exist in the DataFrame
+        self.string_columns = [
+            col for col in self.POTENTIAL_STRING_COLUMNS 
+            if col in df.columns
+        ]
+        
+        # Find numeric columns that exist in the DataFrame
+        self.numeric_columns = [
+            col for col in self.POTENTIAL_NUMERIC_COLUMNS 
+            if col in df.columns
+        ]
+        
+        # Extract available years
+        if "Tahun" in df.columns:
+            self.available_years = sorted(df["Tahun"].dropna().unique().tolist())
+    
+    def get_available_group_defaults(self) -> List[str]:
+        """Get default group columns that are available in data."""
+        return [col for col in self.DEFAULT_GROUP_COLS if col in self.string_columns]
+    
+    def get_available_numeric_defaults(self) -> List[str]:
+        """Get default numeric columns that are available in data."""
+        return [col for col in self.DEFAULT_NUMERIC_COLS if col in self.numeric_columns]
 
 
 @dataclass
@@ -354,7 +392,20 @@ class DataFrameFormatter:
         )
     
     def _is_percentage_column(self, column_name: str) -> bool:
-        return column_name.startswith('PCT_')
+        return column_name.startswith('%CHG_')
+
+
+class ExcelExporter:
+    """Handles Excel file export."""
+    
+    @staticmethod
+    def to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Data") -> bytes:
+        """Export DataFrame to Excel bytes."""
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        excel_buffer.seek(0)
+        return excel_buffer.getvalue()
 
 
 # =============================================================================
@@ -641,7 +692,7 @@ class DatasetComparator:
             )
             
             comparison[f"%CHG_{col}"] = np.where(
-                comparison[col_primary].fillna(0) != 0,
+                comparison[col_comparison].fillna(0) != 0,
                 (comparison[f"SELISIH_{col}"] / comparison[col_comparison].fillna(0).abs()) * 100,
                 np.nan
             )
@@ -738,7 +789,7 @@ class SidebarController:
             min_value=self.config.date_start,
             max_value=self.config.date_end,
             key=f"{key_prefix}primary_date",
-            help="Tanggal Update Data Tersedia:.join(f"- {d}" for d in AVAILABLE_DATES)"
+            help="Pilih tanggal update data"
         )
         primary_date = primary_dt.strftime("%Y-%m-%d")
         
@@ -784,9 +835,9 @@ class SidebarController:
                 unsafe_allow_html=True
             )
         
-        # st.sidebar.markdown("---")
-        # st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
-        # st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
+        st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
         
         return (
             primary_date, 
@@ -796,25 +847,65 @@ class SidebarController:
             comparison_availability
         )
     
-    def render_aggregation_options(self, key_prefix: str = "") -> Tuple[List[str], List[str], str]:
-        """Render aggregation options in sidebar."""
+    def render_aggregation_options(
+        self, 
+        df: pd.DataFrame,
+        key_prefix: str = ""
+    ) -> Tuple[List[int], List[str], List[str], str]:
+        """Render aggregation options in sidebar including Tahun Anggaran selector."""
         st.sidebar.markdown("### Pilih Kolom Data")
         
+        # Use actual available columns (or fall back to potential if not set)
+        string_options = (
+            self.column_config.string_columns 
+            if self.column_config.string_columns 
+            else list(self.column_config.POTENTIAL_STRING_COLUMNS)
+        )
+        numeric_options = (
+            self.column_config.numeric_columns 
+            if self.column_config.numeric_columns 
+            else list(self.column_config.POTENTIAL_NUMERIC_COLUMNS)
+        )
+        
+        # Get available defaults
+        default_groups = self.column_config.get_available_group_defaults() or string_options[:2]
+        default_numerics = self.column_config.get_available_numeric_defaults() or numeric_options[:1]
+        
+        # Tahun Anggaran selector (before group_cols)
+        available_years = self.column_config.available_years
+        if not available_years and "Tahun" in df.columns:
+            available_years = sorted(df["Tahun"].dropna().unique().tolist())
+        
+        selected_years: List[int] = []
+        if available_years:
+            selected_years = st.sidebar.multiselect(
+                "Tahun Anggaran",
+                options=[int(y) for y in available_years],
+                default=[int(y) for y in available_years],
+                help="Pilih tahun anggaran yang ingin ditampilkan",
+                key=f"{key_prefix}tahun_anggaran"
+            )
+            
+            if not selected_years:
+                st.sidebar.warning("⚠️ Pilih minimal 1 tahun anggaran")
+        
+        # Group columns
         group_cols = st.sidebar.multiselect(
             "Kolom Kategori",
-            options=list(self.column_config.STRING_COLUMNS),
-            default=list(self.column_config.DEFAULT_GROUP_COLS),
+            options=string_options,
+            default=default_groups,
             help="Pilih minimal 1 kolom untuk pengelompokan",
             key=f"{key_prefix}group_cols"
         )
         
         if len(group_cols) < 1:
-            st.sidebar.error("⚠️ Pilih minimal 1 kolom string")
+            st.sidebar.error("⚠️ Pilih minimal 1 kolom kategori")
         
+        # Numeric columns
         numeric_cols = st.sidebar.multiselect(
             "Kolom Numerik",
-            options=list(self.column_config.NUMERIC_COLUMNS),
-            default=list(self.column_config.DEFAULT_NUMERIC_COLS),
+            options=numeric_options,
+            default=default_numerics,
             help="Pilih minimal 1 kolom untuk agregasi",
             key=f"{key_prefix}numeric_cols"
         )
@@ -822,6 +913,7 @@ class SidebarController:
         if len(numeric_cols) < 1:
             st.sidebar.error("⚠️ Pilih minimal 1 kolom numerik")
         
+        # Aggregation function
         agg_func = st.sidebar.selectbox(
             "Fungsi Agregasi",
             options=[f.value for f in AggregationFunction],
@@ -829,7 +921,7 @@ class SidebarController:
             key=f"{key_prefix}agg_func"
         )
         
-        return group_cols, numeric_cols, agg_func
+        return selected_years, group_cols, numeric_cols, agg_func
     
     def render_data_info(self, df: pd.DataFrame, label: str, key_prefix: str = "") -> None:
         """Render data info expander in sidebar."""
@@ -903,6 +995,14 @@ class FilterController:
                 filtered_df = filtered_df[filtered_df[col].astype(str).isin(values)]
         
         return filtered_df
+    
+    @staticmethod
+    def filter_by_years(df: pd.DataFrame, years: List[int]) -> pd.DataFrame:
+        """Filter DataFrame by selected years."""
+        if df.empty or not years or "Tahun" not in df.columns:
+            return df
+        
+        return df[df["Tahun"].isin(years)]
 
 
 # =============================================================================
@@ -932,9 +1032,6 @@ class MonitoringDashboard:
             primary_availability, comparison_availability
         ) = self.sidebar.render_date_selector()
         
-        st.sidebar.divider()
-        group_cols, numeric_cols, agg_func = self.sidebar.render_aggregation_options()
-        
         if not primary_availability.is_available:
             UIComponents.render_data_unavailable_message()
             return
@@ -951,13 +1048,28 @@ class MonitoringDashboard:
         if df_primary.empty:
             return
         
+        # Update column config based on actual data
+        self.column_config.update_from_dataframe(df_primary)
+        
         date_label = Formatter.to_indonesian_date(primary_dt)
         st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {date_label}")
         
         self.sidebar.render_data_info(df_primary, date_label, "primary_")
         
+        st.sidebar.divider()
+        selected_years, group_cols, numeric_cols, agg_func = self.sidebar.render_aggregation_options(
+            df_primary
+        )
+        
+        # Filter by selected years
+        if selected_years:
+            df_primary = FilterController.filter_by_years(df_primary, selected_years)
+            if df_primary.empty:
+                st.warning("⚠️ Tidak ada data untuk tahun yang dipilih")
+                return
+        
         if len(group_cols) < 1 or len(numeric_cols) < 1:
-            st.info("👆 Pilih minimal 1 kolom string dan 1 kolom numerik di sidebar")
+            st.info("👆 Pilih minimal 1 kolom kategori dan 1 kolom numerik di sidebar")
             with st.expander("📋 Preview Data Mentah"):
                 st.dataframe(df_primary.head(100), width="stretch")
             return
@@ -971,7 +1083,8 @@ class MonitoringDashboard:
                 df_primary, primary_date,
                 comparison_date, comparison_availability,
                 group_cols, numeric_cols, agg_func,
-                agg_primary_display, formatter
+                agg_primary_display, formatter,
+                selected_years
             )
         else:
             self._render_single_date_view(
@@ -1008,7 +1121,8 @@ class MonitoringDashboard:
         numeric_cols: List[str],
         agg_func: str,
         agg_primary_display: pd.DataFrame,
-        formatter: DataFrameFormatter
+        formatter: DataFrameFormatter,
+        selected_years: List[int]
     ) -> None:
         """Render the date comparison view."""
         if comparison_date == primary_date:
@@ -1023,6 +1137,10 @@ class MonitoringDashboard:
         if df_comparison.empty:
             st.dataframe(agg_primary_display, width="stretch", hide_index=True)
             return
+        
+        # Filter comparison data by selected years
+        if selected_years:
+            df_comparison = FilterController.filter_by_years(df_comparison, selected_years)
         
         comparison_label = Formatter.to_indonesian_date(comparison_dt)
         st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
@@ -1041,9 +1159,10 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
+        # Render comparison summary with filters
         self._render_comparison_summary(
             df_primary, df_comparison,
-            numeric_cols,
+            group_cols, numeric_cols,
             primary_label, comparison_label
         )
         
@@ -1060,22 +1179,35 @@ class MonitoringDashboard:
         self,
         df_primary: pd.DataFrame,
         df_comparison: pd.DataFrame,
+        group_cols: List[str],
         numeric_cols: List[str],
         primary_label: str,
         comparison_label: str
     ) -> None:
-        """Render summary metrics for comparison."""
+        """Render summary metrics for comparison with filters."""
         st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
         
+        # Add filters for summary
+        filters = self.filter_controller.render_filters(
+            df_primary, group_cols, key_prefix="summary_"
+        )
+        
+        # Apply filters to both datasets
+        df_primary_filtered = self.filter_controller.apply_filters(df_primary, filters)
+        df_comparison_filtered = self.filter_controller.apply_filters(df_comparison, filters)
+        
+        if filters:
+            st.info(f"Filter diterapkan: **{len(df_primary_filtered):,}** baris (utama) | **{len(df_comparison_filtered):,}** baris (pembanding)")
+        
         for col in numeric_cols:
-            if col not in df_primary.columns or col not in df_comparison.columns:
+            if col not in df_primary_filtered.columns or col not in df_comparison_filtered.columns:
                 continue
             
             st.markdown(f"**{col}**")
             c1, c2, c3 = st.columns(3)
             
-            val_primary = df_primary[col].sum()
-            val_comparison = df_comparison[col].sum()
+            val_primary = df_primary_filtered[col].sum()
+            val_comparison = df_comparison_filtered[col].sum()
             diff = val_primary - val_comparison
             pct = (diff / abs(val_comparison) * 100) if val_comparison != 0 else 0
             
@@ -1117,12 +1249,16 @@ class MonitoringDashboard:
         display_df = formatter.format_for_display(filtered_df)
         st.dataframe(display_df, width="stretch", hide_index=True)
         
-        csv_data = filtered_df.to_csv(index=False)
+        # Excel download
+        excel_data = ExcelExporter.to_excel_bytes(
+            filtered_df, 
+            sheet_name="Perbandingan"
+        )
         st.download_button(
-            "📥 Download Perbandingan",
-            csv_data,
-            f"perbandingan_{primary_date}_vs_{comparison_date}.csv",
-            "text/csv",
+            "📥 Download Perbandingan (Excel)",
+            excel_data,
+            f"perbandingan_{primary_date}_vs_{comparison_date}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_comparison"
         )
     
@@ -1149,12 +1285,17 @@ class MonitoringDashboard:
         st.dataframe(agg_primary_display, width="stretch", hide_index=True)
         
         agg_primary = DataAggregator.aggregate(df_primary, group_cols, numeric_cols)
-        csv_data = agg_primary.to_csv(index=False)
+        
+        # Excel download
+        excel_data = ExcelExporter.to_excel_bytes(
+            agg_primary,
+            sheet_name="Agregasi"
+        )
         st.download_button(
-            "📥 Download CSV",
-            csv_data,
-            f"agregasi_{primary_date}.csv",
-            "text/csv",
+            "📥 Download Excel",
+            excel_data,
+            f"agregasi_{primary_date}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_single"
         )
     
@@ -1214,6 +1355,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
