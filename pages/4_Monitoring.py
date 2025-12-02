@@ -1,5 +1,6 @@
 # =============================================================================
 # Data Loading with Date Picker + Availability Indicator
+# Handles both ZIP and plain CSV files
 # =============================================================================
 import streamlit as st
 import pandas as pd
@@ -14,7 +15,14 @@ from typing import List, Dict, Optional, Tuple
 # Configuration
 # =============================================================================
 BASE_URL = "https://raw.githubusercontent.com/tubankum3/dashpmk/main/"
-FILENAME_PATTERN = "df_{YYYYMMDD}.csv.zip"
+
+# File patterns to try (in order)
+# The loader will try each pattern until one works
+FILENAME_PATTERNS = [
+    "df_{YYYYMMDD}.csv.zip",  # Try zip first
+    "df_{YYYYMMDD}.csv",       # Then plain CSV
+]
+
 CSV_FILENAME_IN_ZIP = "df.csv"
 
 # Date range for picker
@@ -24,10 +32,15 @@ DATE_END = date.today()
 # =============================================================================
 # URL Builder Functions
 # =============================================================================
-def build_url(data_date: date) -> str:
-    """Build the full URL for a given date."""
-    filename = FILENAME_PATTERN.replace("{YYYYMMDD}", data_date.strftime('%Y%m%d'))
+def build_url(data_date: date, pattern: str) -> str:
+    """Build the full URL for a given date and pattern."""
+    filename = pattern.replace("{YYYYMMDD}", data_date.strftime('%Y%m%d'))
     return BASE_URL + filename
+
+
+def build_all_urls(data_date: date) -> List[str]:
+    """Build all possible URLs for a given date."""
+    return [build_url(data_date, pattern) for pattern in FILENAME_PATTERNS]
 
 
 def parse_date_string(date_str: str) -> date:
@@ -48,25 +61,26 @@ def format_date_label(data_date: date) -> str:
 # =============================================================================
 # Availability Check Functions
 # =============================================================================
-@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
-def check_data_availability(data_date: str) -> bool:
+@st.cache_data(ttl=300, show_spinner=False)
+def check_data_availability(data_date: str) -> Tuple[bool, Optional[str]]:
     """
     Check if data file exists for a given date.
     
-    Args:
-        data_date: Date string in 'YYYY-MM-DD' format
-        
     Returns:
-        bool: True if file exists, False otherwise
+        Tuple of (is_available, working_url)
     """
     dt = parse_date_string(data_date)
-    url = build_url(dt)
     
-    try:
-        response = requests.head(url, timeout=5)
-        return response.status_code == 200
-    except:
-        return False
+    for pattern in FILENAME_PATTERNS:
+        url = build_url(dt, pattern)
+        try:
+            response = requests.head(url, timeout=5)
+            if response.status_code == 200:
+                return True, url
+        except:
+            continue
+    
+    return False, None
 
 
 def render_availability_badge(is_available: bool) -> str:
@@ -98,31 +112,91 @@ def render_availability_badge(is_available: bool) -> str:
 # =============================================================================
 # Data Loading Functions
 # =============================================================================
+def is_zip_content(content: bytes) -> bool:
+    """Check if content is a ZIP file by magic number."""
+    # ZIP files start with PK (0x50 0x4B)
+    return len(content) >= 2 and content[:2] == b'PK'
+
+
+def is_csv_content(content: bytes) -> bool:
+    """Check if content looks like CSV."""
+    try:
+        # Try to decode first 1000 bytes as text
+        text = content[:1000].decode('utf-8')
+        # Check if it contains comma or semicolon separators
+        return ',' in text or ';' in text
+    except:
+        return False
+
+
 @st.cache_data(show_spinner=True, ttl=3600)
 def load_data_by_date(data_date: str) -> pd.DataFrame:
     """
     Load budget data for a specific date.
-    
-    Args:
-        data_date: Date string in 'YYYY-MM-DD' format
-        
-    Returns:
-        pd.DataFrame: Preprocessed budget data with _DATA_DATE column
+    Automatically detects ZIP vs CSV format.
     """
     dt = parse_date_string(data_date)
-    url = build_url(dt)
     
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
+    # Try each pattern
+    last_error = None
+    for pattern in FILENAME_PATTERNS:
+        url = build_url(dt, pattern)
         
-        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+        try:
+            response = requests.get(url, timeout=30)
+            
+            if response.status_code == 404:
+                continue  # Try next pattern
+            
+            response.raise_for_status()
+            content = response.content
+            
+            # Detect file type and parse accordingly
+            if is_zip_content(content):
+                # It's a ZIP file
+                df = load_from_zip(content, data_date)
+                if not df.empty:
+                    return df
+                    
+            elif is_csv_content(content):
+                # It's a plain CSV
+                df = load_from_csv(content, data_date)
+                if not df.empty:
+                    return df
+            else:
+                # Unknown format - show first bytes for debugging
+                preview = content[:100].decode('utf-8', errors='replace')
+                last_error = f"Format tidak dikenali. Preview: {preview[:50]}..."
+                continue
+                
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                continue
+            last_error = f"HTTP Error: {e}"
+        except Exception as e:
+            last_error = str(e)
+            continue
+    
+    # All patterns failed
+    if last_error:
+        st.error(f"❌ Gagal memuat data: {last_error}")
+    else:
+        st.error(f"❌ Data tidak ditemukan untuk tanggal {format_date_label(dt)}")
+    
+    return pd.DataFrame()
+
+
+def load_from_zip(content: bytes, data_date: str) -> pd.DataFrame:
+    """Load DataFrame from ZIP content."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
             csv_files = [f for f in z.namelist() if f.endswith('.csv')]
             
             if not csv_files:
-                st.error(f"❌ Tidak ada file CSV dalam zip untuk tanggal {data_date}")
+                st.error("❌ Tidak ada file CSV dalam ZIP")
                 return pd.DataFrame()
             
+            # Use configured filename or first CSV found
             target_file = CSV_FILENAME_IN_ZIP if CSV_FILENAME_IN_ZIP in csv_files else csv_files[0]
             
             with z.open(target_file) as file:
@@ -130,17 +204,34 @@ def load_data_by_date(data_date: str) -> pd.DataFrame:
         
         df = preprocess_dataframe(df)
         df["_DATA_DATE"] = data_date
-        
         return df
         
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            st.error(f"❌ Data tidak tersedia untuk tanggal {format_date_label(dt)}")
-        else:
-            st.error(f"❌ HTTP Error: {e}")
+    except zipfile.BadZipFile:
+        st.error("❌ File bukan ZIP yang valid")
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"❌ Gagal memuat data: {str(e)}")
+        st.error(f"❌ Gagal membaca ZIP: {str(e)}")
+        return pd.DataFrame()
+
+
+def load_from_csv(content: bytes, data_date: str) -> pd.DataFrame:
+    """Load DataFrame from CSV content."""
+    try:
+        # Try different encodings
+        for encoding in ['utf-8', 'latin-1', 'cp1252']:
+            try:
+                df = pd.read_csv(io.BytesIO(content), low_memory=False, encoding=encoding)
+                df = preprocess_dataframe(df)
+                df["_DATA_DATE"] = data_date
+                return df
+            except UnicodeDecodeError:
+                continue
+        
+        st.error("❌ Gagal decode CSV dengan encoding yang tersedia")
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"❌ Gagal membaca CSV: {str(e)}")
         return pd.DataFrame()
 
 
@@ -275,7 +366,7 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     # Primary date picker
     primary_dt = st.sidebar.date_input(
         "Tanggal Data Utama",
-        value=date(2025, 10, 27),  # Default to known available date
+        value=date(2025, 10, 27),
         min_value=DATE_START,
         max_value=DATE_END,
         key=f"{key_prefix}primary_date",
@@ -285,19 +376,20 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     
     # Check availability
     with st.sidebar:
-        with st.spinner("Memeriksa ketersediaan..."):
-            primary_available = check_data_availability(primary_date)
+        with st.spinner("Memeriksa..."):
+            primary_available, primary_url = check_data_availability(primary_date)
         
         st.markdown(render_availability_badge(primary_available), unsafe_allow_html=True)
         
-        # Show URL info
-        with st.expander("🔗 Info URL", expanded=False):
-            url = build_url(primary_dt)
-            st.code(url, language=None)
+        with st.expander("🔗 Debug Info", expanded=False):
+            st.markdown("**URLs yang dicoba:**")
+            for pattern in FILENAME_PATTERNS:
+                url = build_url(primary_dt, pattern)
+                st.code(url, language=None)
             if primary_available:
-                st.success("File ditemukan")
+                st.success(f"✓ Ditemukan: {primary_url}")
             else:
-                st.error("File tidak ditemukan")
+                st.error("✗ Tidak ada yang tersedia")
     
     st.sidebar.markdown("---")
     
@@ -314,7 +406,7 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     if enable_comparison:
         comparison_dt = st.sidebar.date_input(
             "Tanggal Pembanding",
-            value=date(2025, 11, 11),  # Default to other known available date
+            value=date(2025, 11, 11),
             min_value=DATE_START,
             max_value=DATE_END,
             key=f"{key_prefix}comparison_date",
@@ -322,18 +414,13 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
         )
         comparison_date = comparison_dt.strftime("%Y-%m-%d")
         
-        # Check availability
         with st.sidebar:
-            with st.spinner("Memeriksa ketersediaan..."):
-                comparison_available = check_data_availability(comparison_date)
+            with st.spinner("Memeriksa..."):
+                comparison_available, comp_url = check_data_availability(comparison_date)
             
             st.markdown(render_availability_badge(comparison_available), unsafe_allow_html=True)
-            
-            with st.expander("🔗 Info URL Pembanding", expanded=False):
-                url2 = build_url(comparison_dt)
-                st.code(url2, language=None)
     
-    # Quick select known dates
+    # Quick reference
     st.sidebar.markdown("---")
     st.sidebar.markdown("**📋 Tanggal Tersedia (Prototipe):**")
     st.sidebar.markdown("""
@@ -429,8 +516,8 @@ def main():
         ⚠️ **Data tidak tersedia untuk tanggal {format_date_label(parse_date_string(primary_date))}**
         
         Silakan pilih tanggal lain. Data yang tersedia:
-        - **27 Oktober 2025** (`df_20251027.csv.zip`)
-        - **11 November 2025** (`df_20251111.csv.zip`)
+        - **27 Oktober 2025** (`df_20251027.csv.zip` atau `df_20251027.csv`)
+        - **11 November 2025** (`df_20251111.csv.zip` atau `df_20251111.csv`)
         """)
         return
     
@@ -439,8 +526,7 @@ def main():
         df_primary = load_data_by_date(primary_date)
     
     if df_primary.empty:
-        st.error("Gagal memuat data")
-        return
+        return  # Error already shown
     
     # Success message
     st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {format_date_label(parse_date_string(primary_date))}")
@@ -460,7 +546,6 @@ def main():
     if len(group_cols) < 2 or len(numeric_cols) < 2:
         st.info("👆 Pilih minimal 2 kolom string dan 2 kolom numerik di sidebar untuk melihat agregasi")
         
-        # Show raw data preview
         with st.expander("📋 Preview Data Mentah"):
             st.dataframe(df_primary.head(100), use_container_width=True)
         return
@@ -475,7 +560,6 @@ def main():
             st.dataframe(agg_primary, use_container_width=True, hide_index=True)
             return
         
-        # Load comparison data
         with st.spinner(f"Memuat data pembanding {format_date_label(parse_date_string(comparison_date))}..."):
             df_comparison = load_data_by_date(comparison_date)
         
@@ -486,7 +570,6 @@ def main():
         
         st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
         
-        # Create comparison
         comparison_df = compare_datasets(
             df_primary, df_comparison,
             group_cols, numeric_cols,
@@ -517,7 +600,6 @@ def main():
             st.subheader("Perbandingan Data")
             st.caption(f"**{format_date_label(parse_date_string(primary_date))}** vs **{format_date_label(parse_date_string(comparison_date))}**")
             
-            # Highlight columns info
             st.info(f"""
             **Kolom hasil perbandingan:**
             - `[kolom]_{primary_date}` = Nilai dari tanggal utama
@@ -567,7 +649,6 @@ def main():
                     st.divider()
     
     else:
-        # Single date view
         st.subheader(f"Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
         st.dataframe(agg_primary, use_container_width=True, hide_index=True)
         
