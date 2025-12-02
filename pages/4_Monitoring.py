@@ -7,14 +7,13 @@ across different update dates. Supports data aggregation, filtering,
 and comparison analysis.
 
 Author: Budget Analysis Team
-Version: 3.0.0
+Version: 3.0.1
 """
 
 from __future__ import annotations
 
 import io
 import zipfile
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -52,30 +51,17 @@ class AggregationFunction(Enum):
 
 @dataclass(frozen=True)
 class AppConfig:
-    """
-    Application configuration settings.
-    
-    Frozen dataclass ensures configuration immutability after initialization.
-    """
-    # Data source settings
+    """Application configuration settings."""
     base_url: str = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/"
     filename_pattern: str = "df_{date}.csv.zip"
     csv_filename_in_zip: str = "df.csv"
-    
-    # Date range settings
     date_start: date = field(default_factory=lambda: date(2024, 1, 1))
     date_end: date = field(default_factory=date.today)
-    
-    # Network settings
     connect_timeout: int = 10
     read_timeout: int = 300
-    chunk_size: int = 1024 * 1024  # 1MB chunks for streaming
-    
-    # Cache settings
-    cache_ttl: int = 300  # 5 minutes
-    
-    # UI settings
-    large_file_threshold: int = 50_000_000  # 50MB
+    chunk_size: int = 1024 * 1024
+    cache_ttl: int = 300
+    large_file_threshold: int = 50_000_000
     max_filters_per_row: int = 4
     metrics_per_row: int = 3
 
@@ -83,34 +69,36 @@ class AppConfig:
 @dataclass(frozen=True)
 class ColumnConfig:
     """Column definitions for the budget dataset."""
-    
     STRING_COLUMNS: Tuple[str, ...] = (
         'KEMENTERIAN/LEMBAGA', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
         'PROGRAM', 'KEGIATAN', 'OUTPUT (KRO)', 'SUB OUTPUT (RO)',
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
-    
     NUMERIC_COLUMNS: Tuple[str, ...] = (
         'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI',
         'PAGU DIPA AWAL', 'BLOKIR DIPA AWAL', 'PAGU DIPA AWAL EFEKTIF',
         'PAGU DIPA REVISI EFEKTIF'
     )
-    
-    # Default selections
     DEFAULT_GROUP_COLS: Tuple[str, ...] = ('Tahun', 'KEMENTERIAN/LEMBAGA')
-    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI')
+    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI')
 
 
-# Indonesian month names for date formatting
+@dataclass
+class DataAvailability:
+    """Represents the availability status of a data file."""
+    is_available: bool
+    file_size: Optional[int] = None
+    error_message: Optional[str] = None
+
+
+# Indonesian month names
 INDONESIAN_MONTHS: Dict[int, str] = {
     1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
     5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
     9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
 }
 
-# Known available dates (for user reference)
 AVAILABLE_DATES: List[str] = ["27 Oktober 2025", "11 November 2025"]
-
 
 # =============================================================================
 # STYLING
@@ -121,7 +109,6 @@ CSS_STYLES = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Color Palette */
     --primary: #0066FF;
     --primary-dark: #0052CC;
     --primary-light: #4D94FF;
@@ -129,8 +116,6 @@ CSS_STYLES = """
     --warning: #F59E0B;
     --error: #EF4444;
     --success: #10B981;
-    
-    /* Grayscale */
     --gray-50: #F9FAFB;
     --gray-100: #F3F4F6;
     --gray-200: #E5E7EB;
@@ -141,33 +126,24 @@ CSS_STYLES = """
     --gray-700: #374151;
     --gray-800: #1F2937;
     --gray-900: #111827;
-    
-    /* Surfaces */
     --surface: #FFFFFF;
     --background: #F9FAFB;
     --on-primary: #FFFFFF;
-    
-    /* Effects */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    
-    /* Spacing & Radius */
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-full: 9999px;
     --space-md: 1rem;
     --space-lg: 1.5rem;
     --space-xl: 2rem;
-    
-    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .stApp { background-color: var(--background); }
 
-/* Header */
 .dashboard-header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     padding: var(--space-xl);
@@ -200,7 +176,6 @@ CSS_STYLES = """
     margin: 0.75rem 0 0 0;
 }
 
-/* Cards */
 .material-card {
     background: var(--surface);
     border-radius: var(--radius-lg);
@@ -210,7 +185,6 @@ CSS_STYLES = """
     border: 1px solid var(--gray-200);
 }
 
-/* Buttons */
 .stButton>button {
     background: var(--primary);
     color: var(--on-primary);
@@ -229,10 +203,8 @@ CSS_STYLES = """
     transform: translateY(-1px);
 }
 
-/* Sidebar */
 .stSidebar { background: var(--surface); border-right: 1px solid var(--gray-200); }
 
-/* Tabs */
 .stTabs [data-baseweb="tab-list"] { gap: 0.75rem; border-bottom: 1px solid var(--gray-200); }
 .stTabs [data-baseweb="tab"] {
     background: transparent;
@@ -246,7 +218,6 @@ CSS_STYLES = """
 .stTabs [data-baseweb="tab"]:hover { color: var(--gray-900); background: var(--gray-50); }
 .stTabs [aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); }
 
-/* Badges */
 .availability-badge {
     display: inline-flex;
     align-items: center;
@@ -260,7 +231,6 @@ CSS_STYLES = """
 .badge-available { background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
 .badge-unavailable { background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
 
-/* Comparison Header */
 .comparison-header {
     background: var(--gray-100);
     padding: var(--space-md);
@@ -268,7 +238,6 @@ CSS_STYLES = """
     margin-bottom: var(--space-md);
 }
 
-/* Filter Container */
 .filter-container {
     background: var(--gray-50);
     padding: var(--space-md);
@@ -277,7 +246,6 @@ CSS_STYLES = """
     border: 1px solid var(--gray-200);
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb { background: var(--gray-400); border-radius: var(--radius-full); }
@@ -291,24 +259,11 @@ CSS_STYLES = """
 # =============================================================================
 
 class Formatter:
-    """
-    Utility class for formatting values in various formats.
-    
-    Provides static methods for currency, percentage, file size,
-    and date formatting with Indonesian locale support.
-    """
+    """Utility class for formatting values."""
     
     @staticmethod
     def to_rupiah_short(value: float) -> str:
-        """
-        Format value as Indonesian Rupiah with abbreviated units.
-        
-        Args:
-            value: Numeric value to format
-            
-        Returns:
-            Formatted string (e.g., "Rp 1.5 T" for trillion)
-        """
+        """Format value as Indonesian Rupiah with abbreviated units."""
         if pd.isna(value) or value == 0:
             return "Rp 0"
         
@@ -325,15 +280,7 @@ class Formatter:
     
     @staticmethod
     def to_rupiah_full(value: Any) -> str:
-        """
-        Format value as Indonesian Rupiah with full number and dot separator.
-        
-        Args:
-            value: Numeric value to format
-            
-        Returns:
-            Formatted string (e.g., "Rp 1.500.000.000")
-        """
+        """Format value as Indonesian Rupiah with full number."""
         try:
             value = float(value)
         except (ValueError, TypeError):
@@ -346,15 +293,7 @@ class Formatter:
     
     @staticmethod
     def to_percentage(value: Any) -> str:
-        """
-        Format value as percentage.
-        
-        Args:
-            value: Numeric value to format
-            
-        Returns:
-            Formatted percentage string (e.g., "12.34%")
-        """
+        """Format value as percentage."""
         try:
             value = float(value)
         except (ValueError, TypeError):
@@ -367,23 +306,11 @@ class Formatter:
     
     @staticmethod
     def to_file_size(size_bytes: Optional[int]) -> str:
-        """
-        Format byte count as human-readable file size.
-        
-        Args:
-            size_bytes: File size in bytes
-            
-        Returns:
-            Formatted size string (e.g., "150.23 MB")
-        """
+        """Format byte count as human-readable file size."""
         if size_bytes is None:
             return "Unknown"
         
-        units = [
-            (1_000_000_000, "GB"),
-            (1_000_000, "MB"),
-            (1_000, "KB"),
-        ]
+        units = [(1_000_000_000, "GB"), (1_000_000, "MB"), (1_000, "KB")]
         
         for threshold, unit in units:
             if size_bytes >= threshold:
@@ -393,29 +320,13 @@ class Formatter:
     
     @staticmethod
     def to_indonesian_date(dt: date) -> str:
-        """
-        Format date using Indonesian month names.
-        
-        Args:
-            dt: Date object to format
-            
-        Returns:
-            Formatted date string (e.g., "27 Oktober 2025")
-        """
+        """Format date using Indonesian month names."""
         month_name = INDONESIAN_MONTHS.get(dt.month, str(dt.month))
         return f"{dt.day} {month_name} {dt.year}"
     
     @staticmethod
     def to_number_with_separator(value: Any) -> str:
-        """
-        Format number with thousand separator.
-        
-        Args:
-            value: Numeric value to format
-            
-        Returns:
-            Formatted number string (e.g., "1,500,000")
-        """
+        """Format number with thousand separator."""
         try:
             return f"{int(value):,}"
         except (ValueError, TypeError):
@@ -423,29 +334,13 @@ class Formatter:
 
 
 class DataFrameFormatter:
-    """Formats DataFrames for display with appropriate value formatting."""
+    """Formats DataFrames for display."""
     
     def __init__(self, numeric_columns: List[str]):
-        """
-        Initialize formatter with column configuration.
-        
-        Args:
-            numeric_columns: List of column names that contain numeric values
-        """
         self.numeric_columns = numeric_columns
     
     def format_for_display(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Apply formatting to DataFrame for UI display.
-        
-        Formats numeric columns as Rupiah and percentage columns appropriately.
-        
-        Args:
-            df: DataFrame to format
-            
-        Returns:
-            Formatted DataFrame copy (original unchanged)
-        """
+        """Apply formatting to DataFrame for UI display."""
         if df.empty:
             return df
         
@@ -460,28 +355,58 @@ class DataFrameFormatter:
         return df_display
     
     def _is_numeric_column(self, column_name: str) -> bool:
-        """Check if column should be formatted as currency."""
         return (
             any(nc in column_name for nc in self.numeric_columns) or
             column_name.startswith('SELISIH_')
         )
     
     def _is_percentage_column(self, column_name: str) -> bool:
-        """Check if column should be formatted as percentage."""
         return column_name.startswith('PCT_')
+
+
+# =============================================================================
+# CACHED FUNCTIONS (Module-level for Streamlit compatibility)
+# =============================================================================
+
+@st.cache_data(ttl=300, show_spinner=False)
+def check_availability_cached(
+    base_url: str,
+    filename_pattern: str,
+    timeout: int,
+    date_str: str
+) -> Tuple[bool, Optional[int], Optional[str]]:
+    """
+    Cached availability check.
+    
+    Returns tuple instead of dataclass for pickle compatibility.
+    
+    Returns:
+        Tuple of (is_available, file_size, error_message)
+    """
+    dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+    date_formatted = dt.strftime('%Y%m%d')
+    filename = filename_pattern.replace("{date}", date_formatted)
+    url = f"{base_url}{filename}"
+    
+    try:
+        response = requests.head(url, timeout=timeout, allow_redirects=True)
+        
+        if response.status_code == 200:
+            content_length = response.headers.get('Content-Length')
+            size = int(content_length) if content_length else None
+            return (True, size, None)
+        
+        return (False, None, f"HTTP {response.status_code}")
+        
+    except requests.exceptions.Timeout:
+        return (False, None, "Connection timeout")
+    except requests.exceptions.RequestException as e:
+        return (False, None, str(e))
 
 
 # =============================================================================
 # DATA LAYER
 # =============================================================================
-
-@dataclass
-class DataAvailability:
-    """Represents the availability status of a data file."""
-    is_available: bool
-    file_size: Optional[int] = None
-    error_message: Optional[str] = None
-
 
 class URLBuilder:
     """Constructs URLs for data files based on date patterns."""
@@ -490,106 +415,48 @@ class URLBuilder:
         self.config = config
     
     def build(self, data_date: date) -> str:
-        """
-        Build full URL for a given date.
-        
-        Args:
-            data_date: Date for which to build URL
-            
-        Returns:
-            Complete URL string
-        """
+        """Build full URL for a given date."""
         date_str = data_date.strftime('%Y%m%d')
         filename = self.config.filename_pattern.replace("{date}", date_str)
         return f"{self.config.base_url}{filename}"
 
 
 class DataLoader:
-    """
-    Handles data loading from remote sources with progress tracking.
-    
-    Supports streaming downloads for large files and ZIP extraction.
-    """
+    """Handles data loading from remote sources with progress tracking."""
     
     def __init__(self, config: AppConfig):
         self.config = config
         self.url_builder = URLBuilder(config)
     
-    def check_availability(self, data_date: date) -> DataAvailability:
-        """
-        Check if data file exists for the given date.
-        
-        Args:
-            data_date: Date to check
-            
-        Returns:
-            DataAvailability object with status and file size
-        """
-        url = self.url_builder.build(data_date)
-        
-        try:
-            response = requests.head(
-                url, 
-                timeout=self.config.connect_timeout,
-                allow_redirects=True
-            )
-            
-            if response.status_code == 200:
-                content_length = response.headers.get('Content-Length')
-                size = int(content_length) if content_length else None
-                return DataAvailability(is_available=True, file_size=size)
-            
-            return DataAvailability(
-                is_available=False,
-                error_message=f"HTTP {response.status_code}"
-            )
-            
-        except requests.exceptions.Timeout:
-            return DataAvailability(
-                is_available=False,
-                error_message="Connection timeout"
-            )
-        except requests.exceptions.RequestException as e:
-            return DataAvailability(
-                is_available=False,
-                error_message=str(e)
-            )
+    def check_availability(self, date_str: str) -> DataAvailability:
+        """Check if data file exists for the given date."""
+        result = check_availability_cached(
+            self.config.base_url,
+            self.config.filename_pattern,
+            self.config.connect_timeout,
+            date_str
+        )
+        return DataAvailability(
+            is_available=result[0],
+            file_size=result[1],
+            error_message=result[2]
+        )
     
-    def load_with_progress(
-        self, 
-        data_date: date, 
-        progress_placeholder
-    ) -> pd.DataFrame:
-        """
-        Load data with progress indicator.
-        
-        Args:
-            data_date: Date of data to load
-            progress_placeholder: Streamlit placeholder for progress display
-            
-        Returns:
-            Loaded and preprocessed DataFrame, or empty DataFrame on error
-        """
+    def load_with_progress(self, data_date: date, progress_placeholder) -> pd.DataFrame:
+        """Load data with progress indicator."""
         url = self.url_builder.build(data_date)
         
-        # Download with progress
         content = self._download_with_progress(url, progress_placeholder)
         if content is None:
             return pd.DataFrame()
         
-        # Validate ZIP file
         if not self._is_valid_zip(content):
             self._show_invalid_file_error(content)
             return pd.DataFrame()
         
-        # Extract and read CSV
         return self._extract_and_read(content, data_date, progress_placeholder)
     
-    def _download_with_progress(
-        self, 
-        url: str, 
-        progress_placeholder
-    ) -> Optional[bytes]:
+    def _download_with_progress(self, url: str, progress_placeholder) -> Optional[bytes]:
         """Download file with streaming and progress bar."""
         try:
             response = requests.get(
@@ -643,12 +510,7 @@ class DataLoader:
             st.write(f"File size: {Formatter.to_file_size(len(content))}")
             st.code(content[:200].decode('utf-8', errors='replace'))
     
-    def _extract_and_read(
-        self, 
-        content: bytes, 
-        data_date: date,
-        progress_placeholder
-    ) -> pd.DataFrame:
+    def _extract_and_read(self, content: bytes, data_date: date, progress_placeholder) -> pd.DataFrame:
         """Extract ZIP and read CSV content."""
         try:
             progress_placeholder.info("📦 Extracting ZIP...")
@@ -660,7 +522,6 @@ class DataLoader:
                     st.error("❌ No CSV files found in ZIP archive")
                     return pd.DataFrame()
                 
-                # Use configured filename or first CSV
                 target = (
                     self.config.csv_filename_in_zip 
                     if self.config.csv_filename_in_zip in csv_files 
@@ -674,7 +535,6 @@ class DataLoader:
             
             progress_placeholder.empty()
             
-            # Preprocess and add metadata
             df = self._preprocess(df)
             df["_DATA_DATE"] = data_date.strftime("%Y-%m-%d")
             
@@ -695,12 +555,10 @@ class DataLoader:
         if df.empty:
             return df
         
-        # Remove unnamed columns (often index columns from CSV)
         unnamed_cols = [c for c in df.columns if 'Unnamed' in str(c)]
         if unnamed_cols:
             df = df.drop(columns=unnamed_cols)
         
-        # Convert Tahun to nullable integer
         if "Tahun" in df.columns:
             df["Tahun"] = pd.to_numeric(df["Tahun"], errors="coerce").astype("Int64")
         
@@ -721,19 +579,7 @@ class DataAggregator:
         numeric_columns: List[str],
         agg_function: str = 'sum'
     ) -> pd.DataFrame:
-        """
-        Aggregate numeric columns by group columns.
-        
-        Args:
-            df: Source DataFrame
-            group_columns: Columns to group by
-            numeric_columns: Columns to aggregate
-            agg_function: Aggregation function name
-            
-        Returns:
-            Aggregated DataFrame
-        """
-        # Filter to available columns
+        """Aggregate numeric columns by group columns."""
         available_groups = [c for c in group_columns if c in df.columns]
         available_numerics = [c for c in numeric_columns if c in df.columns]
         
@@ -756,26 +602,11 @@ class DatasetComparator:
         date_primary: str,
         date_comparison: str
     ) -> pd.DataFrame:
-        """
-        Compare two datasets and calculate differences.
-        
-        Args:
-            df_primary: Primary/base dataset
-            df_comparison: Comparison dataset
-            group_columns: Columns to group and merge by
-            numeric_columns: Columns to compare
-            date_primary: Label for primary data
-            date_comparison: Label for comparison data
-            
-        Returns:
-            Comparison DataFrame with difference and percentage columns
-        """
-        # Validate different dates
+        """Compare two datasets and calculate differences."""
         if date_primary == date_comparison:
             st.warning("⚠️ Tanggal utama dan pembanding sama. Pilih tanggal berbeda.")
             return pd.DataFrame()
         
-        # Find common columns
         available_groups = [
             c for c in group_columns 
             if c in df_primary.columns and c in df_comparison.columns
@@ -789,33 +620,21 @@ class DatasetComparator:
             st.warning("⚠️ Tidak ada kolom yang cocok untuk perbandingan")
             return pd.DataFrame()
         
-        # Aggregate both datasets
-        agg_primary = DataAggregator.aggregate(
-            df_primary, available_groups, available_numerics
-        )
-        agg_comparison = DataAggregator.aggregate(
-            df_comparison, available_groups, available_numerics
-        )
+        agg_primary = DataAggregator.aggregate(df_primary, available_groups, available_numerics)
+        agg_comparison = DataAggregator.aggregate(df_comparison, available_groups, available_numerics)
         
         if agg_primary.empty or agg_comparison.empty:
             st.warning("⚠️ Data agregasi kosong")
             return pd.DataFrame()
         
-        # Rename columns with date suffix before merge
         rename_primary = {c: f"{c}_{date_primary}" for c in available_numerics}
         rename_comparison = {c: f"{c}_{date_comparison}" for c in available_numerics}
         
         agg_primary = agg_primary.rename(columns=rename_primary)
         agg_comparison = agg_comparison.rename(columns=rename_comparison)
         
-        # Merge datasets
-        comparison = pd.merge(
-            agg_primary, agg_comparison,
-            on=available_groups,
-            how='outer'
-        )
+        comparison = pd.merge(agg_primary, agg_comparison, on=available_groups, how='outer')
         
-        # Calculate differences and percentages
         for col in available_numerics:
             col_primary = f"{col}_{date_primary}"
             col_comparison = f"{col}_{date_comparison}"
@@ -823,13 +642,11 @@ class DatasetComparator:
             if col_primary not in comparison.columns or col_comparison not in comparison.columns:
                 continue
             
-            # Difference: comparison - primary
             comparison[f"SELISIH_{col}"] = (
                 comparison[col_comparison].fillna(0) - 
                 comparison[col_primary].fillna(0)
             )
             
-            # Percentage change
             comparison[f"PCT_{col}"] = np.where(
                 comparison[col_primary].fillna(0) != 0,
                 (comparison[f"SELISIH_{col}"] / comparison[col_primary].fillna(0).abs()) * 100,
@@ -906,41 +723,7 @@ class UIComponents:
         </div>
         """, unsafe_allow_html=True)
 
-    @st.cache_data(ttl=300, show_spinner=False)
-    def _check_availability_cached_impl(
-        base_url: str,
-        filename_pattern: str,
-        timeout: int,
-        date_str: str
-    ) -> Tuple[bool, Optional[int], Optional[str]]:
-        """
-        Cached availability check implementation.
-        
-        Returns tuple instead of dataclass for pickle compatibility.
-        
-        Returns:
-            Tuple of (is_available, file_size, error_message)
-        """
-        dt = datetime.strptime(date_str, "%Y-%m-%d").date()
-        date_formatted = dt.strftime('%Y%m%d')
-        filename = filename_pattern.replace("{date}", date_formatted)
-        url = f"{base_url}{filename}"
-        
-        try:
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
-            
-            if response.status_code == 200:
-                content_length = response.headers.get('Content-Length')
-                size = int(content_length) if content_length else None
-                return (True, size, None)
-            
-            return (False, None, f"HTTP {response.status_code}")
-            
-        except requests.exceptions.Timeout:
-            return (False, None, "Connection timeout")
-        except requests.exceptions.RequestException as e:
-            return (False, None, str(e))
-        
+
 class SidebarController:
     """Controls sidebar UI elements and state."""
     
@@ -953,16 +736,9 @@ class SidebarController:
         self, 
         key_prefix: str = ""
     ) -> Tuple[str, Optional[str], bool, DataAvailability, Optional[DataAvailability]]:
-        """
-        Render date selection controls in sidebar.
-        
-        Returns:
-            Tuple of (primary_date, comparison_date, enable_comparison,
-                     primary_availability, comparison_availability)
-        """
+        """Render date selection controls in sidebar."""
         st.sidebar.markdown("### 📅 Pilih Tanggal Data")
         
-        # Primary date selection
         primary_dt = st.sidebar.date_input(
             "Tanggal Data Utama",
             value=date(2025, 10, 27),
@@ -973,8 +749,7 @@ class SidebarController:
         )
         primary_date = primary_dt.strftime("%Y-%m-%d")
         
-        # Check availability with caching
-        primary_availability = self._check_availability_cached(primary_date)
+        primary_availability = self.data_loader.check_availability(primary_date)
         st.sidebar.markdown(
             UIComponents.render_availability_badge(primary_availability),
             unsafe_allow_html=True
@@ -982,7 +757,6 @@ class SidebarController:
         
         st.sidebar.markdown("---")
         
-        # Comparison toggle
         enable_comparison = st.sidebar.checkbox(
             "🔄 Bandingkan dengan tanggal lain",
             value=False,
@@ -993,7 +767,6 @@ class SidebarController:
         comparison_availability = None
         
         if enable_comparison:
-            # Default to different date
             default_comparison = (
                 date(2025, 11, 11) 
                 if primary_dt != date(2025, 11, 11) 
@@ -1009,17 +782,15 @@ class SidebarController:
             )
             comparison_date = comparison_dt.strftime("%Y-%m-%d")
             
-            # Warn if same date
             if comparison_date == primary_date:
                 st.sidebar.error("⚠️ Pilih tanggal yang berbeda!")
             
-            comparison_availability = self._check_availability_cached(comparison_date)
+            comparison_availability = self.data_loader.check_availability(comparison_date)
             st.sidebar.markdown(
                 UIComponents.render_availability_badge(comparison_availability),
                 unsafe_allow_html=True
             )
         
-        # Available dates reference
         st.sidebar.markdown("---")
         st.sidebar.markdown("**📋 Tanggal Tersedia:**")
         st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
@@ -1032,33 +803,10 @@ class SidebarController:
             comparison_availability
         )
     
-   def _check_availability_cached(self, date_str: str) -> DataAvailability:
-        """Check availability with caching (returns DataAvailability)."""
-        result = _check_availability_cached_impl(
-            self.config.base_url,
-            self.config.filename_pattern,
-            self.config.connect_timeout,
-            date_str
-        )
-        return DataAvailability(
-            is_available=result[0],
-            file_size=result[1],
-            error_message=result[2]
-        )
-    
-    def render_aggregation_options(
-        self, 
-        key_prefix: str = ""
-    ) -> Tuple[List[str], List[str], str]:
-        """
-        Render aggregation options in sidebar.
-        
-        Returns:
-            Tuple of (group_columns, numeric_columns, aggregation_function)
-        """
+    def render_aggregation_options(self, key_prefix: str = "") -> Tuple[List[str], List[str], str]:
+        """Render aggregation options in sidebar."""
         st.sidebar.markdown("### 📊 Opsi Agregasi")
         
-        # Group columns selection
         group_cols = st.sidebar.multiselect(
             "Group By (Kolom String)",
             options=list(self.column_config.STRING_COLUMNS),
@@ -1070,7 +818,6 @@ class SidebarController:
         if len(group_cols) < 1:
             st.sidebar.error("⚠️ Pilih minimal 1 kolom string")
         
-        # Numeric columns selection
         numeric_cols = st.sidebar.multiselect(
             "Agregasi (Kolom Numerik)",
             options=list(self.column_config.NUMERIC_COLUMNS),
@@ -1082,7 +829,6 @@ class SidebarController:
         if len(numeric_cols) < 1:
             st.sidebar.error("⚠️ Pilih minimal 1 kolom numerik")
         
-        # Aggregation function selection
         agg_func = st.sidebar.selectbox(
             "Fungsi Agregasi",
             options=[f.value for f in AggregationFunction],
@@ -1092,12 +838,7 @@ class SidebarController:
         
         return group_cols, numeric_cols, agg_func
     
-    def render_data_info(
-        self, 
-        df: pd.DataFrame, 
-        label: str, 
-        key_prefix: str = ""
-    ) -> None:
+    def render_data_info(self, df: pd.DataFrame, label: str, key_prefix: str = "") -> None:
         """Render data info expander in sidebar."""
         with st.sidebar.expander(f"📋 Info Data - {label}", expanded=False):
             col1, col2, col3 = st.columns(3)
@@ -1121,17 +862,7 @@ class FilterController:
         group_columns: List[str],
         key_prefix: str = ""
     ) -> Dict[str, List[str]]:
-        """
-        Render filter controls for the given columns.
-        
-        Args:
-            df: DataFrame to filter
-            group_columns: Columns to create filters for
-            key_prefix: Prefix for widget keys
-            
-        Returns:
-            Dictionary mapping column names to selected filter values
-        """
+        """Render filter controls for the given columns."""
         UIComponents.render_filter_header()
         
         available_cols = [col for col in group_columns if col in df.columns]
@@ -1167,20 +898,8 @@ class FilterController:
         return filters
     
     @staticmethod
-    def apply_filters(
-        df: pd.DataFrame, 
-        filters: Dict[str, List[str]]
-    ) -> pd.DataFrame:
-        """
-        Apply filters to DataFrame.
-        
-        Args:
-            df: DataFrame to filter
-            filters: Dictionary of column -> selected values
-            
-        Returns:
-            Filtered DataFrame
-        """
+    def apply_filters(df: pd.DataFrame, filters: Dict[str, List[str]]) -> pd.DataFrame:
+        """Apply filters to DataFrame."""
         if df.empty or not filters:
             return df
         
@@ -1188,9 +907,7 @@ class FilterController:
         
         for col, values in filters.items():
             if col in filtered_df.columns and values:
-                filtered_df = filtered_df[
-                    filtered_df[col].astype(str).isin(values)
-                ]
+                filtered_df = filtered_df[filtered_df[col].astype(str).isin(values)]
         
         return filtered_df
 
@@ -1200,11 +917,7 @@ class FilterController:
 # =============================================================================
 
 class MonitoringDashboard:
-    """
-    Main application controller for the Budget Monitoring Dashboard.
-    
-    Orchestrates data loading, processing, and UI rendering.
-    """
+    """Main application controller for the Budget Monitoring Dashboard."""
     
     def __init__(self):
         self.config = AppConfig()
@@ -1221,7 +934,6 @@ class MonitoringDashboard:
         
         UIComponents.render_header()
         
-        # Render sidebar and get selections
         (
             primary_date, comparison_date, enable_comparison,
             primary_availability, comparison_availability
@@ -1230,18 +942,15 @@ class MonitoringDashboard:
         st.sidebar.divider()
         group_cols, numeric_cols, agg_func = self.sidebar.render_aggregation_options()
         
-        # Check data availability
         if not primary_availability.is_available:
             UIComponents.render_data_unavailable_message()
             return
         
-        # Show large file warning
         if (primary_availability.file_size and 
             primary_availability.file_size > self.config.large_file_threshold):
             size_str = Formatter.to_file_size(primary_availability.file_size)
             st.info(f"📦 File besar ({size_str}). Download mungkin memakan waktu...")
         
-        # Load primary data
         progress_placeholder = st.empty()
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         df_primary = self.data_loader.load_with_progress(primary_dt, progress_placeholder)
@@ -1249,26 +958,21 @@ class MonitoringDashboard:
         if df_primary.empty:
             return
         
-        # Show success message
         date_label = Formatter.to_indonesian_date(primary_dt)
         st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {date_label}")
         
-        # Render data info in sidebar
         self.sidebar.render_data_info(df_primary, date_label, "primary_")
         
-        # Validate column selections
         if len(group_cols) < 1 or len(numeric_cols) < 1:
             st.info("👆 Pilih minimal 1 kolom string dan 1 kolom numerik di sidebar")
             with st.expander("📋 Preview Data Mentah"):
                 st.dataframe(df_primary.head(100), width="stretch")
             return
         
-        # Aggregate primary data
         agg_primary = DataAggregator.aggregate(df_primary, group_cols, numeric_cols, agg_func)
         formatter = DataFrameFormatter(numeric_cols)
         agg_primary_display = formatter.format_for_display(agg_primary)
         
-        # Route to appropriate view
         if enable_comparison and comparison_date and comparison_availability and comparison_availability.is_available:
             self._render_comparison_view(
                 df_primary, primary_date,
@@ -1314,13 +1018,11 @@ class MonitoringDashboard:
         formatter: DataFrameFormatter
     ) -> None:
         """Render the date comparison view."""
-        # Validate different dates
         if comparison_date == primary_date:
             st.error("⚠️ **Tanggal sama!** Pilih tanggal pembanding yang berbeda dari tanggal utama.")
             st.dataframe(agg_primary_display, width="stretch", hide_index=True)
             return
         
-        # Load comparison data
         progress_placeholder = st.empty()
         comparison_dt = datetime.strptime(comparison_date, "%Y-%m-%d").date()
         df_comparison = self.data_loader.load_with_progress(comparison_dt, progress_placeholder)
@@ -1329,12 +1031,10 @@ class MonitoringDashboard:
             st.dataframe(agg_primary_display, width="stretch", hide_index=True)
             return
         
-        # Show success and sidebar info
         comparison_label = Formatter.to_indonesian_date(comparison_dt)
         st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
         self.sidebar.render_data_info(df_comparison, comparison_label, "comparison_")
         
-        # Compare datasets
         comparison_df = self.comparator.compare(
             df_primary, df_comparison,
             group_cols, numeric_cols,
@@ -1348,7 +1048,6 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
-        # Render summary metrics
         self._render_comparison_summary(
             df_primary, df_comparison,
             numeric_cols,
@@ -1357,7 +1056,6 @@ class MonitoringDashboard:
         
         st.divider()
         
-        # Render detailed comparison table
         self._render_comparison_detail(
             comparison_df, group_cols, numeric_cols,
             primary_date, comparison_date,
@@ -1407,7 +1105,6 @@ class MonitoringDashboard:
         st.markdown("### 🔄 Perbandingan Detail")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
-        # Filters
         filters = self.filter_controller.render_filters(
             comparison_df, group_cols, key_prefix="comp_"
         )
@@ -1416,7 +1113,6 @@ class MonitoringDashboard:
         if filters:
             st.info(f"Menampilkan **{len(filtered_df):,}** dari **{len(comparison_df):,}** baris")
         
-        # Column legend
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
             - `[kolom]_{primary_date}` = Nilai tanggal utama
@@ -1425,11 +1121,9 @@ class MonitoringDashboard:
             - `PCT_[kolom]` = Persentase perubahan
             """)
         
-        # Display table
         display_df = formatter.format_for_display(filtered_df)
         st.dataframe(display_df, width="stretch", hide_index=True)
         
-        # Download button
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
             "📥 Download Perbandingan",
@@ -1452,22 +1146,16 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         date_label = Formatter.to_indonesian_date(primary_dt)
         
-        # Show column comparison if multiple numeric columns selected
         if len(numeric_cols) > 1:
             self._render_column_summary(df_primary, numeric_cols)
             st.divider()
             self._render_column_comparison_table(df_primary, numeric_cols)
             st.divider()
         
-        # Always show aggregated data table
         st.markdown(f"### 📋 Data Agregasi - {date_label}")
         st.dataframe(agg_primary_display, width="stretch", hide_index=True)
         
-        # Download button
-        # Need to get original (unformatted) aggregated data for download
-        agg_primary = DataAggregator.aggregate(
-            df_primary, group_cols, numeric_cols
-        )
+        agg_primary = DataAggregator.aggregate(df_primary, group_cols, numeric_cols)
         csv_data = agg_primary.to_csv(index=False)
         st.download_button(
             "📥 Download CSV",
@@ -1477,11 +1165,7 @@ class MonitoringDashboard:
             key="dl_single"
         )
     
-    def _render_column_summary(
-        self, 
-        df: pd.DataFrame, 
-        numeric_cols: List[str]
-    ) -> None:
+    def _render_column_summary(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """Render summary metrics for numeric columns."""
         st.markdown("### 📈 Ringkasan Kolom Numerik")
         
@@ -1494,11 +1178,7 @@ class MonitoringDashboard:
                     value = df[col].sum()
                     cols[idx].metric(col, Formatter.to_rupiah_short(value))
     
-    def _render_column_comparison_table(
-        self, 
-        df: pd.DataFrame, 
-        numeric_cols: List[str]
-    ) -> None:
+    def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """Render comparison table for numeric columns."""
         st.markdown("### 📊 Perbandingan Antar Kolom Numerik")
         
@@ -1521,7 +1201,6 @@ class MonitoringDashboard:
         
         summary_df = pd.DataFrame(summary_data)
         
-        # Format for display
         display_df = summary_df.copy()
         for col in ['Total', 'Rata-rata', 'Min', 'Max']:
             display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
@@ -1542,5 +1221,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
