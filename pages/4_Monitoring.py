@@ -1263,10 +1263,7 @@ class MonitoringDashboard:
         """Render single date view with filters affecting both summary and detail."""
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         date_label = Formatter.to_indonesian_date(primary_dt)
-        
-        # Render header and filters first
-        st.markdown(f"### 📊 Analisis Data - {date_label}")
-        
+               
         # Render filters - affects both summary and detail
         filters = self.filter_controller.render_filters(
             agg_primary, group_cols, key_prefix="single_"
@@ -1291,7 +1288,7 @@ class MonitoringDashboard:
             st.divider()
         
         # Render data table with diff and %chg columns
-        st.markdown("### 📋 Data Agregasi")
+        st.markdown("### 📋 Tabel Data Perbandingan Metrik")
         
         # Add diff and %chg columns if more than 1 numeric column
         filtered_agg_with_diff = filtered_agg.copy()
@@ -1470,3 +1467,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
