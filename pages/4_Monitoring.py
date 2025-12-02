@@ -1077,7 +1077,6 @@ class MonitoringDashboard:
                 selected_years
             )
         else:
-            # ✅ FIXED: Added missing parameters agg_primary and selected_years
             self._render_single_date_view(
                 df_primary, primary_date,
                 group_cols, numeric_cols,
@@ -1150,7 +1149,6 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
-        # ✅ FIXED: Added section header before comparison header
         st.markdown("### 🔄 Detail Perbandingan Data")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
@@ -1292,14 +1290,44 @@ class MonitoringDashboard:
             self._render_column_comparison_table(df_filtered, numeric_cols)
             st.divider()
         
-        # Render data table
-        st.markdown(f"### 📋 Data Agregasi")
-        filtered_display = formatter.format_for_display(filtered_agg)
+        # Render data table with diff and %chg columns
+        st.markdown("### 📋 Data Agregasi")
+        
+        # Add diff and %chg columns if more than 1 numeric column
+        filtered_agg_with_diff = filtered_agg.copy()
+        if len(numeric_cols) > 1:
+            primary_col = numeric_cols[0]
+            if primary_col in filtered_agg_with_diff.columns:
+                for col in numeric_cols[1:]:
+                    if col in filtered_agg_with_diff.columns:
+                        # Calculate difference
+                        filtered_agg_with_diff[f'SELISIH_{col}'] = (
+                            filtered_agg_with_diff[col] - filtered_agg_with_diff[primary_col]
+                        )
+                        # Calculate percentage change
+                        filtered_agg_with_diff[f'%CHG_{col}'] = np.where(
+                            filtered_agg_with_diff[primary_col] != 0,
+                            (filtered_agg_with_diff[f'SELISIH_{col}'] / 
+                             filtered_agg_with_diff[primary_col].abs()) * 100,
+                            np.nan
+                        )
+        
+        filtered_display = formatter.format_for_display(filtered_agg_with_diff)
         st.dataframe(filtered_display, width="stretch", hide_index=True)
+        
+        # Show column explanation if diff columns were added
+        if len(numeric_cols) > 1:
+            with st.expander("ℹ️ Keterangan Kolom", expanded=False):
+                primary_col = numeric_cols[0]
+                st.markdown(f"""
+                - **Kolom Utama (Baseline)**: `{primary_col}`
+                - `SELISIH_[kolom]` = Nilai kolom - Nilai {primary_col}
+                - `%CHG_[kolom]` = Persentase perubahan terhadap {primary_col}
+                """)
         
         # Excel download
         excel_data = ExcelExporter.to_excel_bytes(
-            filtered_agg,
+            filtered_agg_with_diff,
             sheet_name="Agregasi"
         )
         st.download_button(
@@ -1315,7 +1343,7 @@ class MonitoringDashboard:
         Render summary metrics for numeric columns.
         First column is primary (baseline), others show diff and %chg from primary.
         """
-        st.markdown("### 📈 Ringkasan Perbandingan Kolom Numerik")
+        st.markdown("### 📈 Ringkasan Perbandingan Metrik")
         
         if len(numeric_cols) < 1:
             return
@@ -1329,7 +1357,7 @@ class MonitoringDashboard:
         
         # Show primary column
         st.markdown(f"**{primary_col} (Baseline)**")
-        st.metric(Formatter.to_rupiah_short(primary_value))
+        st.metric(label=primary_col, value=Formatter.to_rupiah_short(primary_value))
         
         # Show comparison columns (2nd and onwards)
         if len(numeric_cols) > 1:
@@ -1359,7 +1387,7 @@ class MonitoringDashboard:
         Render comparison table for numeric columns.
         Shows each column's stats with diff and %chg from primary (1st column).
         """
-        st.markdown("### 📊 Tabel Perbandingan Antar Kolom Numerik")
+        st.markdown("### 📊 Tabel Perbandingan Antar Metrik")
         
         if len(numeric_cols) < 1:
             return
@@ -1370,6 +1398,8 @@ class MonitoringDashboard:
             return
         
         primary_total = df[primary_col].sum()
+        
+        diff_col_name = 'Selisih dengan Baseline'
         
         summary_data = []
         for col in numeric_cols:
@@ -1391,10 +1421,10 @@ class MonitoringDashboard:
             
             # Add diff and %chg columns (except for primary column itself)
             if col == primary_col:
-                row_data[f'Selisih dengan Baseline'] = '-'
+                row_data[diff_col_name] = '-'
                 row_data['%Chg'] = '-'
             else:
-                row_data[f'Selisih dengan Baseline'] = diff
+                row_data[diff_col_name] = diff
                 row_data['%Chg'] = pct
             
             summary_data.append(row_data)
@@ -1410,9 +1440,8 @@ class MonitoringDashboard:
             display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
         display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
         
-        # Format diff column (handle '-' for primary row)
-        diff_col = f'Selisih vs {primary_col[:15]}...'
-        display_df[diff_col] = display_df[diff_col].apply(
+        # ✅ FIX: Use the same column name for formatting
+        display_df[diff_col_name] = display_df[diff_col_name].apply(
             lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
         )
         display_df['%Chg'] = display_df['%Chg'].apply(
@@ -1424,7 +1453,7 @@ class MonitoringDashboard:
         with st.expander("ℹ️ Keterangan", expanded=False):
             st.markdown(f"""
             - **Kolom Utama (Baseline)**: `{primary_col}`
-            - **Selisih**: Nilai kolom - Nilai {primary_col}
+            - **Selisih dengan Baseline**: Nilai kolom - Nilai {primary_col}
             - **%Chg**: Persentase perubahan terhadap {primary_col}
             """)
 
@@ -1441,4 +1470,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
