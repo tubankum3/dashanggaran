@@ -1,5 +1,5 @@
 # =============================================================================
-# Data Loading with Date Picker + Availability Indicator
+# Data Loading with Streaming Download for Large Files
 # =============================================================================
 import streamlit as st
 import pandas as pd
@@ -17,9 +17,12 @@ BASE_URL = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/"
 FILENAME_PATTERN = "df_{YYYYMMDD}.csv.zip"
 CSV_FILENAME_IN_ZIP = "df.csv"
 
-# Date range for picker
 DATE_START = date(2024, 1, 1)
 DATE_END = date.today()
+
+# Timeout settings for large files
+CONNECT_TIMEOUT = 10  # seconds to establish connection
+READ_TIMEOUT = 300    # seconds to read data (5 minutes for large files)
 
 # =============================================================================
 # URL Builder Functions
@@ -46,33 +49,50 @@ def format_date_label(data_date: date) -> str:
 
 
 # =============================================================================
-# Availability Check Functions
+# Availability Check
 # =============================================================================
-@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
-def check_data_availability(data_date: str) -> bool:
+@st.cache_data(ttl=300, show_spinner=False)
+def check_data_availability(data_date: str) -> Tuple[bool, Optional[int]]:
     """
-    Check if data file exists for a given date.
+    Check if data file exists and get file size.
     
-    Args:
-        data_date: Date string in 'YYYY-MM-DD' format
-        
     Returns:
-        bool: True if file exists, False otherwise
+        Tuple of (is_available, file_size_bytes)
     """
     dt = parse_date_string(data_date)
     url = build_url(dt)
     
     try:
-        response = requests.head(url, timeout=5)
-        return response.status_code == 200
+        response = requests.head(url, timeout=10, allow_redirects=True)
+        if response.status_code == 200:
+            content_length = response.headers.get('Content-Length')
+            size = int(content_length) if content_length else None
+            return True, size
+        return False, None
     except:
-        return False
+        return False, None
 
 
-def render_availability_badge(is_available: bool) -> str:
+def format_file_size(size_bytes: Optional[int]) -> str:
+    """Format file size in human readable format."""
+    if size_bytes is None:
+        return "Unknown"
+    
+    if size_bytes >= 1_000_000_000:
+        return f"{size_bytes / 1_000_000_000:.2f} GB"
+    elif size_bytes >= 1_000_000:
+        return f"{size_bytes / 1_000_000:.2f} MB"
+    elif size_bytes >= 1_000:
+        return f"{size_bytes / 1_000:.2f} KB"
+    else:
+        return f"{size_bytes} bytes"
+
+
+def render_availability_badge(is_available: bool, file_size: Optional[int] = None) -> str:
     """Return HTML badge for availability status."""
     if is_available:
-        return """
+        size_text = f" • {format_file_size(file_size)}" if file_size else ""
+        return f"""
         <span style="
             background-color: #10B981;
             color: white;
@@ -80,7 +100,7 @@ def render_availability_badge(is_available: bool) -> str:
             border-radius: 20px;
             font-size: 14px;
             font-weight: 500;
-        ">✓ Data Tersedia</span>
+        ">✓ Data Tersedia{size_text}</span>
         """
     else:
         return """
@@ -96,31 +116,179 @@ def render_availability_badge(is_available: bool) -> str:
 
 
 # =============================================================================
+# Streaming Download Functions
+# =============================================================================
+def download_with_progress(url: str, progress_placeholder) -> Optional[bytes]:
+    """
+    Download file with progress bar for large files.
+    
+    Args:
+        url: URL to download
+        progress_placeholder: Streamlit placeholder for progress bar
+        
+    Returns:
+        File content as bytes, or None if failed
+    """
+    try:
+        # Start streaming download
+        response = requests.get(
+            url, 
+            stream=True, 
+            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            allow_redirects=True
+        )
+        response.raise_for_status()
+        
+        # Get total size
+        total_size = response.headers.get('Content-Length')
+        total_size = int(total_size) if total_size else None
+        
+        # Download in chunks
+        chunks = []
+        downloaded = 0
+        chunk_size = 1024 * 1024  # 1MB chunks
+        
+        progress_bar = progress_placeholder.progress(0, text="Downloading...")
+        
+        for chunk in response.iter_content(chunk_size=chunk_size):
+            if chunk:
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                
+                if total_size:
+                    progress = min(downloaded / total_size, 1.0)
+                    progress_bar.progress(
+                        progress, 
+                        text=f"Downloading... {format_file_size(downloaded)} / {format_file_size(total_size)}"
+                    )
+                else:
+                    progress_bar.progress(0.5, text=f"Downloading... {format_file_size(downloaded)}")
+        
+        progress_bar.progress(1.0, text="Download complete!")
+        
+        content = b''.join(chunks)
+        return content
+        
+    except requests.exceptions.Timeout:
+        progress_placeholder.error("⏱️ Download timeout - file terlalu besar atau koneksi lambat")
+        return None
+    except requests.exceptions.RequestException as e:
+        progress_placeholder.error(f"❌ Download error: {e}")
+        return None
+    except Exception as e:
+        progress_placeholder.error(f"❌ Error: {e}")
+        return None
+
+
+# =============================================================================
 # Data Loading Functions
 # =============================================================================
-@st.cache_data(show_spinner=True, ttl=3600)
-def load_data_by_date(data_date: str) -> pd.DataFrame:
+def load_data_by_date_with_progress(data_date: str, progress_placeholder) -> pd.DataFrame:
     """
-    Load budget data for a specific date.
+    Load budget data with progress indicator.
     
     Args:
         data_date: Date string in 'YYYY-MM-DD' format
+        progress_placeholder: Streamlit placeholder for progress
         
     Returns:
-        pd.DataFrame: Preprocessed budget data with _DATA_DATE column
+        pd.DataFrame: Preprocessed budget data
+    """
+    dt = parse_date_string(data_date)
+    url = build_url(dt)
+    
+    # Download with progress
+    content = download_with_progress(url, progress_placeholder)
+    
+    if content is None:
+        return pd.DataFrame()
+    
+    # Check if it's a valid ZIP
+    if len(content) < 4:
+        st.error("❌ Downloaded file is too small")
+        return pd.DataFrame()
+    
+    # Debug: show first bytes
+    first_bytes = content[:20]
+    is_zip = content[:2] == b'PK'
+    
+    if not is_zip:
+        st.error(f"❌ File bukan ZIP yang valid")
+        with st.expander("🔍 Debug Info"):
+            st.write(f"File size: {format_file_size(len(content))}")
+            st.write(f"First 20 bytes (hex): {first_bytes.hex()}")
+            st.write(f"First 20 bytes (text): {first_bytes.decode('utf-8', errors='replace')}")
+            
+            # Check if it's HTML error
+            try:
+                text_preview = content[:500].decode('utf-8', errors='ignore')
+                if '<html' in text_preview.lower() or '404' in text_preview:
+                    st.write("⚠️ Received HTML error page instead of file")
+                st.code(text_preview)
+            except:
+                pass
+        return pd.DataFrame()
+    
+    # Parse ZIP
+    try:
+        progress_placeholder.info("📦 Extracting ZIP...")
+        
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            file_list = z.namelist()
+            csv_files = [f for f in file_list if f.endswith('.csv')]
+            
+            if not csv_files:
+                st.error(f"❌ No CSV files in ZIP. Contents: {file_list}")
+                return pd.DataFrame()
+            
+            target_file = CSV_FILENAME_IN_ZIP if CSV_FILENAME_IN_ZIP in csv_files else csv_files[0]
+            
+            progress_placeholder.info(f"📄 Reading {target_file}...")
+            
+            with z.open(target_file) as file:
+                df = pd.read_csv(file, low_memory=False)
+        
+        progress_placeholder.empty()
+        
+        df = preprocess_dataframe(df)
+        df["_DATA_DATE"] = data_date
+        
+        return df
+        
+    except zipfile.BadZipFile as e:
+        st.error(f"❌ Invalid ZIP file: {e}")
+        with st.expander("🔍 Debug Info"):
+            st.write(f"File size: {format_file_size(len(content))}")
+            st.write(f"First bytes: {content[:50].hex()}")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"❌ Error reading ZIP: {e}")
+        return pd.DataFrame()
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_data_by_date_cached(data_date: str) -> pd.DataFrame:
+    """
+    Cached version - downloads without progress (for subsequent loads).
     """
     dt = parse_date_string(data_date)
     url = build_url(dt)
     
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(
+            url, 
+            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            allow_redirects=True
+        )
         response.raise_for_status()
+        content = response.content
         
-        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+        if content[:2] != b'PK':
+            return pd.DataFrame()
+        
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
             csv_files = [f for f in z.namelist() if f.endswith('.csv')]
-            
             if not csv_files:
-                st.error(f"❌ Tidak ada file CSV dalam zip untuk tanggal {data_date}")
                 return pd.DataFrame()
             
             target_file = CSV_FILENAME_IN_ZIP if CSV_FILENAME_IN_ZIP in csv_files else csv_files[0]
@@ -130,17 +298,9 @@ def load_data_by_date(data_date: str) -> pd.DataFrame:
         
         df = preprocess_dataframe(df)
         df["_DATA_DATE"] = data_date
-        
         return df
         
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            st.error(f"❌ Data tidak tersedia untuk tanggal {format_date_label(dt)}")
-        else:
-            st.error(f"❌ HTTP Error: {e}")
-        return pd.DataFrame()
-    except Exception as e:
-        st.error(f"❌ Gagal memuat data: {str(e)}")
+    except:
         return pd.DataFrame()
 
 
@@ -176,7 +336,7 @@ NUMERIC_COLUMNS = [
 
 
 # =============================================================================
-# Aggregation & Comparison Functions
+# Aggregation & Comparison Functions  
 # =============================================================================
 def aggregate_data(
     df: pd.DataFrame,
@@ -263,19 +423,18 @@ def rupiah_separator(x):
 # =============================================================================
 # Sidebar Components
 # =============================================================================
-def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Optional[str], Optional[str], bool, bool, bool]:
+def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Optional[str], Optional[str], bool, bool, bool, Optional[int]]:
     """
     Render date selection with availability indicator.
     
     Returns:
-        Tuple of (primary_date, comparison_date, enable_comparison, primary_available, comparison_available)
+        Tuple of (primary_date, comparison_date, enable_comparison, primary_available, comparison_available, primary_size)
     """
     st.sidebar.markdown("### 📅 Pilih Tanggal Data")
     
-    # Primary date picker
     primary_dt = st.sidebar.date_input(
         "Tanggal Data Utama",
-        value=date(2025, 10, 27),  # Default to known available date
+        value=date(2025, 10, 27),
         min_value=DATE_START,
         max_value=DATE_END,
         key=f"{key_prefix}primary_date",
@@ -283,25 +442,20 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     )
     primary_date = primary_dt.strftime("%Y-%m-%d")
     
-    # Check availability
     with st.sidebar:
-        with st.spinner("Memeriksa ketersediaan..."):
-            primary_available = check_data_availability(primary_date)
+        with st.spinner("Memeriksa..."):
+            primary_available, primary_size = check_data_availability(primary_date)
         
-        st.markdown(render_availability_badge(primary_available), unsafe_allow_html=True)
+        st.markdown(render_availability_badge(primary_available, primary_size), unsafe_allow_html=True)
         
-        # Show URL info
         with st.expander("🔗 Info URL", expanded=False):
             url = build_url(primary_dt)
             st.code(url, language=None)
             if primary_available:
-                st.success("File ditemukan")
-            else:
-                st.error("File tidak ditemukan")
+                st.success(f"✓ File size: {format_file_size(primary_size)}")
     
     st.sidebar.markdown("---")
     
-    # Comparison toggle
     enable_comparison = st.sidebar.checkbox(
         "🔄 Bandingkan dengan tanggal lain",
         value=False,
@@ -314,34 +468,24 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     if enable_comparison:
         comparison_dt = st.sidebar.date_input(
             "Tanggal Pembanding",
-            value=date(2025, 11, 11),  # Default to other known available date
+            value=date(2025, 11, 11),
             min_value=DATE_START,
             max_value=DATE_END,
-            key=f"{key_prefix}comparison_date",
-            help="Pilih tanggal untuk dibandingkan"
+            key=f"{key_prefix}comparison_date"
         )
         comparison_date = comparison_dt.strftime("%Y-%m-%d")
         
-        # Check availability
         with st.sidebar:
-            with st.spinner("Memeriksa ketersediaan..."):
-                comparison_available = check_data_availability(comparison_date)
+            with st.spinner("Memeriksa..."):
+                comparison_available, comp_size = check_data_availability(comparison_date)
             
-            st.markdown(render_availability_badge(comparison_available), unsafe_allow_html=True)
-            
-            with st.expander("🔗 Info URL Pembanding", expanded=False):
-                url2 = build_url(comparison_dt)
-                st.code(url2, language=None)
+            st.markdown(render_availability_badge(comparison_available, comp_size), unsafe_allow_html=True)
     
-    # Quick select known dates
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**📋 Tanggal Tersedia (Prototipe):**")
-    st.sidebar.markdown("""
-    - 27 Oktober 2025
-    - 11 November 2025
-    """)
+    st.sidebar.markdown("**📋 Tanggal Tersedia:**")
+    st.sidebar.markdown("- 27 Oktober 2025\n- 11 November 2025")
     
-    return primary_date, comparison_date, enable_comparison, primary_available, comparison_available
+    return primary_date, comparison_date, enable_comparison, primary_available, comparison_available, primary_size
 
 
 def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[str], str]:
@@ -352,34 +496,28 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
         "Group By (Kolom String)",
         options=STRING_COLUMNS,
         default=['KEMENTERIAN/LEMBAGA', 'PROGRAM'],
-        help="Pilih minimal 2 kolom untuk pengelompokan",
+        help="Pilih minimal 2 kolom",
         key=f"{key_prefix}group_cols"
     )
     
     if len(group_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom string")
+        st.sidebar.warning("⚠️ Pilih minimal 2 kolom")
     
     numeric_cols = st.sidebar.multiselect(
         "Agregasi (Kolom Numerik)",
         options=NUMERIC_COLUMNS,
         default=['REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI'],
-        help="Pilih minimal 2 kolom untuk agregasi",
+        help="Pilih minimal 2 kolom",
         key=f"{key_prefix}numeric_cols"
     )
     
     if len(numeric_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom numerik")
+        st.sidebar.warning("⚠️ Pilih minimal 2 kolom")
     
     agg_func = st.sidebar.selectbox(
         "Fungsi Agregasi",
         options=['sum', 'mean', 'count', 'min', 'max'],
-        format_func=lambda x: {
-            'sum': 'Jumlah (Sum)',
-            'mean': 'Rata-rata (Mean)', 
-            'count': 'Hitung (Count)',
-            'min': 'Minimum',
-            'max': 'Maksimum'
-        }.get(x, x),
+        format_func=lambda x: {'sum': 'Jumlah', 'mean': 'Rata-rata', 'count': 'Hitung', 'min': 'Min', 'max': 'Max'}.get(x, x),
         key=f"{key_prefix}agg_func"
     )
     
@@ -393,12 +531,11 @@ def main():
     """Main application."""
     
     st.set_page_config(
-        page_title="Dashboard Anggaran - Prototipe",
+        page_title="Dashboard Anggaran",
         page_icon="📊",
         layout="wide"
     )
     
-    # Header
     st.markdown("""
     <div style="
         background: linear-gradient(135deg, #0066FF 0%, #0052CC 100%);
@@ -413,39 +550,32 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar
     with st.sidebar:
         st.markdown("## ⚙️ Pengaturan")
-        
         result = render_date_selector_with_availability()
-        primary_date, comparison_date, enable_comparison, primary_available, comparison_available = result
-        
+        primary_date, comparison_date, enable_comparison, primary_available, comparison_available, primary_size = result
         st.divider()
         group_cols, numeric_cols, agg_func = render_aggregation_options()
     
-    # Main content
     if not primary_available:
-        st.warning(f"""
-        ⚠️ **Data tidak tersedia untuk tanggal {format_date_label(parse_date_string(primary_date))}**
-        
-        Silakan pilih tanggal lain. Data yang tersedia:
-        - **27 Oktober 2025** (`df_20251027.csv.zip`)
-        - **11 November 2025** (`df_20251111.csv.zip`)
-        """)
+        st.warning(f"⚠️ Data tidak tersedia untuk {format_date_label(parse_date_string(primary_date))}")
         return
     
-    # Load primary data
-    with st.spinner(f"Memuat data {format_date_label(parse_date_string(primary_date))}..."):
-        df_primary = load_data_by_date(primary_date)
+    # Show file size warning for large files
+    if primary_size and primary_size > 50_000_000:  # > 50MB
+        st.info(f"📦 File besar ({format_file_size(primary_size)}). Download mungkin memakan waktu...")
+    
+    # Progress placeholder
+    progress_placeholder = st.empty()
+    
+    # Load data with progress
+    df_primary = load_data_by_date_with_progress(primary_date, progress_placeholder)
     
     if df_primary.empty:
-        st.error("Gagal memuat data")
         return
     
-    # Success message
     st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {format_date_label(parse_date_string(primary_date))}")
     
-    # Info metrics
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Total Baris", f"{len(df_primary):,}")
     col2.metric("📋 Total Kolom", len(df_primary.columns))
@@ -456,128 +586,64 @@ def main():
     
     st.divider()
     
-    # Check column selection
     if len(group_cols) < 2 or len(numeric_cols) < 2:
-        st.info("👆 Pilih minimal 2 kolom string dan 2 kolom numerik di sidebar untuk melihat agregasi")
-        
-        # Show raw data preview
-        with st.expander("📋 Preview Data Mentah"):
+        st.info("👆 Pilih minimal 2 kolom string dan 2 kolom numerik")
+        with st.expander("📋 Preview Data"):
             st.dataframe(df_primary.head(100), use_container_width=True)
         return
     
-    # Aggregate primary data
     agg_primary = aggregate_data(df_primary, group_cols, numeric_cols, agg_func)
     
-    # Comparison mode
-    if enable_comparison and comparison_date:
-        if not comparison_available:
-            st.warning(f"⚠️ Data pembanding tidak tersedia untuk tanggal {format_date_label(parse_date_string(comparison_date))}")
-            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
-            return
+    if enable_comparison and comparison_date and comparison_available:
+        progress_placeholder2 = st.empty()
+        df_comparison = load_data_by_date_with_progress(comparison_date, progress_placeholder2)
         
-        # Load comparison data
-        with st.spinner(f"Memuat data pembanding {format_date_label(parse_date_string(comparison_date))}..."):
-            df_comparison = load_data_by_date(comparison_date)
-        
-        if df_comparison.empty:
-            st.warning("⚠️ Gagal memuat data pembanding")
-            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
-            return
-        
-        st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
-        
-        # Create comparison
-        comparison_df = compare_datasets(
-            df_primary, df_comparison,
-            group_cols, numeric_cols,
-            primary_date, comparison_date
-        )
-        
-        # Tabs
-        tab1, tab2, tab3 = st.tabs([
-            f"📊 Data {format_date_label(parse_date_string(primary_date))}",
-            "🔄 Perbandingan",
-            "📈 Ringkasan"
-        ])
-        
-        with tab1:
-            st.subheader(f"Agregasi - {format_date_label(parse_date_string(primary_date))}")
-            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+        if not df_comparison.empty:
+            st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
             
-            csv1 = agg_primary.to_csv(index=False)
-            st.download_button(
-                "📥 Download CSV",
-                data=csv1,
-                file_name=f"agregasi_{primary_date}.csv",
-                mime="text/csv",
-                key="download_primary"
+            comparison_df = compare_datasets(
+                df_primary, df_comparison,
+                group_cols, numeric_cols,
+                primary_date, comparison_date
             )
-        
-        with tab2:
-            st.subheader("Perbandingan Data")
-            st.caption(f"**{format_date_label(parse_date_string(primary_date))}** vs **{format_date_label(parse_date_string(comparison_date))}**")
             
-            # Highlight columns info
-            st.info(f"""
-            **Kolom hasil perbandingan:**
-            - `[kolom]_{primary_date}` = Nilai dari tanggal utama
-            - `[kolom]_{comparison_date}` = Nilai dari tanggal pembanding  
-            - `SELISIH_[kolom]` = Selisih (pembanding - utama)
-            - `PCT_[kolom]` = Persentase perubahan
-            """)
+            tab1, tab2, tab3 = st.tabs([
+                f"📊 Data {format_date_label(parse_date_string(primary_date))}",
+                "🔄 Perbandingan",
+                "📈 Ringkasan"
+            ])
             
-            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+            with tab1:
+                st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+                csv1 = agg_primary.to_csv(index=False)
+                st.download_button("📥 Download CSV", csv1, f"agregasi_{primary_date}.csv", "text/csv", key="dl1")
             
-            csv2 = comparison_df.to_csv(index=False)
-            st.download_button(
-                "📥 Download Perbandingan (CSV)",
-                data=csv2,
-                file_name=f"perbandingan_{primary_date}_vs_{comparison_date}.csv",
-                mime="text/csv",
-                key="download_comparison"
-            )
-        
-        with tab3:
-            st.subheader("Ringkasan Perbandingan")
+            with tab2:
+                st.info(f"""
+                **Kolom:** `[kolom]_{primary_date}` = Utama | `[kolom]_{comparison_date}` = Pembanding | `SELISIH_` = Selisih | `PCT_` = %
+                """)
+                st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                csv2 = comparison_df.to_csv(index=False)
+                st.download_button("📥 Download CSV", csv2, f"perbandingan_{primary_date}_vs_{comparison_date}.csv", "text/csv", key="dl2")
             
-            for col in numeric_cols:
-                if col in df_primary.columns and col in df_comparison.columns:
-                    st.markdown(f"#### {col}")
-                    
-                    c1, c2, c3 = st.columns(3)
-                    
-                    val1 = df_primary[col].sum()
-                    val2 = df_comparison[col].sum()
-                    diff = val2 - val1
-                    pct = (diff / abs(val1) * 100) if val1 != 0 else 0
-                    
-                    c1.metric(
-                        format_date_label(parse_date_string(primary_date)),
-                        format_rupiah(val1)
-                    )
-                    c2.metric(
-                        format_date_label(parse_date_string(comparison_date)),
-                        format_rupiah(val2)
-                    )
-                    c3.metric(
-                        "Selisih",
-                        format_rupiah(diff),
-                        f"{pct:+.2f}%"
-                    )
-                    st.divider()
-    
+            with tab3:
+                for col in numeric_cols:
+                    if col in df_primary.columns and col in df_comparison.columns:
+                        st.markdown(f"#### {col}")
+                        c1, c2, c3 = st.columns(3)
+                        val1, val2 = df_primary[col].sum(), df_comparison[col].sum()
+                        diff = val2 - val1
+                        pct = (diff / abs(val1) * 100) if val1 != 0 else 0
+                        c1.metric(primary_date, format_rupiah(val1))
+                        c2.metric(comparison_date, format_rupiah(val2))
+                        c3.metric("Selisih", format_rupiah(diff), f"{pct:+.2f}%")
+                        st.divider()
+        else:
+            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
     else:
-        # Single date view
-        st.subheader(f"Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
         st.dataframe(agg_primary, use_container_width=True, hide_index=True)
-        
         csv = agg_primary.to_csv(index=False)
-        st.download_button(
-            "📥 Download Data (CSV)",
-            data=csv,
-            file_name=f"agregasi_{primary_date}.csv",
-            mime="text/csv"
-        )
+        st.download_button("📥 Download CSV", csv, f"agregasi_{primary_date}.csv", "text/csv")
 
 
 if __name__ == "__main__":
