@@ -76,7 +76,7 @@ class ColumnConfig:
     )
     
     # Defaults
-    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('Tahun', 'KEMENTERIAN/LEMBAGA')
+    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA','FUNGSI','PROGRAM')
     DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
     
     # Actual available columns (set after loading data)
@@ -879,7 +879,7 @@ class SidebarController:
             selected_years = st.sidebar.multiselect(
                 "Tahun Anggaran",
                 options=[int(y) for y in available_years],
-                default=[int(y) for y in available_years],
+                default=datetime.now().strftime('%Y')}",
                 help="Pilih tahun anggaran yang ingin ditampilkan",
                 key=f"{key_prefix}tahun_anggaran"
             )
@@ -920,17 +920,6 @@ class SidebarController:
         )
         
         return selected_years, group_cols, numeric_cols, agg_func
-    
-    def render_data_info(self, df: pd.DataFrame, label: str, key_prefix: str = "") -> None:
-        """Render data info expander in sidebar."""
-        with st.sidebar.expander(f"📋 Info Data - {label}", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            col1.metric("📊 Baris", Formatter.to_number_with_separator(len(df)))
-            col2.metric("📋 Kolom", len(df.columns))
-            
-            if "Tahun" in df.columns:
-                years = sorted(df["Tahun"].dropna().unique())
-                col3.metric("📆 Tahun", ", ".join(map(str, years)))
 
 
 class FilterController:
@@ -1052,8 +1041,6 @@ class MonitoringDashboard:
         date_label = Formatter.to_indonesian_date(primary_dt)
         st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {date_label}")
         
-        self.sidebar.render_data_info(df_primary, date_label, "primary_")
-        
         st.sidebar.divider()
         selected_years, group_cols, numeric_cols, agg_func = self.sidebar.render_aggregation_options(
             df_primary
@@ -1142,7 +1129,6 @@ class MonitoringDashboard:
         
         comparison_label = Formatter.to_indonesian_date(comparison_dt)
         st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
-        self.sidebar.render_data_info(df_comparison, comparison_label, "comparison_")
         
         comparison_df = self.comparator.compare(
             df_primary, df_comparison,
@@ -1351,3 +1337,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
