@@ -76,7 +76,7 @@ class ColumnConfig:
     )
     
     # Defaults
-    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA','FUNGSI','PROGRAM')
+    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA', 'FUNGSI', 'PROGRAM')
     DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
     
     # Actual available columns (set after loading data)
@@ -1077,10 +1077,12 @@ class MonitoringDashboard:
                 selected_years
             )
         else:
+            # ✅ FIXED: Added missing parameters agg_primary and selected_years
             self._render_single_date_view(
                 df_primary, primary_date,
                 group_cols, numeric_cols,
-                agg_primary_display, formatter
+                agg_primary, agg_primary_display, formatter,
+                selected_years
             )
     
     def _configure_page(self) -> None:
@@ -1148,6 +1150,8 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
+        # ✅ FIXED: Added section header before comparison header
+        st.markdown("### 🔄 Detail Perbandingan Data")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
         # Render filters - affects both summary and detail
@@ -1221,7 +1225,7 @@ class MonitoringDashboard:
         formatter: DataFrameFormatter
     ) -> None:
         """Render detailed comparison table (uses pre-filtered data)."""
-        st.markdown("### 📋 Detail Perbandingan Data")
+        st.markdown("### 📋 Tabel Detail Perbandingan")
         
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
@@ -1246,7 +1250,7 @@ class MonitoringDashboard:
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_comparison"
         )
-        
+    
     def _render_single_date_view(
         self,
         df_primary: pd.DataFrame,
@@ -1437,7 +1441,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
