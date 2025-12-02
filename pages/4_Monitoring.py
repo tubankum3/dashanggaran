@@ -1328,12 +1328,12 @@ class MonitoringDashboard:
         primary_value = df[primary_col].sum()
         
         # Show primary column
-        st.markdown(f"**Kolom Utama (Baseline): {primary_col}**")
-        st.metric(primary_col, Formatter.to_rupiah_short(primary_value))
+        st.markdown(f"**{primary_col} (Baseline)**")
+        st.metric(Formatter.to_rupiah_short(primary_value))
         
         # Show comparison columns (2nd and onwards)
         if len(numeric_cols) > 1:
-            st.markdown("**Perbandingan dengan Kolom Lain:**")
+            st.markdown("**Perbandingan dengan Metrik Lain:**")
             
             comparison_cols = numeric_cols[1:]
             cols_per_row = min(len(comparison_cols), self.config.metrics_per_row)
@@ -1351,7 +1351,7 @@ class MonitoringDashboard:
                         cols[idx].metric(
                             col, 
                             Formatter.to_rupiah_short(value),
-                            f"{pct:+.2f}% vs {primary_col[:20]}..."
+                            f"{pct:+.2f}%"
                         )
     
     def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
@@ -1391,10 +1391,10 @@ class MonitoringDashboard:
             
             # Add diff and %chg columns (except for primary column itself)
             if col == primary_col:
-                row_data[f'Selisih vs {primary_col[:15]}...'] = '-'
+                row_data[f'Selisih dengan Baseline'] = '-'
                 row_data['%Chg'] = '-'
             else:
-                row_data[f'Selisih vs {primary_col[:15]}...'] = diff
+                row_data[f'Selisih dengan Baseline'] = diff
                 row_data['%Chg'] = pct
             
             summary_data.append(row_data)
@@ -1441,3 +1441,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
