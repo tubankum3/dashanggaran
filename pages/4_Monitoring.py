@@ -1065,7 +1065,7 @@ class MonitoringDashboard:
         comparison_label: str
     ) -> None:
         """Render summary metrics for comparison."""
-        st.markdown("### 📈 Ringkasan Perbandingan Antar Tanggal")
+        st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
         
         for col in numeric_cols:
             if col not in df_primary.columns or col not in df_comparison.columns:
@@ -1076,8 +1076,8 @@ class MonitoringDashboard:
             
             val_primary = df_primary[col].sum()
             val_comparison = df_comparison[col].sum()
-            diff = val_comparison - val_primary
-            pct = (diff / abs(val_primary) * 100) if val_primary != 0 else 0
+            diff = val_primary - val_comparison
+            pct = (diff / abs(val_comparison) * 100) if val_comparison != 0 else 0
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
@@ -1214,4 +1214,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
