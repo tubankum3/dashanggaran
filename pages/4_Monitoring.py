@@ -76,7 +76,7 @@ class ColumnConfig:
     )
     
     # Defaults
-    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA', 'FUNGSI','PROGRAM')
+    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('Tahun', 'KEMENTERIAN/LEMBAGA')
     DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
     
     # Actual available columns (set after loading data)
@@ -783,7 +783,7 @@ class SidebarController:
         """Render date selection controls in sidebar."""
         st.sidebar.markdown("### 📅 Pengaturan Tanggal Data Update")
         help_text = "Tanggal tersedia:\n" + "\n".join(f"- {d}" for d in AVAILABLE_DATES)
-      
+        
         primary_dt = st.sidebar.date_input(
             "Pilih Tanggal Data Terkini",
             value=date(2025, 11, 11),
@@ -869,7 +869,7 @@ class SidebarController:
         default_groups = self.column_config.get_available_group_defaults() or string_options[:2]
         default_numerics = self.column_config.get_available_numeric_defaults() or numeric_options[:1]
         
-        # Tahun Anggaran selector
+        # Tahun Anggaran selector (before group_cols)
         available_years = self.column_config.available_years
         if not available_years and "Tahun" in df.columns:
             available_years = sorted(df["Tahun"].dropna().unique().tolist())
@@ -920,6 +920,17 @@ class SidebarController:
         )
         
         return selected_years, group_cols, numeric_cols, agg_func
+    
+    def render_data_info(self, df: pd.DataFrame, label: str, key_prefix: str = "") -> None:
+        """Render data info expander in sidebar."""
+        with st.sidebar.expander(f"📋 Info Data - {label}", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            col1.metric("📊 Baris", Formatter.to_number_with_separator(len(df)))
+            col2.metric("📋 Kolom", len(df.columns))
+            
+            if "Tahun" in df.columns:
+                years = sorted(df["Tahun"].dropna().unique())
+                col3.metric("📆 Tahun", ", ".join(map(str, years)))
 
 
 class FilterController:
@@ -1340,4 +1351,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
