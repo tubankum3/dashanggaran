@@ -1148,8 +1148,6 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
-        # Render detail section first to get filters (but display after summary)
-        st.markdown("### 🔄 Detail Perbandingan Data")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
         # Render filters once here - affects both summary and detail
@@ -1223,7 +1221,7 @@ class MonitoringDashboard:
         formatter: DataFrameFormatter
     ) -> None:
         """Render detailed comparison table (uses pre-filtered data)."""
-        st.markdown("### 📋 Tabel Detail Perbandingan")
+        st.markdown("### 📋 Detail Perbandingan Data")
         
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
@@ -1342,5 +1340,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
