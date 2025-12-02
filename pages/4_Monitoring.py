@@ -1,13 +1,7 @@
 """
-Monitoring Anggaran - Budget Monitoring Dashboard
+Monitoring Anggaran
 =================================================
-
-A Streamlit dashboard for comparing Indonesian government budget data
-across different update dates. Supports data aggregation, filtering,
-and comparison analysis.
-
-Author: Budget Analysis Team
-Version: 3.0.1
+Dashboard untuk mengkomparasi data anggaran pemerintah antar tanggal update database yang berbeda.
 """
 
 from __future__ import annotations
@@ -38,7 +32,6 @@ class AggregationFunction(Enum):
     
     @property
     def display_name(self) -> str:
-        """Return human-readable name for UI display."""
         names = {
             "sum": "Jumlah (Sum)",
             "mean": "Rata-rata (Mean)",
@@ -365,7 +358,7 @@ class DataFrameFormatter:
 
 
 # =============================================================================
-# CACHED FUNCTIONS (Module-level for Streamlit compatibility)
+# CACHED FUNCTIONS
 # =============================================================================
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -643,13 +636,13 @@ class DatasetComparator:
                 continue
             
             comparison[f"SELISIH_{col}"] = (
-                comparison[col_comparison].fillna(0) - 
-                comparison[col_primary].fillna(0)
+                comparison[col_primary].fillna(0) - 
+                comparison[col_comparison].fillna(0)
             )
             
-            comparison[f"PCT_{col}"] = np.where(
+            comparison[f"%CHG_{col}"] = np.where(
                 comparison[col_primary].fillna(0) != 0,
-                (comparison[f"SELISIH_{col}"] / comparison[col_primary].fillna(0).abs()) * 100,
+                (comparison[f"SELISIH_{col}"] / comparison[col_comparison].fillna(0).abs()) * 100,
                 np.nan
             )
         
@@ -668,7 +661,7 @@ class UIComponents:
         """Render the main dashboard header."""
         st.markdown("""
         <div class="dashboard-header">
-            <p class="breadcrumb">KEMENTERIAN KEUANGAN RI • BIDJA</p>
+            <p class="breadcrumb">DASHBOARD / MONITORING</p>
             <h1 class="dashboard-title">Monitoring Anggaran</h1>
             <p class="dashboard-subtitle">Perbandingan Data Anggaran Berdasarkan Tanggal Update Database</p>
         </div>
@@ -737,11 +730,11 @@ class SidebarController:
         key_prefix: str = ""
     ) -> Tuple[str, Optional[str], bool, DataAvailability, Optional[DataAvailability]]:
         """Render date selection controls in sidebar."""
-        st.sidebar.markdown("### 📅 Pilih Tanggal Data")
+        st.sidebar.markdown("### 📅 Pengaturan Tanggal Data Update")
         
         primary_dt = st.sidebar.date_input(
-            "Tanggal Data Utama",
-            value=date(2025, 10, 27),
+            "Pilih Tanggal Data Terkini",
+            value=date(2025, 11, 11),
             min_value=self.config.date_start,
             max_value=self.config.date_end,
             key=f"{key_prefix}primary_date",
@@ -758,7 +751,7 @@ class SidebarController:
         st.sidebar.markdown("---")
         
         enable_comparison = st.sidebar.checkbox(
-            "🔄 Bandingkan dengan tanggal lain",
+            "Bandingkan dengan tanggal update data sebelumnya",
             value=False,
             key=f"{key_prefix}enable_comparison"
         )
@@ -768,13 +761,13 @@ class SidebarController:
         
         if enable_comparison:
             default_comparison = (
-                date(2025, 11, 11) 
-                if primary_dt != date(2025, 11, 11) 
-                else date(2025, 10, 27)
+                date(2025, 10, 27) 
+                if primary_dt != date(2025, 10, 27) 
+                else date(2025, 11, 11)
             )
             
             comparison_dt = st.sidebar.date_input(
-                "Tanggal Pembanding",
+                "Pilih Tanggal Pembanding",
                 value=default_comparison,
                 min_value=self.config.date_start,
                 max_value=self.config.date_end,
@@ -792,7 +785,7 @@ class SidebarController:
             )
         
         st.sidebar.markdown("---")
-        st.sidebar.markdown("**📋 Tanggal Tersedia:**")
+        st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
         st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
         
         return (
@@ -805,10 +798,10 @@ class SidebarController:
     
     def render_aggregation_options(self, key_prefix: str = "") -> Tuple[List[str], List[str], str]:
         """Render aggregation options in sidebar."""
-        st.sidebar.markdown("### 📊 Opsi Agregasi")
+        st.sidebar.markdown("### Pilih Kolom Data")
         
         group_cols = st.sidebar.multiselect(
-            "Group By (Kolom String)",
+            "Kolom Kategori",
             options=list(self.column_config.STRING_COLUMNS),
             default=list(self.column_config.DEFAULT_GROUP_COLS),
             help="Pilih minimal 1 kolom untuk pengelompokan",
@@ -819,7 +812,7 @@ class SidebarController:
             st.sidebar.error("⚠️ Pilih minimal 1 kolom string")
         
         numeric_cols = st.sidebar.multiselect(
-            "Agregasi (Kolom Numerik)",
+            "Kolom Numerik",
             options=list(self.column_config.NUMERIC_COLUMNS),
             default=list(self.column_config.DEFAULT_NUMERIC_COLS),
             help="Pilih minimal 1 kolom untuk agregasi",
@@ -1102,7 +1095,7 @@ class MonitoringDashboard:
         formatter: DataFrameFormatter
     ) -> None:
         """Render detailed comparison table with filters."""
-        st.markdown("### 🔄 Perbandingan Detail")
+        st.markdown("### 🔄 Detail Perbandingan Data")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
         filters = self.filter_controller.render_filters(
@@ -1117,8 +1110,8 @@ class MonitoringDashboard:
             st.markdown(f"""
             - `[kolom]_{primary_date}` = Nilai tanggal utama
             - `[kolom]_{comparison_date}` = Nilai tanggal pembanding
-            - `SELISIH_[kolom]` = Selisih (pembanding - utama)
-            - `PCT_[kolom]` = Persentase perubahan
+            - `SELISIH_[kolom]` = Selisih (utama - pembanding)
+            - `%CHG_[kolom]` = Persentase perubahan
             """)
         
         display_df = formatter.format_for_display(filtered_df)
@@ -1221,3 +1214,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
