@@ -1150,7 +1150,7 @@ class MonitoringDashboard:
         
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
-        # Render filters once here - affects both summary and detail
+        # Render filters - affects both summary and detail
         filters = self.filter_controller.render_filters(
             comparison_df, group_cols, key_prefix="comp_"
         )
@@ -1246,34 +1246,56 @@ class MonitoringDashboard:
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_comparison"
         )
-    
+        
     def _render_single_date_view(
         self,
         df_primary: pd.DataFrame,
         primary_date: str,
         group_cols: List[str],
         numeric_cols: List[str],
+        agg_primary: pd.DataFrame,
         agg_primary_display: pd.DataFrame,
-        formatter: DataFrameFormatter
+        formatter: DataFrameFormatter,
+        selected_years: List[int]
     ) -> None:
-        """Render single date view with optional column comparison."""
+        """Render single date view with filters affecting both summary and detail."""
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         date_label = Formatter.to_indonesian_date(primary_dt)
         
+        # Render header and filters first
+        st.markdown(f"### 📊 Analisis Data - {date_label}")
+        
+        # Render filters - affects both summary and detail
+        filters = self.filter_controller.render_filters(
+            agg_primary, group_cols, key_prefix="single_"
+        )
+        
+        # Apply filters to aggregated data
+        filtered_agg = self.filter_controller.apply_filters(agg_primary, filters)
+        
+        # Also filter raw data for summary calculations
+        df_filtered = self.filter_controller.apply_filters(df_primary, filters)
+        
+        if filters:
+            st.info(f"Filter diterapkan: **{len(filtered_agg):,}** dari **{len(agg_primary):,}** baris")
+        
+        st.divider()
+        
+        # Render column summary with comparison (if more than 1 numeric column)
         if len(numeric_cols) > 1:
-            self._render_column_summary(df_primary, numeric_cols)
+            self._render_column_summary(df_filtered, numeric_cols)
             st.divider()
-            self._render_column_comparison_table(df_primary, numeric_cols)
+            self._render_column_comparison_table(df_filtered, numeric_cols)
             st.divider()
         
-        st.markdown(f"### 📋 Data Agregasi - {date_label}")
-        st.dataframe(agg_primary_display, width="stretch", hide_index=True)
-        
-        agg_primary = DataAggregator.aggregate(df_primary, group_cols, numeric_cols)
+        # Render data table
+        st.markdown(f"### 📋 Data Agregasi")
+        filtered_display = formatter.format_for_display(filtered_agg)
+        st.dataframe(filtered_display, width="stretch", hide_index=True)
         
         # Excel download
         excel_data = ExcelExporter.to_excel_bytes(
-            agg_primary,
+            filtered_agg,
             sheet_name="Agregasi"
         )
         st.download_button(
@@ -1285,47 +1307,122 @@ class MonitoringDashboard:
         )
     
     def _render_column_summary(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
-        """Render summary metrics for numeric columns."""
-        st.markdown("### 📈 Ringkasan Kolom Numerik")
+        """
+        Render summary metrics for numeric columns.
+        First column is primary (baseline), others show diff and %chg from primary.
+        """
+        st.markdown("### 📈 Ringkasan Perbandingan Kolom Numerik")
         
-        for i in range(0, len(numeric_cols), self.config.metrics_per_row):
-            chunk = numeric_cols[i:i + self.config.metrics_per_row]
-            cols = st.columns(len(chunk))
+        if len(numeric_cols) < 1:
+            return
+        
+        # First column is the primary (baseline)
+        primary_col = numeric_cols[0]
+        if primary_col not in df.columns:
+            return
+        
+        primary_value = df[primary_col].sum()
+        
+        # Show primary column
+        st.markdown(f"**Kolom Utama (Baseline): {primary_col}**")
+        st.metric(primary_col, Formatter.to_rupiah_short(primary_value))
+        
+        # Show comparison columns (2nd and onwards)
+        if len(numeric_cols) > 1:
+            st.markdown("**Perbandingan dengan Kolom Lain:**")
             
-            for idx, col in enumerate(chunk):
-                if col in df.columns:
-                    value = df[col].sum()
-                    cols[idx].metric(col, Formatter.to_rupiah_short(value))
+            comparison_cols = numeric_cols[1:]
+            cols_per_row = min(len(comparison_cols), self.config.metrics_per_row)
+            
+            for i in range(0, len(comparison_cols), cols_per_row):
+                chunk = comparison_cols[i:i + cols_per_row]
+                cols = st.columns(len(chunk))
+                
+                for idx, col in enumerate(chunk):
+                    if col in df.columns:
+                        value = df[col].sum()
+                        diff = value - primary_value
+                        pct = (diff / abs(primary_value) * 100) if primary_value != 0 else 0
+                        
+                        cols[idx].metric(
+                            col, 
+                            Formatter.to_rupiah_short(value),
+                            f"{pct:+.2f}% vs {primary_col[:20]}..."
+                        )
     
     def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
-        """Render comparison table for numeric columns."""
-        st.markdown("### 📊 Perbandingan Antar Kolom Numerik")
+        """
+        Render comparison table for numeric columns.
+        Shows each column's stats with diff and %chg from primary (1st column).
+        """
+        st.markdown("### 📊 Tabel Perbandingan Antar Kolom Numerik")
+        
+        if len(numeric_cols) < 1:
+            return
+        
+        # First column is the primary (baseline)
+        primary_col = numeric_cols[0]
+        if primary_col not in df.columns:
+            return
+        
+        primary_total = df[primary_col].sum()
         
         summary_data = []
         for col in numeric_cols:
             if col not in df.columns:
                 continue
             
-            summary_data.append({
+            total = df[col].sum()
+            diff = total - primary_total
+            pct = (diff / abs(primary_total) * 100) if primary_total != 0 else 0
+            
+            row_data = {
                 'Kolom': col,
-                'Total': df[col].sum(),
+                'Total': total,
                 'Rata-rata': df[col].mean(),
                 'Min': df[col].min(),
                 'Max': df[col].max(),
-                'Count': df[col].count()
-            })
+                'Count': df[col].count(),
+            }
+            
+            # Add diff and %chg columns (except for primary column itself)
+            if col == primary_col:
+                row_data[f'Selisih vs {primary_col[:15]}...'] = '-'
+                row_data['%Chg'] = '-'
+            else:
+                row_data[f'Selisih vs {primary_col[:15]}...'] = diff
+                row_data['%Chg'] = pct
+            
+            summary_data.append(row_data)
         
         if not summary_data:
             return
         
         summary_df = pd.DataFrame(summary_data)
         
+        # Format display
         display_df = summary_df.copy()
         for col in ['Total', 'Rata-rata', 'Min', 'Max']:
             display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
         display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
         
+        # Format diff column (handle '-' for primary row)
+        diff_col = f'Selisih vs {primary_col[:15]}...'
+        display_df[diff_col] = display_df[diff_col].apply(
+            lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
+        )
+        display_df['%Chg'] = display_df['%Chg'].apply(
+            lambda x: Formatter.to_percentage(x) if x != '-' else '-'
+        )
+        
         st.dataframe(display_df, width="stretch", hide_index=True)
+        
+        with st.expander("ℹ️ Keterangan", expanded=False):
+            st.markdown(f"""
+            - **Kolom Utama (Baseline)**: `{primary_col}`
+            - **Selisih**: Nilai kolom - Nilai {primary_col}
+            - **%Chg**: Persentase perubahan terhadap {primary_col}
+            """)
 
 
 # =============================================================================
@@ -1340,6 +1437,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
