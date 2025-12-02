@@ -76,7 +76,7 @@ class ColumnConfig:
     )
     
     # Defaults
-    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('Tahun', 'KEMENTERIAN/LEMBAGA')
+    DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA', 'FUNGSI','PROGRAM')
     DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
     
     # Actual available columns (set after loading data)
@@ -782,14 +782,15 @@ class SidebarController:
     ) -> Tuple[str, Optional[str], bool, DataAvailability, Optional[DataAvailability]]:
         """Render date selection controls in sidebar."""
         st.sidebar.markdown("### 📅 Pengaturan Tanggal Data Update")
-        
+        help_text = "Tanggal tersedia:\n" + "\n".join(f"- {d}" for d in AVAILABLE_DATES)
+      
         primary_dt = st.sidebar.date_input(
             "Pilih Tanggal Data Terkini",
             value=date(2025, 11, 11),
             min_value=self.config.date_start,
             max_value=self.config.date_end,
             key=f"{key_prefix}primary_date",
-            help="Pilih tanggal update data"
+            help=help_text
         )
         primary_date = primary_dt.strftime("%Y-%m-%d")
         
@@ -822,7 +823,8 @@ class SidebarController:
                 value=default_comparison,
                 min_value=self.config.date_start,
                 max_value=self.config.date_end,
-                key=f"{key_prefix}comparison_date"
+                key=f"{key_prefix}comparison_date",
+                help=help_text
             )
             comparison_date = comparison_dt.strftime("%Y-%m-%d")
             
@@ -834,10 +836,6 @@ class SidebarController:
                 UIComponents.render_availability_badge(comparison_availability),
                 unsafe_allow_html=True
             )
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**📋 Tanggal Update Data Tersedia:**")
-        st.sidebar.markdown("\n".join(f"- {d}" for d in AVAILABLE_DATES))
         
         return (
             primary_date, 
@@ -871,7 +869,7 @@ class SidebarController:
         default_groups = self.column_config.get_available_group_defaults() or string_options[:2]
         default_numerics = self.column_config.get_available_numeric_defaults() or numeric_options[:1]
         
-        # Tahun Anggaran selector (before group_cols)
+        # Tahun Anggaran selector
         available_years = self.column_config.available_years
         if not available_years and "Tahun" in df.columns:
             available_years = sorted(df["Tahun"].dropna().unique().tolist())
@@ -922,17 +920,6 @@ class SidebarController:
         )
         
         return selected_years, group_cols, numeric_cols, agg_func
-    
-    def render_data_info(self, df: pd.DataFrame, label: str, key_prefix: str = "") -> None:
-        """Render data info expander in sidebar."""
-        with st.sidebar.expander(f"📋 Info Data - {label}", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            col1.metric("📊 Baris", Formatter.to_number_with_separator(len(df)))
-            col2.metric("📋 Kolom", len(df.columns))
-            
-            if "Tahun" in df.columns:
-                years = sorted(df["Tahun"].dropna().unique())
-                col3.metric("📆 Tahun", ", ".join(map(str, years)))
 
 
 class FilterController:
@@ -1159,17 +1146,37 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
-        # Render comparison summary with filters
+        # Render detail section first to get filters (but display after summary)
+        st.markdown("### 🔄 Detail Perbandingan Data")
+        UIComponents.render_comparison_header(primary_label, comparison_label)
+        
+        # Render filters once here - affects both summary and detail
+        filters = self.filter_controller.render_filters(
+            comparison_df, group_cols, key_prefix="comp_"
+        )
+        
+        # Apply filters to all data
+        df_primary_filtered = self.filter_controller.apply_filters(df_primary, filters)
+        df_comparison_filtered = self.filter_controller.apply_filters(df_comparison, filters)
+        filtered_comparison_df = self.filter_controller.apply_filters(comparison_df, filters)
+        
+        if filters:
+            st.info(f"Filter diterapkan: **{len(filtered_comparison_df):,}** dari **{len(comparison_df):,}** baris")
+        
+        st.divider()
+        
+        # Render comparison summary (uses filtered data)
         self._render_comparison_summary(
-            df_primary, df_comparison,
-            group_cols, numeric_cols,
+            df_primary_filtered, df_comparison_filtered,
+            numeric_cols,
             primary_label, comparison_label
         )
         
         st.divider()
         
+        # Render comparison detail table (uses filtered data)
         self._render_comparison_detail(
-            comparison_df, group_cols, numeric_cols,
+            filtered_comparison_df, group_cols, numeric_cols,
             primary_date, comparison_date,
             primary_label, comparison_label,
             formatter
@@ -1177,27 +1184,14 @@ class MonitoringDashboard:
     
     def _render_comparison_summary(
         self,
-        df_primary: pd.DataFrame,
-        df_comparison: pd.DataFrame,
-        group_cols: List[str],
+        df_primary_filtered: pd.DataFrame,
+        df_comparison_filtered: pd.DataFrame,
         numeric_cols: List[str],
         primary_label: str,
         comparison_label: str
     ) -> None:
-        """Render summary metrics for comparison with filters."""
+        """Render summary metrics for comparison (uses pre-filtered data)."""
         st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
-        
-        # Add filters for summary
-        filters = self.filter_controller.render_filters(
-            df_primary, group_cols, key_prefix="summary_"
-        )
-        
-        # Apply filters to both datasets
-        df_primary_filtered = self.filter_controller.apply_filters(df_primary, filters)
-        df_comparison_filtered = self.filter_controller.apply_filters(df_comparison, filters)
-        
-        if filters:
-            st.info(f"Filter diterapkan: **{len(df_primary_filtered):,}** baris (utama) | **{len(df_comparison_filtered):,}** baris (pembanding)")
         
         for col in numeric_cols:
             if col not in df_primary_filtered.columns or col not in df_comparison_filtered.columns:
@@ -1217,7 +1211,7 @@ class MonitoringDashboard:
     
     def _render_comparison_detail(
         self,
-        comparison_df: pd.DataFrame,
+        filtered_df: pd.DataFrame,
         group_cols: List[str],
         numeric_cols: List[str],
         primary_date: str,
@@ -1226,17 +1220,8 @@ class MonitoringDashboard:
         comparison_label: str,
         formatter: DataFrameFormatter
     ) -> None:
-        """Render detailed comparison table with filters."""
-        st.markdown("### 🔄 Detail Perbandingan Data")
-        UIComponents.render_comparison_header(primary_label, comparison_label)
-        
-        filters = self.filter_controller.render_filters(
-            comparison_df, group_cols, key_prefix="comp_"
-        )
-        filtered_df = self.filter_controller.apply_filters(comparison_df, filters)
-        
-        if filters:
-            st.info(f"Menampilkan **{len(filtered_df):,}** dari **{len(comparison_df):,}** baris")
+        """Render detailed comparison table (uses pre-filtered data)."""
+        st.markdown("### 📋 Tabel Detail Perbandingan")
         
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
@@ -1355,3 +1340,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
