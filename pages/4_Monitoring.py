@@ -1,7 +1,3 @@
-# =============================================================================
-# Data Loading with Streaming Download + Modern CSS Styling
-# Fixed: Same date comparison error + Streamlit deprecation warnings
-# =============================================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -22,7 +18,7 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.kemenkeu.go.id',
         'Report a bug': 'https://github.com/tubankum3/dashanggaran/issues',
-        'About': "Dashboard Anggaran - Perbandingan Data Berdasarkan Tanggal Update"
+        'About': "Monitoring Anggaran Belanja - Perbandingan Data Berdasarkan Tanggal Update"
     }
 )
 
@@ -412,7 +408,7 @@ def compare_datasets(
     numeric_cols: List[str],
     date1: str,
     date2: str
-) -> pd.DataFrame:
+    ) -> pd.DataFrame:
     """
     Compare two datasets and calculate differences.
     
@@ -580,24 +576,24 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
     group_cols = st.sidebar.multiselect(
         "Group By (Kolom String)",
         options=STRING_COLUMNS,
-        default=['KEMENTERIAN/LEMBAGA', 'PROGRAM'],
-        help="Pilih minimal 2 kolom untuk pengelompokan",
-        key=f"{key_prefix}group_cols"
+        default=['Tahun','KEMENTERIAN/LEMBAGA'],
+        help="Pilih kolom untuk pengelompokan",
+        # key=f"{key_prefix}group_cols"
     )
     
-    if len(group_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom string")
+    # if len(group_cols) < 2:
+    #     st.sidebar.warning("⚠️ Pilih minimal 2 kolom string")
     
     numeric_cols = st.sidebar.multiselect(
         "Agregasi (Kolom Numerik)",
         options=NUMERIC_COLUMNS,
         default=['REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI'],
         help="Pilih minimal 2 kolom untuk agregasi",
-        key=f"{key_prefix}numeric_cols"
+        # key=f"{key_prefix}numeric_cols"
     )
     
-    if len(numeric_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom numerik")
+    # if len(numeric_cols) < 2:
+    #     st.sidebar.warning("⚠️ Pilih minimal 2 kolom numerik")
     
     agg_func = st.sidebar.selectbox(
         "Fungsi Agregasi",
@@ -625,8 +621,8 @@ def main():
     st.markdown("""
     <div class="dashboard-header">
         <p class="breadcrumb">KEMENTERIAN KEUANGAN RI • BIDJA</p>
-        <h1 class="dashboard-title">Dashboard Analisis Anggaran</h1>
-        <p class="dashboard-subtitle">Perbandingan Data Berdasarkan Tanggal Update</p>
+        <h1 class="dashboard-title">Monitoring Anggaran</h1>
+        <p class="dashboard-subtitle">Perbandingan Data Anggaran Berdasarkan Tanggal Update Database</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -771,3 +767,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
