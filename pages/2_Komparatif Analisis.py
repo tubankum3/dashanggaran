@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     menu_items={
         "Get Help": "https://www.kemenkeu.go.id",
-        "Report a bug": "https://github.com/tubankum3/dashpmk/issues",
+        "Report a bug": "https://github.com/tubankum3/dashanggaran/issues",
         "About": "Dashboard Anggaran Bidang PMK"
     }
 )
@@ -382,7 +382,7 @@ st.markdown("""
 # =============================================================================
 @st.cache_data(show_spinner="Memuat dataset anggaran...")
 def load_data():
-    url = "https://raw.githubusercontent.com/tubankum3/dashpmk/main/df.csv.zip"
+    url = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/df.csv.zip"
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -931,6 +931,7 @@ if __name__ == "__main__":
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
 
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
 
 
 
