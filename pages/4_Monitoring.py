@@ -906,7 +906,41 @@ class UIComponents:
         </div>
         """, unsafe_allow_html=True)
 
-
+@st.cache_data(ttl=300, show_spinner=False)
+def _check_availability_cached_impl(
+    base_url: str,
+    filename_pattern: str,
+    timeout: int,
+    date_str: str
+) -> Tuple[bool, Optional[int], Optional[str]]:
+    """
+    Cached availability check implementation.
+    
+    Returns tuple instead of dataclass for pickle compatibility.
+    
+    Returns:
+        Tuple of (is_available, file_size, error_message)
+    """
+    dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+    date_formatted = dt.strftime('%Y%m%d')
+    filename = filename_pattern.replace("{date}", date_formatted)
+    url = f"{base_url}{filename}"
+    
+    try:
+        response = requests.head(url, timeout=timeout, allow_redirects=True)
+        
+        if response.status_code == 200:
+            content_length = response.headers.get('Content-Length')
+            size = int(content_length) if content_length else None
+            return (True, size, None)
+        
+        return (False, None, f"HTTP {response.status_code}")
+        
+    except requests.exceptions.Timeout:
+        return (False, None, "Connection timeout")
+    except requests.exceptions.RequestException as e:
+        return (False, None, str(e))
+        
 class SidebarController:
     """Controls sidebar UI elements and state."""
     
@@ -998,11 +1032,19 @@ class SidebarController:
             comparison_availability
         )
     
-    @st.cache_data(ttl=300, show_spinner=False)
-    def _check_availability_cached(_self, date_str: str) -> DataAvailability:
-        """Cached availability check."""
-        dt = datetime.strptime(date_str, "%Y-%m-%d").date()
-        return _self.data_loader.check_availability(dt)
+   def _check_availability_cached(self, date_str: str) -> DataAvailability:
+        """Check availability with caching (returns DataAvailability)."""
+        result = _check_availability_cached_impl(
+            self.config.base_url,
+            self.config.filename_pattern,
+            self.config.connect_timeout,
+            date_str
+        )
+        return DataAvailability(
+            is_available=result[0],
+            file_size=result[1],
+            error_message=result[2]
+        )
     
     def render_aggregation_options(
         self, 
@@ -1500,3 +1542,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
