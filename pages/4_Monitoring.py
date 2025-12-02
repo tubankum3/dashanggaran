@@ -1,11 +1,10 @@
 # =============================================================================
-# Data Loading with Date Picker + Enhanced Debugging
+# Data Loading with Date Picker + Availability Indicator
 # =============================================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
 import zipfile
-import gzip
 import io
 import requests
 from datetime import datetime, date, timedelta
@@ -15,25 +14,19 @@ from typing import List, Dict, Optional, Tuple
 # Configuration
 # =============================================================================
 BASE_URL = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/"
-
-# File patterns to try (in order)
-FILENAME_PATTERNS = [
-    "df_{YYYYMMDD}.csv.zip",
-    "df_{YYYYMMDD}.csv.gz",
-    "df_{YYYYMMDD}.csv",
-]
-
+FILENAME_PATTERN = "df_{YYYYMMDD}.csv.zip"
 CSV_FILENAME_IN_ZIP = "df.csv"
 
+# Date range for picker
 DATE_START = date(2024, 1, 1)
 DATE_END = date.today()
 
 # =============================================================================
 # URL Builder Functions
 # =============================================================================
-def build_url(data_date: date, pattern: str) -> str:
-    """Build the full URL for a given date and pattern."""
-    filename = pattern.replace("{YYYYMMDD}", data_date.strftime('%Y%m%d'))
+def build_url(data_date: date) -> str:
+    """Build the full URL for a given date."""
+    filename = FILENAME_PATTERN.replace("{YYYYMMDD}", data_date.strftime('%Y%m%d'))
     return BASE_URL + filename
 
 
@@ -53,95 +46,33 @@ def format_date_label(data_date: date) -> str:
 
 
 # =============================================================================
-# File Type Detection
-# =============================================================================
-def detect_file_type(content: bytes) -> str:
-    """
-    Detect file type from content bytes.
-    
-    Returns: 'zip', 'gzip', 'csv', 'html', or 'unknown'
-    """
-    if len(content) < 4:
-        return 'unknown'
-    
-    # Check magic bytes
-    if content[:2] == b'PK':
-        return 'zip'
-    
-    if content[:2] == b'\x1f\x8b':
-        return 'gzip'
-    
-    # Check if HTML (error page)
-    try:
-        text_start = content[:500].decode('utf-8', errors='ignore').lower()
-        if '<html' in text_start or '<!doctype' in text_start or '404' in text_start:
-            return 'html'
-    except:
-        pass
-    
-    # Check if CSV-like
-    try:
-        text = content[:2000].decode('utf-8')
-        lines = text.split('\n')
-        if len(lines) > 1:
-            # Check if first line looks like headers (contains letters and commas/semicolons)
-            first_line = lines[0]
-            if (',' in first_line or ';' in first_line) and any(c.isalpha() for c in first_line):
-                return 'csv'
-    except:
-        pass
-    
-    return 'unknown'
-
-
-def get_content_preview(content: bytes, max_chars: int = 200) -> str:
-    """Get a readable preview of content."""
-    try:
-        text = content[:max_chars].decode('utf-8', errors='replace')
-        # Clean up for display
-        text = text.replace('\n', '\\n').replace('\r', '\\r')
-        return text
-    except:
-        return content[:max_chars].hex()
-
-
-# =============================================================================
 # Availability Check Functions
 # =============================================================================
-@st.cache_data(ttl=300, show_spinner=False)
-def check_data_availability(data_date: str) -> Tuple[bool, Optional[str], Optional[str]]:
+@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
+def check_data_availability(data_date: str) -> bool:
     """
     Check if data file exists for a given date.
     
+    Args:
+        data_date: Date string in 'YYYY-MM-DD' format
+        
     Returns:
-        Tuple of (is_available, working_url, file_type)
+        bool: True if file exists, False otherwise
     """
     dt = parse_date_string(data_date)
+    url = build_url(dt)
     
-    for pattern in FILENAME_PATTERNS:
-        url = build_url(dt, pattern)
-        try:
-            # Use GET with stream to check content type
-            response = requests.get(url, timeout=10, stream=True)
-            if response.status_code == 200:
-                # Read first chunk to detect type
-                first_chunk = next(response.iter_content(chunk_size=1024), b'')
-                file_type = detect_file_type(first_chunk)
-                
-                if file_type in ['zip', 'gzip', 'csv']:
-                    return True, url, file_type
-                    
-        except Exception as e:
-            continue
-    
-    return False, None, None
+    try:
+        response = requests.head(url, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
 
 
-def render_availability_badge(is_available: bool, file_type: str = None) -> str:
+def render_availability_badge(is_available: bool) -> str:
     """Return HTML badge for availability status."""
     if is_available:
-        type_text = f" ({file_type.upper()})" if file_type else ""
-        return f"""
+        return """
         <span style="
             background-color: #10B981;
             color: white;
@@ -149,7 +80,7 @@ def render_availability_badge(is_available: bool, file_type: str = None) -> str:
             border-radius: 20px;
             font-size: 14px;
             font-weight: 500;
-        ">✓ Data Tersedia{type_text}</span>
+        ">✓ Data Tersedia</span>
         """
     else:
         return """
@@ -168,93 +99,28 @@ def render_availability_badge(is_available: bool, file_type: str = None) -> str:
 # Data Loading Functions
 # =============================================================================
 @st.cache_data(show_spinner=True, ttl=3600)
-def load_data_by_date(data_date: str, debug: bool = False) -> pd.DataFrame:
+def load_data_by_date(data_date: str) -> pd.DataFrame:
     """
     Load budget data for a specific date.
-    Automatically detects file format.
+    
+    Args:
+        data_date: Date string in 'YYYY-MM-DD' format
+        
+    Returns:
+        pd.DataFrame: Preprocessed budget data with _DATA_DATE column
     """
     dt = parse_date_string(data_date)
+    url = build_url(dt)
     
-    errors = []
-    
-    for pattern in FILENAME_PATTERNS:
-        url = build_url(dt, pattern)
-        
-        try:
-            response = requests.get(url, timeout=60)
-            
-            if response.status_code == 404:
-                errors.append(f"{pattern}: 404 Not Found")
-                continue
-            
-            response.raise_for_status()
-            content = response.content
-            
-            if len(content) == 0:
-                errors.append(f"{pattern}: Empty response")
-                continue
-            
-            # Detect type
-            file_type = detect_file_type(content)
-            
-            if debug:
-                st.write(f"**URL:** `{url}`")
-                st.write(f"**Size:** {len(content):,} bytes")
-                st.write(f"**Detected type:** {file_type}")
-                st.write(f"**Preview:** `{get_content_preview(content, 100)}`")
-            
-            # Parse based on type
-            if file_type == 'zip':
-                df = load_from_zip(content, data_date)
-                if not df.empty:
-                    return df
-                errors.append(f"{pattern}: ZIP parsing failed")
-                    
-            elif file_type == 'gzip':
-                df = load_from_gzip(content, data_date)
-                if not df.empty:
-                    return df
-                errors.append(f"{pattern}: GZIP parsing failed")
-                    
-            elif file_type == 'csv':
-                df = load_from_csv(content, data_date)
-                if not df.empty:
-                    return df
-                errors.append(f"{pattern}: CSV parsing failed")
-                
-            elif file_type == 'html':
-                preview = get_content_preview(content, 100)
-                errors.append(f"{pattern}: Received HTML (error page?): {preview}")
-                
-            else:
-                preview = get_content_preview(content, 100)
-                errors.append(f"{pattern}: Unknown format. Preview: {preview}")
-                
-        except requests.exceptions.Timeout:
-            errors.append(f"{pattern}: Timeout")
-        except requests.exceptions.HTTPError as e:
-            errors.append(f"{pattern}: HTTP {e.response.status_code}")
-        except Exception as e:
-            errors.append(f"{pattern}: {str(e)}")
-    
-    # All patterns failed
-    st.error("❌ Gagal memuat data")
-    with st.expander("🔍 Detail Error", expanded=True):
-        for err in errors:
-            st.write(f"- {err}")
-    
-    return pd.DataFrame()
-
-
-def load_from_zip(content: bytes, data_date: str) -> pd.DataFrame:
-    """Load DataFrame from ZIP content."""
     try:
-        with zipfile.ZipFile(io.BytesIO(content)) as z:
-            file_list = z.namelist()
-            csv_files = [f for f in file_list if f.endswith('.csv')]
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            csv_files = [f for f in z.namelist() if f.endswith('.csv')]
             
             if not csv_files:
-                st.warning(f"ZIP contains: {file_list}")
+                st.error(f"❌ Tidak ada file CSV dalam zip untuk tanggal {data_date}")
                 return pd.DataFrame()
             
             target_file = CSV_FILENAME_IN_ZIP if CSV_FILENAME_IN_ZIP in csv_files else csv_files[0]
@@ -264,55 +130,18 @@ def load_from_zip(content: bytes, data_date: str) -> pd.DataFrame:
         
         df = preprocess_dataframe(df)
         df["_DATA_DATE"] = data_date
+        
         return df
         
-    except Exception as e:
-        st.warning(f"ZIP error: {e}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            st.error(f"❌ Data tidak tersedia untuk tanggal {format_date_label(dt)}")
+        else:
+            st.error(f"❌ HTTP Error: {e}")
         return pd.DataFrame()
-
-
-def load_from_gzip(content: bytes, data_date: str) -> pd.DataFrame:
-    """Load DataFrame from GZIP content."""
-    try:
-        with gzip.GzipFile(fileobj=io.BytesIO(content)) as gz:
-            df = pd.read_csv(gz, low_memory=False)
-        
-        df = preprocess_dataframe(df)
-        df["_DATA_DATE"] = data_date
-        return df
-        
     except Exception as e:
-        st.warning(f"GZIP error: {e}")
+        st.error(f"❌ Gagal memuat data: {str(e)}")
         return pd.DataFrame()
-
-
-def load_from_csv(content: bytes, data_date: str) -> pd.DataFrame:
-    """Load DataFrame from CSV content."""
-    # Try different encodings and separators
-    encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
-    separators = [',', ';', '\t']
-    
-    for encoding in encodings:
-        for sep in separators:
-            try:
-                df = pd.read_csv(
-                    io.BytesIO(content), 
-                    low_memory=False, 
-                    encoding=encoding,
-                    sep=sep
-                )
-                
-                # Check if parsing was successful (more than 1 column)
-                if len(df.columns) > 1:
-                    df = preprocess_dataframe(df)
-                    df["_DATA_DATE"] = data_date
-                    return df
-                    
-            except Exception:
-                continue
-    
-    st.warning("CSV parsing failed with all encoding/separator combinations")
-    return pd.DataFrame()
 
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -437,13 +266,16 @@ def rupiah_separator(x):
 def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Optional[str], Optional[str], bool, bool, bool]:
     """
     Render date selection with availability indicator.
+    
+    Returns:
+        Tuple of (primary_date, comparison_date, enable_comparison, primary_available, comparison_available)
     """
     st.sidebar.markdown("### 📅 Pilih Tanggal Data")
     
     # Primary date picker
     primary_dt = st.sidebar.date_input(
         "Tanggal Data Utama",
-        value=date(2025, 10, 27),
+        value=date(2025, 10, 27),  # Default to known available date
         min_value=DATE_START,
         max_value=DATE_END,
         key=f"{key_prefix}primary_date",
@@ -453,19 +285,19 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     
     # Check availability
     with st.sidebar:
-        with st.spinner("Memeriksa..."):
-            primary_available, primary_url, primary_type = check_data_availability(primary_date)
+        with st.spinner("Memeriksa ketersediaan..."):
+            primary_available = check_data_availability(primary_date)
         
-        st.markdown(render_availability_badge(primary_available, primary_type), unsafe_allow_html=True)
+        st.markdown(render_availability_badge(primary_available), unsafe_allow_html=True)
         
-        with st.expander("🔗 Debug Info", expanded=False):
-            st.markdown("**URLs yang dicoba:**")
-            for pattern in FILENAME_PATTERNS:
-                url = build_url(primary_dt, pattern)
-                st.code(url, language=None)
+        # Show URL info
+        with st.expander("🔗 Info URL", expanded=False):
+            url = build_url(primary_dt)
+            st.code(url, language=None)
             if primary_available:
-                st.success(f"✓ Ditemukan: {primary_type.upper()}")
-                st.code(primary_url)
+                st.success("File ditemukan")
+            else:
+                st.error("File tidak ditemukan")
     
     st.sidebar.markdown("---")
     
@@ -482,23 +314,32 @@ def render_date_selector_with_availability(key_prefix: str = "") -> Tuple[Option
     if enable_comparison:
         comparison_dt = st.sidebar.date_input(
             "Tanggal Pembanding",
-            value=date(2025, 11, 11),
+            value=date(2025, 11, 11),  # Default to other known available date
             min_value=DATE_START,
             max_value=DATE_END,
-            key=f"{key_prefix}comparison_date"
+            key=f"{key_prefix}comparison_date",
+            help="Pilih tanggal untuk dibandingkan"
         )
         comparison_date = comparison_dt.strftime("%Y-%m-%d")
         
+        # Check availability
         with st.sidebar:
-            with st.spinner("Memeriksa..."):
-                comparison_available, comp_url, comp_type = check_data_availability(comparison_date)
+            with st.spinner("Memeriksa ketersediaan..."):
+                comparison_available = check_data_availability(comparison_date)
             
-            st.markdown(render_availability_badge(comparison_available, comp_type), unsafe_allow_html=True)
+            st.markdown(render_availability_badge(comparison_available), unsafe_allow_html=True)
+            
+            with st.expander("🔗 Info URL Pembanding", expanded=False):
+                url2 = build_url(comparison_dt)
+                st.code(url2, language=None)
     
-    # Quick reference
+    # Quick select known dates
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**📋 Tanggal Tersedia:**")
-    st.sidebar.markdown("- 27 Oktober 2025\n- 11 November 2025")
+    st.sidebar.markdown("**📋 Tanggal Tersedia (Prototipe):**")
+    st.sidebar.markdown("""
+    - 27 Oktober 2025
+    - 11 November 2025
+    """)
     
     return primary_date, comparison_date, enable_comparison, primary_available, comparison_available
 
@@ -511,91 +352,38 @@ def render_aggregation_options(key_prefix: str = "") -> Tuple[List[str], List[st
         "Group By (Kolom String)",
         options=STRING_COLUMNS,
         default=['KEMENTERIAN/LEMBAGA', 'PROGRAM'],
-        help="Pilih minimal 2 kolom",
+        help="Pilih minimal 2 kolom untuk pengelompokan",
         key=f"{key_prefix}group_cols"
     )
     
     if len(group_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom")
+        st.sidebar.warning("⚠️ Pilih minimal 2 kolom string")
     
     numeric_cols = st.sidebar.multiselect(
         "Agregasi (Kolom Numerik)",
         options=NUMERIC_COLUMNS,
         default=['REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI'],
-        help="Pilih minimal 2 kolom",
+        help="Pilih minimal 2 kolom untuk agregasi",
         key=f"{key_prefix}numeric_cols"
     )
     
     if len(numeric_cols) < 2:
-        st.sidebar.warning("⚠️ Pilih minimal 2 kolom")
+        st.sidebar.warning("⚠️ Pilih minimal 2 kolom numerik")
     
     agg_func = st.sidebar.selectbox(
         "Fungsi Agregasi",
         options=['sum', 'mean', 'count', 'min', 'max'],
-        format_func=lambda x: {'sum': 'Jumlah', 'mean': 'Rata-rata', 'count': 'Hitung', 'min': 'Min', 'max': 'Max'}.get(x, x),
+        format_func=lambda x: {
+            'sum': 'Jumlah (Sum)',
+            'mean': 'Rata-rata (Mean)', 
+            'count': 'Hitung (Count)',
+            'min': 'Minimum',
+            'max': 'Maksimum'
+        }.get(x, x),
         key=f"{key_prefix}agg_func"
     )
     
     return group_cols, numeric_cols, agg_func
-
-
-# =============================================================================
-# Debug Tool
-# =============================================================================
-def render_debug_tool():
-    """Render a debug tool to test URLs directly."""
-    st.markdown("---")
-    st.subheader("🔧 Debug Tool")
-    
-    test_url = st.text_input(
-        "Test URL langsung:",
-        value="https://raw.githubusercontent.com/tubankum3/dashpmk/main/df_20251027.csv.zip",
-        help="Masukkan URL file untuk di-test"
-    )
-    
-    if st.button("🧪 Test URL"):
-        with st.spinner("Testing..."):
-            try:
-                response = requests.get(test_url, timeout=30)
-                
-                st.write(f"**Status Code:** {response.status_code}")
-                st.write(f"**Content-Type:** {response.headers.get('Content-Type', 'N/A')}")
-                st.write(f"**Content-Length:** {len(response.content):,} bytes")
-                
-                content = response.content
-                file_type = detect_file_type(content)
-                st.write(f"**Detected Type:** {file_type}")
-                
-                st.write("**First 500 bytes (hex):**")
-                st.code(content[:500].hex())
-                
-                st.write("**First 500 bytes (text):**")
-                st.code(get_content_preview(content, 500))
-                
-                # Try to load
-                if file_type == 'csv':
-                    df = load_from_csv(content, "test")
-                    if not df.empty:
-                        st.success(f"✅ Loaded {len(df)} rows, {len(df.columns)} columns")
-                        st.write("**Columns:**", list(df.columns))
-                        st.dataframe(df.head())
-                        
-                elif file_type == 'zip':
-                    with zipfile.ZipFile(io.BytesIO(content)) as z:
-                        st.write("**ZIP contents:**", z.namelist())
-                    df = load_from_zip(content, "test")
-                    if not df.empty:
-                        st.success(f"✅ Loaded {len(df)} rows")
-                        st.dataframe(df.head())
-                        
-                elif file_type == 'gzip':
-                    df = load_from_gzip(content, "test")
-                    if not df.empty:
-                        st.success(f"✅ Loaded {len(df)} rows")
-                        st.dataframe(df.head())
-                
-            except Exception as e:
-                st.error(f"Error: {e}")
 
 
 # =============================================================================
@@ -605,8 +393,8 @@ def main():
     """Main application."""
     
     st.set_page_config(
-        page_title="Dashboard Anggaran - Debug",
-        page_icon="🔧",
+        page_title="Dashboard Anggaran - Prototipe",
+        page_icon="📊",
         layout="wide"
     )
     
@@ -619,18 +407,11 @@ def main():
         margin-bottom: 1.5rem;
         color: white;
     ">
-        <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">DEBUG MODE</p>
+        <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">PROTOTIPE</p>
         <h1 style="margin: 0; font-size: 1.75rem;">Dashboard Analisis Anggaran</h1>
-        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Perbandingan Data dengan Enhanced Debugging</p>
+        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Perbandingan Data Berdasarkan Tanggal Update</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Debug mode toggle
-    debug_mode = st.checkbox("🔧 Enable Debug Mode", value=True)
-    
-    if debug_mode:
-        render_debug_tool()
-        st.markdown("---")
     
     # Sidebar
     with st.sidebar:
@@ -644,35 +425,160 @@ def main():
     
     # Main content
     if not primary_available:
-        st.warning(f"⚠️ Data tidak tersedia untuk {format_date_label(parse_date_string(primary_date))}")
-        st.info("Gunakan Debug Tool di atas untuk test URL secara langsung")
+        st.warning(f"""
+        ⚠️ **Data tidak tersedia untuk tanggal {format_date_label(parse_date_string(primary_date))}**
+        
+        Silakan pilih tanggal lain. Data yang tersedia:
+        - **27 Oktober 2025** (`df_20251027.csv.zip`)
+        - **11 November 2025** (`df_20251111.csv.zip`)
+        """)
         return
     
     # Load primary data
-    with st.spinner(f"Memuat data..."):
-        df_primary = load_data_by_date(primary_date, debug=debug_mode)
+    with st.spinner(f"Memuat data {format_date_label(parse_date_string(primary_date))}..."):
+        df_primary = load_data_by_date(primary_date)
     
     if df_primary.empty:
+        st.error("Gagal memuat data")
         return
     
+    # Success message
     st.success(f"✅ Data dimuat: **{len(df_primary):,}** baris | {format_date_label(parse_date_string(primary_date))}")
     
-    # Show columns for debugging
-    if debug_mode:
-        with st.expander("📋 Kolom tersedia di data"):
-            st.write(list(df_primary.columns))
+    # Info metrics
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("📊 Total Baris", f"{len(df_primary):,}")
+    col2.metric("📋 Total Kolom", len(df_primary.columns))
+    col3.metric("📅 Tanggal Data", primary_date)
+    if "Tahun" in df_primary.columns:
+        tahun_list = df_primary["Tahun"].dropna().unique()
+        col4.metric("📆 Tahun Anggaran", ", ".join(map(str, sorted(tahun_list))))
     
-    # Rest of the app...
+    st.divider()
+    
+    # Check column selection
     if len(group_cols) < 2 or len(numeric_cols) < 2:
-        st.info("👆 Pilih minimal 2 kolom string dan 2 kolom numerik")
-        with st.expander("📋 Preview Data"):
+        st.info("👆 Pilih minimal 2 kolom string dan 2 kolom numerik di sidebar untuk melihat agregasi")
+        
+        # Show raw data preview
+        with st.expander("📋 Preview Data Mentah"):
             st.dataframe(df_primary.head(100), use_container_width=True)
         return
     
+    # Aggregate primary data
     agg_primary = aggregate_data(df_primary, group_cols, numeric_cols, agg_func)
-    st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+    
+    # Comparison mode
+    if enable_comparison and comparison_date:
+        if not comparison_available:
+            st.warning(f"⚠️ Data pembanding tidak tersedia untuk tanggal {format_date_label(parse_date_string(comparison_date))}")
+            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+            return
+        
+        # Load comparison data
+        with st.spinner(f"Memuat data pembanding {format_date_label(parse_date_string(comparison_date))}..."):
+            df_comparison = load_data_by_date(comparison_date)
+        
+        if df_comparison.empty:
+            st.warning("⚠️ Gagal memuat data pembanding")
+            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+            return
+        
+        st.success(f"✅ Data pembanding dimuat: **{len(df_comparison):,}** baris")
+        
+        # Create comparison
+        comparison_df = compare_datasets(
+            df_primary, df_comparison,
+            group_cols, numeric_cols,
+            primary_date, comparison_date
+        )
+        
+        # Tabs
+        tab1, tab2, tab3 = st.tabs([
+            f"📊 Data {format_date_label(parse_date_string(primary_date))}",
+            "🔄 Perbandingan",
+            "📈 Ringkasan"
+        ])
+        
+        with tab1:
+            st.subheader(f"Agregasi - {format_date_label(parse_date_string(primary_date))}")
+            st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+            
+            csv1 = agg_primary.to_csv(index=False)
+            st.download_button(
+                "📥 Download CSV",
+                data=csv1,
+                file_name=f"agregasi_{primary_date}.csv",
+                mime="text/csv",
+                key="download_primary"
+            )
+        
+        with tab2:
+            st.subheader("Perbandingan Data")
+            st.caption(f"**{format_date_label(parse_date_string(primary_date))}** vs **{format_date_label(parse_date_string(comparison_date))}**")
+            
+            # Highlight columns info
+            st.info(f"""
+            **Kolom hasil perbandingan:**
+            - `[kolom]_{primary_date}` = Nilai dari tanggal utama
+            - `[kolom]_{comparison_date}` = Nilai dari tanggal pembanding  
+            - `SELISIH_[kolom]` = Selisih (pembanding - utama)
+            - `PCT_[kolom]` = Persentase perubahan
+            """)
+            
+            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+            
+            csv2 = comparison_df.to_csv(index=False)
+            st.download_button(
+                "📥 Download Perbandingan (CSV)",
+                data=csv2,
+                file_name=f"perbandingan_{primary_date}_vs_{comparison_date}.csv",
+                mime="text/csv",
+                key="download_comparison"
+            )
+        
+        with tab3:
+            st.subheader("Ringkasan Perbandingan")
+            
+            for col in numeric_cols:
+                if col in df_primary.columns and col in df_comparison.columns:
+                    st.markdown(f"#### {col}")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    
+                    val1 = df_primary[col].sum()
+                    val2 = df_comparison[col].sum()
+                    diff = val2 - val1
+                    pct = (diff / abs(val1) * 100) if val1 != 0 else 0
+                    
+                    c1.metric(
+                        format_date_label(parse_date_string(primary_date)),
+                        format_rupiah(val1)
+                    )
+                    c2.metric(
+                        format_date_label(parse_date_string(comparison_date)),
+                        format_rupiah(val2)
+                    )
+                    c3.metric(
+                        "Selisih",
+                        format_rupiah(diff),
+                        f"{pct:+.2f}%"
+                    )
+                    st.divider()
+    
+    else:
+        # Single date view
+        st.subheader(f"Data Agregasi - {format_date_label(parse_date_string(primary_date))}")
+        st.dataframe(agg_primary, use_container_width=True, hide_index=True)
+        
+        csv = agg_primary.to_csv(index=False)
+        st.download_button(
+            "📥 Download Data (CSV)",
+            data=csv,
+            file_name=f"agregasi_{primary_date}.csv",
+            mime="text/csv"
+        )
 
 
 if __name__ == "__main__":
     main()
-
