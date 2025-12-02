@@ -876,10 +876,15 @@ class SidebarController:
         
         selected_years: List[int] = []
         if available_years:
+            # Get current year as default if available, otherwise use all years
+            current_year = datetime.now().year
+            year_options = [int(y) for y in available_years]
+            default_years = [current_year] if current_year in year_options else year_options
+            
             selected_years = st.sidebar.multiselect(
                 "Tahun Anggaran",
-                options=[int(y) for y in available_years],
-                default=datetime.now().strftime('%Y')}",
+                options=year_options,
+                default=default_years,
                 help="Pilih tahun anggaran yang ingin ditampilkan",
                 key=f"{key_prefix}tahun_anggaran"
             )
@@ -1337,4 +1342,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
