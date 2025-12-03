@@ -1088,7 +1088,7 @@ class MonitoringDashboard:
         """Configure Streamlit page settings."""
         st.set_page_config(
             page_title="Dashboard Analisis Anggaran dan Realisasi Belanja Negara",
-            page_icon="📊",
+            page_icon=":material/monitoring:",
             layout="wide",
             initial_sidebar_state="expanded",
             menu_items={
@@ -1467,4 +1467,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
