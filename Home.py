@@ -1270,9 +1270,7 @@ class BudgetAnalysisDashboard:
                 "Report a bug": "https://github.com/tubankum3/dashanggaran/issues",
                 "About": "Dashboard Anggaran Bidang PMK"
             }
-        )       
-        # Apply CSS styles
-        st.markdown(CSS_STYLES, unsafe_allow_html=True)
+        )
 
 # =============================================================================
 # ENTRY POINT
@@ -1290,6 +1288,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
