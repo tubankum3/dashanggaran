@@ -343,7 +343,7 @@ class LabelShortener:
         "KEGIATAN": lambda v: v[:4],
         "OUTPUT (KRO)": lambda v: f"{v[:4]} {v[5:8]}" if len(v) >= 8 else v,
         "SUB OUTPUT (RO)": lambda v: f"{v[:4]} {v[5:8]} {v[9:12]}" if len(v) >= 12 else v,
-        "KOMPONEN": lambda v: f"{v[:3]} {v[4:7]} {v[8:11]}" if len(v) >= 11 else v,
+        "KOMPONEN": lambda v: f"{v[:4]} {v[5:8]} {v[9:12] {v[13:15]}" if len(v) >= 11 else v,
         "AKUN 4 DIGIT": lambda v: v[:4],
     }
     
@@ -942,8 +942,6 @@ class TrendAnalysisApp:
                 "About": "Dashboard Anggaran Bidang PMK"
             }
         )
-        # Apply CSS styles
-        st.markdown(CSS_STYLES, unsafe_allow_html=True)
     
     def _render_category_tabs(
         self,
@@ -986,5 +984,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
