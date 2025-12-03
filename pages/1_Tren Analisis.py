@@ -329,11 +329,9 @@ class MetricsCalculator:
 # =============================================================================
 # LABEL SHORTENER
 # =============================================================================
-
 class LabelShortener:
     """Creates shortened labels for chart legends based on column type."""
     
-    # Mapping of column types to their shortening rules
     SHORTENING_RULES = {
         "SUMBER DANA": lambda v: v[:2],
         "FUNGSI": lambda v: v[:2],
@@ -343,22 +341,17 @@ class LabelShortener:
         "KEGIATAN": lambda v: v[:4],
         "OUTPUT (KRO)": lambda v: f"{v[:4]} {v[5:8]}" if len(v) >= 8 else v,
         "SUB OUTPUT (RO)": lambda v: f"{v[:4]} {v[5:8]} {v[9:12]}" if len(v) >= 12 else v,
-        "KOMPONEN": lambda v: f"{v[:4]} {v[5:8]} {v[9:12] {v[13:15]}" if len(v) >= 11 else v,
+        "KOMPONEN": lambda v: (
+            v[:16] if len(v) >= 16 and v[:4].isdigit()
+            else v[:11] if len(v) >= 11
+            else v
+        ),
         "AKUN 4 DIGIT": lambda v: v[:4],
     }
     
     @classmethod
     def shorten(cls, value: Any, col_type: str) -> str:
-        """
-        Create shortened label for legend display.
-        
-        Args:
-            value: Original value
-            col_type: Column type to determine shortening rule
-            
-        Returns:
-            Shortened string label
-        """
+        """Create shortened label for legend display."""
         value_str = str(value)
         
         rule = cls.SHORTENING_RULES.get(col_type)
@@ -368,10 +361,8 @@ class LabelShortener:
             except (IndexError, TypeError):
                 pass
         
-        # Default: return first word
         return value_str.split(" ")[0]
-
-
+        
 # =============================================================================
 # CHART BUILDER
 # =============================================================================
@@ -984,6 +975,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
