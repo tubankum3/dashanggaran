@@ -788,7 +788,7 @@ class UIComponents:
     def apply_styles() -> None:
         """Apply CSS styles to the page."""
         st.markdown(CSS_STYLES, unsafe_allow_html=True)
-
+        st.markdown(CSS_TABS_UNDERLINE, unsafe_allow_html=True)
 
 class SidebarController:
     """Manages sidebar filter controls."""
@@ -1196,9 +1196,6 @@ class BudgetClassificationApp:
                 "About": "Dashboard Anggaran Bidang PMK"
             }
         )
-        # Apply CSS styles
-        st.markdown(CSS_STYLES, unsafe_allow_html=True)
-        st.markdown(CSS_TABS_UNDERLINE, unsafe_allow_html=True)
     
     def _validate_required_columns(self, df: pd.DataFrame) -> bool:
         """Validate that required columns exist in the DataFrame."""
@@ -1256,5 +1253,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
