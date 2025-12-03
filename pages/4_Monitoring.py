@@ -70,14 +70,15 @@ class ColumnConfig:
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
     POTENTIAL_NUMERIC_COLUMNS: Tuple[str, ...] = (
-        'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI',
-        'PAGU DIPA AWAL', 'BLOKIR DIPA AWAL', 'PAGU DIPA AWAL EFEKTIF',
-        'PAGU DIPA REVISI EFEKTIF'
+        'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI', 'PAGU DIPA AWAL',
+        'BLOKIR DIPA AWAL', 'PAGU HIMPUNAN', 'BLOKIR HIMPUNAN', 'Tahun',
+        'PAGU PERPRES', 'BLOKIR PERPRES', 'PAGU DIPA AWAL EFEKTIF',
+        'PAGU DIPA REVISI EFEKTIF', 'PAGU HIMPUNAN EFEKTIF','PAGU PERPRES EFEKTIF'
     )
     
     # Defaults
     DEFAULT_GROUP_COLS: Tuple[str, ...] = ('KEMENTERIAN/LEMBAGA', 'FUNGSI', 'PROGRAM')
-    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA REVISI',)
+    DEFAULT_NUMERIC_COLS: Tuple[str, ...] = ('PAGU DIPA AWAL',)
     
     # Actual available columns (set after loading data)
     string_columns: List[str] = field(default_factory=list)
@@ -1426,6 +1427,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
