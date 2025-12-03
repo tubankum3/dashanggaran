@@ -1198,8 +1198,8 @@ class MonitoringDashboard:
         Shows 5 columns:
         - Primary date value
         - Comparison date value
-        - Total Kenaikan (sum of positive SELISIH)
-        - Total Penurunan (sum of negative SELISIH)
+        - Total Kenaikan (sum of positive SELISIH) - GREEN text
+        - Total Penurunan (sum of negative SELISIH) - RED text
         - Net Selisih (kenaikan - penurunan)
         """
         st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
@@ -1235,16 +1235,29 @@ class MonitoringDashboard:
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
-            c3.metric(
-                "Total Kenaikan ⬆️", 
-                Formatter.to_rupiah_short(total_kenaikan),
-                help="Jumlah selisih positif (kenaikan)"
-            )
-            c4.metric(
-                "Total Penurunan ⬇️", 
-                Formatter.to_rupiah_short(abs(total_penurunan)),  # Show as positive for readability
-                help="Jumlah selisih negatif (penurunan)"
-            )
+            
+            # Custom colored metric for Total Kenaikan (GREEN)
+            with c3:
+                st.markdown("""
+                <div class="metric-card" style="padding: 1rem;">
+                    <div class="metric-label">Total Kenaikan ⬆️</div>
+                    <div class="metric-value" style="color: #059669; font-size: 1.5rem;">""" + 
+                    Formatter.to_rupiah_short(total_kenaikan) + """</div>
+                    <div class="metric-sublabel">Jumlah selisih positif</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Custom colored metric for Total Penurunan (RED)
+            with c4:
+                st.markdown("""
+                <div class="metric-card" style="padding: 1rem;">
+                    <div class="metric-label">Total Penurunan ⬇️</div>
+                    <div class="metric-value" style="color: #DC2626; font-size: 1.5rem;">""" + 
+                    Formatter.to_rupiah_short(abs(total_penurunan)) + """</div>
+                    <div class="metric-sublabel">Jumlah selisih negatif</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
             c5.metric(
                 "Net Selisih", 
                 Formatter.to_rupiah_short(net_selisih), 
@@ -1401,6 +1414,7 @@ class MonitoringDashboard:
     def _render_column_summary(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """
         Render summary metrics for numeric columns with kenaikan/penurunan breakdown.
+        Uses colored text: GREEN for kenaikan, RED for penurunan.
         """
         st.markdown("### 📈 Ringkasan Perbandingan Metrik")
         
@@ -1439,16 +1453,29 @@ class MonitoringDashboard:
                 total_penurunan = row_diffs[row_diffs < 0].sum()
                 
                 c1.metric(col, Formatter.to_rupiah_short(value))
-                c2.metric(
-                    "Total Kenaikan ⬆️", 
-                    Formatter.to_rupiah_short(total_kenaikan),
-                    help="Jumlah selisih positif"
-                )
-                c3.metric(
-                    "Total Penurunan ⬇️", 
-                    Formatter.to_rupiah_short(abs(total_penurunan)),
-                    help="Jumlah selisih negatif"
-                )
+                
+                # Custom colored metric for Total Kenaikan (GREEN)
+                with c2:
+                    st.markdown("""
+                    <div class="metric-card" style="padding: 1rem;">
+                        <div class="metric-label">Total Kenaikan ⬆️</div>
+                        <div class="metric-value" style="color: #059669; font-size: 1.5rem;">""" + 
+                        Formatter.to_rupiah_short(total_kenaikan) + """</div>
+                        <div class="metric-sublabel">Jumlah selisih positif</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Custom colored metric for Total Penurunan (RED)
+                with c3:
+                    st.markdown("""
+                    <div class="metric-card" style="padding: 1rem;">
+                        <div class="metric-label">Total Penurunan ⬇️</div>
+                        <div class="metric-value" style="color: #DC2626; font-size: 1.5rem;">""" + 
+                        Formatter.to_rupiah_short(abs(total_penurunan)) + """</div>
+                        <div class="metric-sublabel">Jumlah selisih negatif</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
                 c4.metric(
                     "Net Selisih", 
                     Formatter.to_rupiah_short(diff),
