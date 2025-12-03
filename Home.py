@@ -1263,11 +1263,11 @@ class BudgetAnalysisDashboard:
                 "About": "Dashboard Anggaran Bidang PMK"
             }
         )
-    def main():
-        st.set_page_config(page_title="...", layout="wide")
-        
-        # Apply CSS styles
-        st.markdown(CSS_STYLES, unsafe_allow_html=True)
+        def main():
+            st.set_page_config(page_title="...", layout="wide")
+            
+            # Apply CSS styles
+            st.markdown(CSS_STYLES, unsafe_allow_html=True)
 
 # =============================================================================
 # ENTRY POINT
@@ -1285,4 +1285,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
