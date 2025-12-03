@@ -55,6 +55,10 @@ class AppConfig:
 # STYLING
 # =============================================================================
 
+# =============================================================================
+# CSS STYLING SECTION - COPY THIS ENTIRE BLOCK TO YOUR DASHBOARD
+# =============================================================================
+
 CSS_STYLES = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -100,7 +104,6 @@ CSS_STYLES = """
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .stApp { background-color: var(--background); }
 
-/* Dashboard Header */
 .dashboard-header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     padding: var(--space-xl);
@@ -110,174 +113,45 @@ CSS_STYLES = """
     box-shadow: var(--shadow-lg);
 }
 
-.breadcrumb {
-    font-size: 0.875rem;
-    font-weight: 500;
-    opacity: 0.9;
-    margin-bottom: var(--space-sm);
-    letter-spacing: 0.025em;
-}
+.breadcrumb { font-size: 0.875rem; font-weight: 500; opacity: 0.9; margin-bottom: var(--space-sm); letter-spacing: 0.025em; }
+.dashboard-title { font-weight: 700; font-size: 2rem; line-height: 1.2; margin: 0; letter-spacing: -0.025em; }
+.dashboard-subtitle { font-weight: 400; font-size: 1rem; opacity: 0.9; margin: 0.75rem 0 0 0; }
 
-.dashboard-title {
-    font-weight: 700;
-    font-size: 2rem;
-    line-height: 1.2;
-    margin: 0;
-    letter-spacing: -0.025em;
-}
+.section-title { font-weight: 600; font-size: 1.125rem; color: var(--gray-900); margin-bottom: var(--space-lg); padding-bottom: var(--space-md); border-bottom: 2px solid var(--gray-200); }
 
-/* Section Title */
-.section-title {
-    font-weight: 600;
-    font-size: 1.125rem;
-    color: var(--gray-900);
-    margin-bottom: var(--space-lg);
-    padding-bottom: var(--space-md);
-    border-bottom: 2px solid var(--gray-200);
-}
+.material-card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-xl); margin-bottom: var(--space-lg); border: 1px solid var(--gray-200); transition: all var(--transition-base); }
+.material-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 
-/* Material Card */
-.material-card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: var(--space-xl);
-    margin-bottom: var(--space-lg);
-    border: 1px solid var(--gray-200);
-    transition: all var(--transition-base);
-}
+.chart-container { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200); }
 
-.material-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-/* Metric Cards */
-.metric-card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    padding: var(--space-lg);
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-base);
-    border: 1px solid var(--gray-200);
-    position: relative;
-    overflow: hidden;
-}
-
-.metric-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    border-color: var(--primary-light);
-}
-
-.metric-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin: var(--space-sm) 0;
-    line-height: 1;
-}
-
-.metric-label {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    font-weight: 500;
-}
-
-.metric-sublabel {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    margin-top: var(--space-xs);
-}
-
-.metric-trend {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-top: var(--space-sm);
-}
-
+.metric-card { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-lg); box-shadow: var(--shadow-sm); transition: all var(--transition-base); border: 1px solid var(--gray-200); position: relative; overflow: hidden; }
+.metric-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--primary-light); }
+.metric-value { font-size: 2rem; font-weight: 700; color: var(--gray-900); margin: var(--space-sm) 0; line-height: 1; }
+.metric-label { font-size: 0.875rem; color: var(--gray-600); font-weight: 500; }
+.metric-sublabel { font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-xs); }
+.metric-trend { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600; margin-top: var(--space-sm); }
 .trend-positive { background: #ECFDF5; color: var(--success); }
 .trend-negative { background: #FEF2F2; color: var(--error); }
 
-/* Buttons */
-.stButton>button {
-    background: var(--primary);
-    color: var(--on-primary);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 0.625rem 1.25rem;
-    font-weight: 500;
-    font-size: 0.875rem;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-sm);
-}
+.availability-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full); font-size: 13px; font-weight: 500; margin: 8px 0; }
+.badge-available { background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+.badge-unavailable { background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
 
-.stButton>button:hover {
-    background: var(--primary-dark);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-}
+.comparison-header { background: var(--gray-100); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-md); }
+.filter-container { background: var(--gray-50); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-lg); border: 1px solid var(--gray-200); }
 
-/* Sidebar */
+.stButton > button { background: var(--primary); color: var(--on-primary); border: none; border-radius: var(--radius-md); padding: 0.625rem 1.25rem; font-weight: 500; font-size: 0.875rem; transition: all var(--transition-fast); box-shadow: var(--shadow-sm); }
+.stButton > button:hover { background: var(--primary-dark); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
 .stSidebar { background: var(--surface); border-right: 1px solid var(--gray-200); }
+.sidebar-section { background: var(--surface); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-md); border: 1px solid var(--gray-200); }
 
-.sidebar-section {
-    background: var(--surface);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    margin-bottom: var(--space-md);
-    border: 1px solid var(--gray-200);
-}
+.stTabs [data-baseweb="tab-list"] { display: flex; flex-wrap: wrap; gap: var(--space-xs); border-bottom: 1px solid var(--gray-200); padding-bottom: var(--space-sm); row-gap: var(--space-sm); }
+.stTabs [data-baseweb="tab"] { background: var(--gray-50); border: 1px solid var(--gray-200); border-bottom: 2px solid transparent; border-radius: var(--radius-md); padding: var(--space-sm) var(--space-md); color: var(--gray-600); font-weight: 500; font-size: 0.8rem; transition: all var(--transition-fast); white-space: nowrap; flex-shrink: 0; }
+.stTabs [data-baseweb="tab"]:hover { color: var(--gray-900); background: var(--gray-100); border-color: var(--gray-300); }
+.stTabs [aria-selected="true"] { background: var(--primary-light); color: white; border-color: var(--primary); border-bottom-color: var(--primary); }
+.stTabs [data-baseweb="tab-panel"] { padding-top: var(--space-lg); }
 
-/* ============================================================================
-   MULTI-LINE TABS - Allow tabs to wrap to multiple lines
-   ============================================================================ */
-.stTabs [data-baseweb="tab-list"] {
-    display: flex;
-    flex-wrap: wrap;           /* Enable wrapping to multiple lines */
-    gap: var(--space-xs);      /* Gap between tabs */
-    border-bottom: 1px solid var(--gray-200);
-    padding-bottom: var(--space-sm);
-    row-gap: var(--space-sm);  /* Vertical gap between rows */
-}
-
-.stTabs [data-baseweb="tab"] {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-bottom: 2px solid transparent;
-    border-radius: var(--radius-md);
-    padding: var(--space-sm) var(--space-md);
-    color: var(--gray-600);
-    font-weight: 500;
-    font-size: 0.8rem;
-    transition: all var(--transition-fast);
-    white-space: nowrap;       /* Prevent text wrapping within tab */
-    flex-shrink: 0;            /* Don't shrink tabs */
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--gray-900);
-    background: var(--gray-100);
-    border-color: var(--gray-300);
-}
-
-.stTabs [aria-selected="true"] {
-    background: var(--primary-light);
-    color: white;
-    border-color: var(--primary);
-    border-bottom-color: var(--primary);
-}
-
-/* Tab panel content */
-.stTabs [data-baseweb="tab-panel"] {
-    padding-top: var(--space-lg);
-}
-
-/* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb { background: var(--gray-400); border-radius: var(--radius-full); }
@@ -285,6 +159,14 @@ CSS_STYLES = """
 </style>
 """
 
+CSS_TABS_UNDERLINE = """
+<style>
+.stTabs [data-baseweb="tab-list"] { display: flex; flex-wrap: nowrap; gap: var(--space-sm); border-bottom: 1px solid var(--gray-200); padding-bottom: 0; }
+.stTabs [data-baseweb="tab"] { background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: var(--space-md) var(--space-lg); color: var(--gray-600); font-weight: 500; font-size: 0.875rem; }
+.stTabs [data-baseweb="tab"]:hover { color: var(--gray-900); background: var(--gray-50); }
+.stTabs [aria-selected="true"] { background: transparent; color: var(--primary); border-bottom-color: var(--primary); }
+</style>
+"""
 
 # =============================================================================
 # FORMATTING UTILITIES
@@ -1064,6 +946,8 @@ class TrendAnalysisApp:
                 "About": "Dashboard Anggaran Bidang PMK"
             }
         )
+        # Apply CSS styles
+        st.markdown(CSS_STYLES, unsafe_allow_html=True)
     
     def _render_category_tabs(
         self,
@@ -1106,3 +990,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
