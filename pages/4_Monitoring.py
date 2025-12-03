@@ -129,7 +129,7 @@ INDONESIAN_MONTHS: Dict[int, str] = {
     9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
 }
 
-AVAILABLE_DATES: List[str] = ["27 Oktober 2025", "11 November 2025"]
+AVAILABLE_DATES: List[str] = ["27 Oktober 2025", "11 November 2025", "3 Desember 2025"]
 
 # =============================================================================
 # STYLING
@@ -745,7 +745,7 @@ class SidebarController:
         
         primary_dt = st.sidebar.date_input(
             "Pilih Tanggal Data Terkini",
-            value=date(2025, 11, 11),
+            value=date(2025, 12, 3),
             min_value=self.config.date_start,
             max_value=self.config.date_end,
             key=f"{key_prefix}primary_date",
@@ -772,9 +772,9 @@ class SidebarController:
         
         if enable_comparison:
             default_comparison = (
-                date(2025, 10, 27) 
-                if primary_dt != date(2025, 10, 27) 
-                else date(2025, 11, 11)
+                date(2025, 11, 11) 
+                if primary_dt != date(2025, 11, 11) 
+                else date(2025, 12, 3)
             )
             
             comparison_dt = st.sidebar.date_input(
@@ -1426,6 +1426,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
