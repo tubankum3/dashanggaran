@@ -406,13 +406,14 @@ def format_rupiah(value: float) -> str:
     if pd.isna(value) or value == 0:
         return "Rp 0"
     abs_val = abs(value)
+    sign = "-" if value < 0 else ""
     if abs_val >= 1_000_000_000_000:
-        return f"Rp {value/1_000_000_000_000:.2f} T"
+        return f"{sign}Rp {abs_val/1_000_000_000_000:.2f} T"
     elif abs_val >= 1_000_000_000:
-        return f"Rp {value/1_000_000_000:.2f} M"
+        return f"{sign}Rp {abs_val/1_000_000_000:.2f} M"
     elif abs_val >= 1_000_000:
-        return f"Rp {value/1_000_000:.2f} Jt"
-    return f"Rp {value:,.0f}"
+        return f"{sign}Rp {abs_val/1_000_000:.2f} Jt"
+    return f"{sign}Rp {abs_val:,.0f}"
 
 def rupiah_separator(x):
     try:
@@ -421,25 +422,42 @@ def rupiah_separator(x):
         return x
     return f"Rp {x:,.0f}".replace(",", ".")
     
-def aggregate_level(df, group_cols, metric, top_n=None):
-    """Aggregate data by grouping columns and return top N"""
+def aggregate_level(df, group_cols, metric, top_n=None, sort_order="Top"):
+    """
+    Aggregate data by grouping columns and return top N or bottom N
+    
+    Args:
+        df: DataFrame to aggregate
+        group_cols: List of columns to group by
+        metric: Numeric column to aggregate
+        top_n: Number of items to return
+        sort_order: "Top" for highest values, "Bottom" for lowest values
+    """
     group_cols = [c for c in group_cols if c in df.columns]
     if not group_cols:
         return pd.DataFrame()
     agg = df.groupby(group_cols, as_index=False)[metric].sum()
     agg = agg.dropna(subset=[group_cols[-1]])
+    
     if top_n:
-        top = agg.nlargest(top_n, metric)
+        if sort_order == "Top":
+            # Get top N (largest values)
+            top = agg.nlargest(top_n, metric)
+        else:
+            # Get bottom N (smallest values)
+            top = agg.nsmallest(top_n, metric)
         agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
+    
     return agg
 
-def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None):
+def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None, sort_order="Top"):
     """
     Create horizontal bar chart with:
     - X-axis: numeric/continuous float metric values (Rupiah)
     - Bar labels: percentage of total
     - Hover: both percentage and Rupiah value
     - Dynamic height scaling based on number of bars
+    - Sort order: ascending for Top (largest at top), descending for Bottom (smallest at top)
     """
     df_plot = df.copy()
     
@@ -462,8 +480,13 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.2f}%")
     df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
     
-    # Sort ascending by metric
-    df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
+    # Sort based on sort_order
+    # For horizontal bar chart: ascending=True puts largest at top (for "Top")
+    # ascending=False puts smallest at top (for "Bottom")
+    if sort_order == "Top":
+        df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
+    else:
+        df_plot = df_plot.sort_values(metric, ascending=False).reset_index(drop=True)
     
     # Wrap long y-axis labels (wrap at spaces)
     import textwrap
@@ -505,6 +528,9 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
     else:
         tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
     
+    # Choose bar color based on sort_order
+    bar_color = "#1a73e8" if sort_order == "Top" else "#dc3545"  # Blue for Top, Red for Bottom
+    
     # Create figure
     fig = go.Figure()
     
@@ -516,7 +542,7 @@ def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False,
             text=row["__pct_label"],
             textposition="outside",
             textfont=dict(size=11, color="#333"),
-            marker=dict(color="#1a73e8"),
+            marker=dict(color=bar_color),
             hovertemplate=(
                 f"{row[y_col]}<br>"
                 f"Jumlah: {row['__rupiah_formatted']}<br>"
@@ -642,7 +668,24 @@ def sidebar(df):
         default_year_index = years.index(2025) if 2025 in years else len(years) - 1
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
 
-        top_n = st.number_input("Tampilkan Top (N)", min_value=1, max_value=500, value=11, step=1)
+        # ✅ NEW: Top/Bottom selector
+        sort_order = st.radio(
+            "Tampilkan Data",
+            options=["Top", "Bottom"],
+            index=0,
+            horizontal=True,
+            help="Top: Data tertinggi | Bottom: Data terendah"
+        )
+        
+        # ✅ UPDATED: Dynamic label based on sort_order
+        top_n = st.number_input(
+            f"Tampilkan {sort_order}-N Data",
+            min_value=1,
+            max_value=500,
+            value=10,
+            step=1,
+            help=f"Jumlah Data {'tertinggi' if sort_order == 'Top' else 'terendah'} yang ditampilkan pada grafik berdasarkan Metrik yang dipilih."
+        )
 
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
         if not numeric_cols:
@@ -662,12 +705,13 @@ def sidebar(df):
         if "Semua" in selected_kls:
             selected_kls = []
 
-    return selected_year, selected_kls, top_n, selected_metric
+    # ✅ Return sort_order as well
+    return selected_year, selected_kls, top_n, selected_metric, sort_order
 
 # =============================================================================
 # Drill-down UI
 # =============================================================================
-def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n):
+def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order="Top"):
     """
     Main drill-down interface with breadcrumb navigation and interactive chart
     
@@ -676,7 +720,8 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
         available_levels: List of hierarchy column names available in data
         selected_metric: The numeric metric column to aggregate and display
         selected_year: Selected year for display
-        top_n: Number of top items to show
+        top_n: Number of top/bottom items to show
+        sort_order: "Top" or "Bottom" to determine sorting
     """
     placeholder = st.empty()
     with placeholder.container():
@@ -742,16 +787,16 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
             if anc_val is not None:
                 df_view = df_view[df_view[anc_row] == anc_val]
 
-        # === Aggregate data for current level ===
-        agg = aggregate_level(df_view, [view_row], selected_metric, top_n)
+        # === Aggregate data for current level (with sort_order) ===
+        agg = aggregate_level(df_view, [view_row], selected_metric, top_n, sort_order)
         
         if agg.empty:
             st.info("Tidak ada data untuk level ini.")
             return
 
-        # === Create and display chart ===
-        title = f"TOP {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
-        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600)
+        # === Create and display chart (with sort_order in title and chart) ===
+        title = f"{sort_order.upper()} {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
+        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600, sort_order=sort_order)
 
         # ✅ Show chart and capture click events
         events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
@@ -766,8 +811,11 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
             # Ensure numeric
             df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0)
         
-            # Sort largest first
-            df_table = df_table.sort_values(by=selected_metric, ascending=False).reset_index(drop=True)
+            # Sort based on sort_order
+            df_table = df_table.sort_values(
+                by=selected_metric, 
+                ascending=(sort_order == "Bottom")
+            ).reset_index(drop=True)
         
             # Hidden numeric column for export
             hidden_numeric_col = f"_numeric_{selected_metric}"
@@ -803,7 +851,7 @@ def general_drill_down(df_filtered, available_levels, selected_metric, selected_
             st.download_button(
                 label="Download Excel",
                 data=buffer,
-                file_name=f"drill_view_{selected_metric}_{selected_year}.xlsx",
+                file_name=f"drill_view_{sort_order}_{top_n}_{selected_metric}_{selected_year}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
@@ -844,7 +892,8 @@ def main():
         st.error("Kolom 'Tahun' atau 'KEMENTERIAN/LEMBAGA' tidak ditemukan.")
         return
 
-    selected_year, selected_kls, top_n, selected_metric = sidebar(df)
+    # ✅ Get sort_order from sidebar
+    selected_year, selected_kls, top_n, selected_metric, sort_order = sidebar(df)
     header(selected_year, selected_metric, selected_kls)
 
     # Filter base data by year + K/L
@@ -858,11 +907,12 @@ def main():
         st.error("Kolom hierarki tidak ditemukan di dataset.")
         return
 
-    # Run the drill-down interface
-    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n)
+    # ✅ Pass sort_order to drill-down
+    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order)
 
     # Sidebar: current filters and drill state
     st.sidebar.markdown("---")
+    st.sidebar.markdown(f"**Mode:** {sort_order} {top_n}")
     if selected_kls:
         st.sidebar.write("**K/L:**")
         for k in selected_kls:
@@ -886,32 +936,3 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
