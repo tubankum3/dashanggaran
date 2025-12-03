@@ -842,6 +842,7 @@ class UIComponents:
     def apply_styles() -> None:
         """Apply CSS styles to the page."""
         st.markdown(CSS_STYLES, unsafe_allow_html=True)
+        st.markdown(CSS_TABS_UNDERLINE, unsafe_allow_html=True)
 
 
 class SidebarController:
@@ -1146,9 +1147,6 @@ class BudgetComparisonApp:
                 "About": "Dashboard Anggaran Bidang PMK"
             }
         )
-        # Apply CSS styles
-        st.markdown(CSS_STYLES, unsafe_allow_html=True)
-        st.markdown(CSS_TABS_UNDERLINE, unsafe_allow_html=True)
     
     def _render_tabs(
         self,
@@ -1205,4 +1203,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
