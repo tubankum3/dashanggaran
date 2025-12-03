@@ -330,8 +330,14 @@ class DataFrameFormatter:
     def __init__(self, numeric_columns: List[str]):
         self.numeric_columns = numeric_columns
     
-    def format_for_display(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply formatting to DataFrame for UI display."""
+    def format_for_display(self, df: pd.DataFrame, keep_pct_numeric: bool = False) -> pd.DataFrame:
+        """
+        Apply formatting to DataFrame for UI display.
+        
+        Args:
+            df: DataFrame to format
+            keep_pct_numeric: If True, keep %CHG columns as numeric for bar styling
+        """
         if df.empty:
             return df
         
@@ -339,7 +345,9 @@ class DataFrameFormatter:
         
         for col in df_display.columns:
             if self._is_percentage_column(col):
-                df_display[col] = df_display[col].apply(Formatter.to_percentage)
+                if not keep_pct_numeric:
+                    df_display[col] = df_display[col].apply(Formatter.to_percentage)
+                # If keep_pct_numeric=True, leave as numeric for bar styling
             elif self._is_numeric_column(col):
                 df_display[col] = df_display[col].apply(Formatter.to_rupiah_full)
         
@@ -361,7 +369,7 @@ class DataFrameStyler:
     @staticmethod
     def style_selisih_columns(df: pd.DataFrame, numeric_columns: List[str]) -> pd.io.formats.style.Styler:
         """
-        Apply conditional formatting to SELISIH columns.
+        Apply conditional formatting to SELISIH columns only.
         
         - Positive (>0): green font, light-green background (kenaikan)
         - Negative (<0): red font, light-red background (penurunan)
@@ -388,6 +396,77 @@ class DataFrameStyler:
         
         # Create styler and apply to SELISIH columns only
         styler = df.style.applymap(highlight_selisih, subset=selisih_cols)
+        
+        return styler
+    
+    @staticmethod
+    def style_comparison_table(df: pd.DataFrame, numeric_columns: List[str]) -> pd.io.formats.style.Styler:
+        """
+        Apply comprehensive styling to comparison table:
+        - SELISIH columns: conditional text color (green/red)
+        - %CHG columns: progress bar with center alignment (green for positive, red for negative)
+        
+        Args:
+            df: DataFrame with SELISIH_ and %CHG_ columns (keep %CHG as numeric)
+            numeric_columns: List of original numeric column names
+            
+        Returns:
+            Styled DataFrame
+        """
+        selisih_cols = [col for col in df.columns if col.startswith('SELISIH_')]
+        pct_cols = [col for col in df.columns if col.startswith('%CHG_')]
+        
+        # Start with base styler
+        styler = df.style
+        
+        # Apply SELISIH conditional formatting (text color)
+        if selisih_cols:
+            def highlight_selisih(val):
+                """Return CSS style based on value."""
+                try:
+                    if isinstance(val, str):
+                        num_val = float(val.replace('Rp ', '').replace('.', '').replace(',', '.'))
+                    else:
+                        num_val = float(val) if pd.notna(val) else 0
+                except (ValueError, TypeError):
+                    return ''
+                
+                if num_val > 0:
+                    return 'color: #059669; background-color: #ECFDF5; font-weight: 600;'
+                elif num_val < 0:
+                    return 'color: #DC2626; background-color: #FEF2F2; font-weight: 600;'
+                return ''
+            
+            styler = styler.applymap(highlight_selisih, subset=selisih_cols)
+        
+        # Apply %CHG bar styling with center alignment
+        if pct_cols:
+            # Calculate min/max for symmetric bar display
+            all_pct_values = []
+            for col in pct_cols:
+                if col in df.columns:
+                    values = df[col].dropna().tolist()
+                    all_pct_values.extend(values)
+            
+            if all_pct_values:
+                max_abs = max(abs(min(all_pct_values, default=0)), abs(max(all_pct_values, default=0)), 1)
+                # Cap at reasonable range for visualization
+                max_abs = min(max_abs, 200)  # Cap at 200% for better visualization
+            else:
+                max_abs = 100
+            
+            # Bar chart with center alignment
+            # Red for negative (left), Green for positive (right)
+            styler = styler.bar(
+                subset=pct_cols,
+                align='mid',
+                color=['#FCA5A5', '#86EFAC'],  # [negative, positive] - Tailwind red-300, green-300
+                vmin=-max_abs,
+                vmax=max_abs
+            )
+            
+            # Format percentage values
+            styler = styler.format('{:+.2f}%', subset=pct_cols, na_rep='-')
         
         return styler
 
@@ -628,7 +707,14 @@ class DataAggregator:
             return pd.DataFrame()
         
         agg_dict = {col: agg_function for col in available_numerics}
-        return df.groupby(available_groups, as_index=False).agg(agg_dict)
+        result = df.groupby(available_groups, as_index=False).agg(agg_dict)
+        
+        # Fill NaN values in numeric columns with 0 for calculations
+        for col in available_numerics:
+            if col in result.columns:
+                result[col] = result[col].fillna(0)
+        
+        return result
 
 
 class DatasetComparator:
@@ -676,6 +762,16 @@ class DatasetComparator:
         
         comparison = pd.merge(agg_primary, agg_comparison, on=available_groups, how='outer')
         
+        # Fill NaN values with 0 for all numeric columns after merge
+        for col in available_numerics:
+            col_primary = f"{col}_{date_primary}"
+            col_comparison = f"{col}_{date_comparison}"
+            
+            if col_primary in comparison.columns:
+                comparison[col_primary] = comparison[col_primary].fillna(0)
+            if col_comparison in comparison.columns:
+                comparison[col_comparison] = comparison[col_comparison].fillna(0)
+        
         for col in available_numerics:
             col_primary = f"{col}_{date_primary}"
             col_comparison = f"{col}_{date_comparison}"
@@ -684,13 +780,12 @@ class DatasetComparator:
                 continue
             
             comparison[f"SELISIH_{col}"] = (
-                comparison[col_primary].fillna(0) - 
-                comparison[col_comparison].fillna(0)
+                comparison[col_primary] - comparison[col_comparison]
             )
             
             comparison[f"%CHG_{col}"] = np.where(
-                comparison[col_comparison].fillna(0) != 0,
-                (comparison[f"SELISIH_{col}"] / comparison[col_comparison].fillna(0).abs()) * 100,
+                comparison[col_comparison] != 0,
+                (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100,
                 np.nan
             )
         
@@ -1219,8 +1314,9 @@ class MonitoringDashboard:
             st.markdown(f"**{col}**")
             c1, c2, c3, c4, c5 = st.columns(5)
             
-            val_primary = filtered_comparison_df[col_primary].sum()
-            val_comparison = filtered_comparison_df[col_comparison].sum()
+            # Fill NaN with 0 for calculations
+            val_primary = filtered_comparison_df[col_primary].fillna(0).sum()
+            val_comparison = filtered_comparison_df[col_comparison].fillna(0).sum()
             
             # Calculate kenaikan (positive selisih) and penurunan (negative selisih)
             selisih_values = filtered_comparison_df[selisih_col].fillna(0)
@@ -1235,14 +1331,9 @@ class MonitoringDashboard:
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
-            c3.metric(
-                "Net Selisih", 
-                Formatter.to_rupiah_short(net_selisih), 
-                f"{pct:+.2f}%",
-                help="Kenaikan - Penurunan"
-            )
+            
             # Custom colored metric for Total Kenaikan (GREEN)
-            with c4:
+            with c3:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Kenaikan ⬆️</div>
@@ -1253,7 +1344,7 @@ class MonitoringDashboard:
                 """, unsafe_allow_html=True)
             
             # Custom colored metric for Total Penurunan (RED)
-            with c5:
+            with c4:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Penurunan ⬇️</div>
@@ -1263,7 +1354,12 @@ class MonitoringDashboard:
                 </div>
                 """, unsafe_allow_html=True)
             
-            
+            c5.metric(
+                "Net Selisih", 
+                Formatter.to_rupiah_short(net_selisih), 
+                f"{pct:+.2f}%",
+                help="Kenaikan - Penurunan"
+            )
     
     def _render_comparison_detail(
         self,
@@ -1281,7 +1377,7 @@ class MonitoringDashboard:
         
         - Positive SELISIH: green font, light-green background (kenaikan)
         - Negative SELISIH: red font, light-red background (penurunan)
-        - Zero: neutral color
+        - %CHG columns: progress bar (green for positive, red for negative)
         """
         st.markdown("### 📋 Tabel Detail Perbandingan")
         
@@ -1292,14 +1388,16 @@ class MonitoringDashboard:
             - `SELISIH_[kolom]` = Selisih (utama - pembanding)
               - 🟢 **Hijau** = Kenaikan (nilai positif)
               - 🔴 **Merah** = Penurunan (nilai negatif)
-            - `%CHG_[kolom]` = Persentase perubahan
+            - `%CHG_[kolom]` = Persentase perubahan (dengan progress bar)
+              - 🟢 **Bar hijau ke kanan** = Kenaikan (%)
+              - 🔴 **Bar merah ke kiri** = Penurunan (%)
             """)
         
-        # Format the dataframe for display
-        display_df = formatter.format_for_display(filtered_df)
+        # Format the dataframe for display, but keep %CHG columns numeric for bar styling
+        display_df = formatter.format_for_display(filtered_df, keep_pct_numeric=True)
         
-        # Apply conditional styling to SELISIH columns
-        styled_df = DataFrameStyler.style_selisih_columns(display_df, numeric_cols)
+        # Apply comprehensive styling (SELISIH text color + %CHG progress bars)
+        styled_df = DataFrameStyler.style_comparison_table(display_df, numeric_cols)
         
         # Display styled dataframe
         st.dataframe(styled_df, width="stretch", hide_index=True)
@@ -1365,23 +1463,23 @@ class MonitoringDashboard:
             if primary_col in filtered_agg_with_diff.columns:
                 for col in numeric_cols[1:]:
                     if col in filtered_agg_with_diff.columns:
-                        # Calculate difference
+                        # Calculate difference (with fillna)
                         filtered_agg_with_diff[f'SELISIH_{col}'] = (
-                            filtered_agg_with_diff[col] - filtered_agg_with_diff[primary_col]
+                            filtered_agg_with_diff[col].fillna(0) - filtered_agg_with_diff[primary_col].fillna(0)
                         )
-                        # Calculate percentage change
+                        # Calculate percentage change (with fillna)
                         filtered_agg_with_diff[f'%CHG_{col}'] = np.where(
-                            filtered_agg_with_diff[primary_col] != 0,
+                            filtered_agg_with_diff[primary_col].fillna(0) != 0,
                             (filtered_agg_with_diff[f'SELISIH_{col}'] / 
-                             filtered_agg_with_diff[primary_col].abs()) * 100,
+                             filtered_agg_with_diff[primary_col].fillna(0).abs()) * 100,
                             np.nan
                         )
         
-        filtered_display = formatter.format_for_display(filtered_agg_with_diff)
+        filtered_display = formatter.format_for_display(filtered_agg_with_diff, keep_pct_numeric=True)
         
         # Apply conditional styling if there are SELISIH columns
         if len(numeric_cols) > 1:
-            styled_df = DataFrameStyler.style_selisih_columns(filtered_display, numeric_cols)
+            styled_df = DataFrameStyler.style_comparison_table(filtered_display, numeric_cols)
             st.dataframe(styled_df, width="stretch", hide_index=True)
         else:
             st.dataframe(filtered_display, width="stretch", hide_index=True)
@@ -1396,6 +1494,8 @@ class MonitoringDashboard:
                   - 🟢 **Hijau** = Kenaikan (nilai positif)
                   - 🔴 **Merah** = Penurunan (nilai negatif)
                 - `%CHG_[kolom]` = Persentase perubahan terhadap {primary_col}
+                  - 🟢 **Bar hijau ke kanan** = Kenaikan (%)
+                  - 🔴 **Bar merah ke kiri** = Penurunan (%)
                 """)
         
         # Excel download
@@ -1426,7 +1526,8 @@ class MonitoringDashboard:
         if primary_col not in df.columns:
             return
         
-        primary_value = df[primary_col].sum()
+        # Fill NaN with 0 for calculations
+        primary_value = df[primary_col].fillna(0).sum()
         
         # Show primary column
         st.markdown(f"**{primary_col} (Baseline)**")
@@ -1443,12 +1544,13 @@ class MonitoringDashboard:
                 st.markdown(f"**{col}**")
                 c1, c2, c3, c4 = st.columns(4)
                 
-                value = df[col].sum()
+                # Fill NaN with 0 for calculations
+                value = df[col].fillna(0).sum()
                 diff = value - primary_value
                 pct = (diff / abs(primary_value) * 100) if primary_value != 0 else 0
                 
-                # Calculate row-level differences for kenaikan/penurunan
-                row_diffs = df[col] - df[primary_col]
+                # Calculate row-level differences for kenaikan/penurunan (with fillna)
+                row_diffs = df[col].fillna(0) - df[primary_col].fillna(0)
                 total_kenaikan = row_diffs[row_diffs > 0].sum()
                 total_penurunan = row_diffs[row_diffs < 0].sum()
                 
@@ -1497,25 +1599,28 @@ class MonitoringDashboard:
         if primary_col not in df.columns:
             return
         
-        primary_total = df[primary_col].sum()
+        # Fill NaN with 0 for calculations
+        primary_total = df[primary_col].fillna(0).sum()
         
         summary_data = []
         for col in numeric_cols:
             if col not in df.columns:
                 continue
             
-            total = df[col].sum()
+            # Fill NaN with 0 for calculations
+            col_data = df[col].fillna(0)
+            total = col_data.sum()
             diff = total - primary_total
             pct = (diff / abs(primary_total) * 100) if primary_total != 0 else 0
             
-            # Calculate row-level kenaikan/penurunan
+            # Calculate row-level kenaikan/penurunan (with fillna)
             if col == primary_col:
                 kenaikan = '-'
                 penurunan = '-'
                 net_selisih = '-'
                 pct_str = '-'
             else:
-                row_diffs = df[col] - df[primary_col]
+                row_diffs = col_data - df[primary_col].fillna(0)
                 kenaikan = row_diffs[row_diffs > 0].sum()
                 penurunan = abs(row_diffs[row_diffs < 0].sum())
                 net_selisih = diff
@@ -1524,10 +1629,10 @@ class MonitoringDashboard:
             row_data = {
                 'Kolom': col,
                 'Total': total,
-                'Rata-rata': df[col].mean(),
-                'Min': df[col].min(),
-                'Max': df[col].max(),
-                'Count': df[col].count(),
+                'Rata-rata': col_data.mean(),
+                'Min': col_data.min(),
+                'Max': col_data.max(),
+                'Count': col_data.count(),
                 'Kenaikan ⬆️': kenaikan,
                 'Penurunan ⬇️': penurunan,
                 'Net Selisih': net_selisih,
@@ -1579,4 +1684,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
