@@ -10,6 +10,7 @@ import io
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
+from datetime import date
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1125,20 +1126,19 @@ class SankeyControlPanel:
         
         with colC:
             year_options = sorted(int(y) for y in df_filtered[self.config.YEAR_COLUMN].dropna().unique())
-            
-            # Get current year
-            current_year = datetime.date.today().year
-            
-            # Use current year if available, otherwise fall back to the last option
-            default_year = current_year if current_year in year_options else year_options[-1]
+            if not year_options:
+                year_options = [date.today().year]
+                
+            current_year = date.today().year
+            default_index = year_options.index(current_year) if current_year in year_options else -1
             
             selected_year = st.selectbox(
                 "Tahun",
                 year_options,
-                index=year_options.index(default_year),
+                index=default_index,
                 key="year_sankey"
             )
-        
+            
         with colD:
             metric_idx = (
                 numeric_cols.index(self.config.DEFAULT_SECONDARY_METRIC)
@@ -1290,6 +1290,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
