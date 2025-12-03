@@ -355,6 +355,43 @@ class DataFrameFormatter:
         return column_name.startswith('%CHG_')
 
 
+class DataFrameStyler:
+    """Applies conditional styling to DataFrames."""
+    
+    @staticmethod
+    def style_selisih_columns(df: pd.DataFrame, numeric_columns: List[str]) -> pd.io.formats.style.Styler:
+        """
+        Apply conditional formatting to SELISIH columns.
+        
+        - Positive (>0): green font, light-green background (kenaikan)
+        - Negative (<0): red font, light-red background (penurunan)
+        - Zero (=0): neutral color (default)
+        """
+        # Get SELISIH columns
+        selisih_cols = [col for col in df.columns if col.startswith('SELISIH_')]
+        
+        if not selisih_cols:
+            return df.style
+        
+        def highlight_selisih(val):
+            """Return CSS style based on value."""
+            try:
+                num_val = float(str(val).replace('Rp ', '').replace('.', '').replace(',', '.'))
+            except (ValueError, TypeError):
+                return ''
+            
+            if num_val > 0:
+                return 'color: #059669; background-color: #ECFDF5; font-weight: 600;'
+            elif num_val < 0:
+                return 'color: #DC2626; background-color: #FEF2F2; font-weight: 600;'
+            return ''
+        
+        # Create styler and apply to SELISIH columns only
+        styler = df.style.applymap(highlight_selisih, subset=selisih_cols)
+        
+        return styler
+
+
 class ExcelExporter:
     """Handles Excel file export."""
     
@@ -1048,7 +1085,7 @@ class MonitoringDashboard:
         """Configure Streamlit page settings."""
         st.set_page_config(
             page_title="Dashboard Analisis Anggaran dan Realisasi Belanja Negara",
-            page_icon=":material/monitoring:",
+            page_icon="📋",
             layout="wide",
             initial_sidebar_state="expanded",
             menu_items={
@@ -1130,9 +1167,10 @@ class MonitoringDashboard:
         
         # Render comparison summary (uses filtered data)
         self._render_comparison_summary(
-            df_primary_filtered, df_comparison_filtered,
+            filtered_comparison_df,
             numeric_cols,
-            primary_label, comparison_label
+            primary_label, comparison_label,
+            primary_date, comparison_date
         )
         
         st.divider()
@@ -1147,30 +1185,72 @@ class MonitoringDashboard:
     
     def _render_comparison_summary(
         self,
-        df_primary_filtered: pd.DataFrame,
-        df_comparison_filtered: pd.DataFrame,
+        filtered_comparison_df: pd.DataFrame,
         numeric_cols: List[str],
         primary_label: str,
-        comparison_label: str
+        comparison_label: str,
+        primary_date: str,
+        comparison_date: str
     ) -> None:
-        """Render summary metrics for comparison (uses pre-filtered data)."""
+        """
+        Render summary metrics for comparison with kenaikan/penurunan breakdown.
+        
+        Shows 5 columns:
+        - Primary date value
+        - Comparison date value
+        - Total Kenaikan (sum of positive SELISIH)
+        - Total Penurunan (sum of negative SELISIH)
+        - Net Selisih (kenaikan - penurunan)
+        """
         st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
         
         for col in numeric_cols:
-            if col not in df_primary_filtered.columns or col not in df_comparison_filtered.columns:
+            col_primary = f"{col}_{primary_date}"
+            col_comparison = f"{col}_{comparison_date}"
+            selisih_col = f"SELISIH_{col}"
+            
+            if col_primary not in filtered_comparison_df.columns:
+                continue
+            if col_comparison not in filtered_comparison_df.columns:
+                continue
+            if selisih_col not in filtered_comparison_df.columns:
                 continue
             
             st.markdown(f"**{col}**")
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4, c5 = st.columns(5)
             
-            val_primary = df_primary_filtered[col].sum()
-            val_comparison = df_comparison_filtered[col].sum()
-            diff = val_primary - val_comparison
-            pct = (diff / abs(val_comparison) * 100) if val_comparison != 0 else 0
+            val_primary = filtered_comparison_df[col_primary].sum()
+            val_comparison = filtered_comparison_df[col_comparison].sum()
+            
+            # Calculate kenaikan (positive selisih) and penurunan (negative selisih)
+            selisih_values = filtered_comparison_df[selisih_col].fillna(0)
+            total_kenaikan = selisih_values[selisih_values > 0].sum()
+            total_penurunan = selisih_values[selisih_values < 0].sum()  # This will be negative
+            
+            # Net selisih = kenaikan + penurunan (penurunan is negative, so this is kenaikan - |penurunan|)
+            net_selisih = total_kenaikan + total_penurunan
+            
+            # Calculate percentage change
+            pct = (net_selisih / abs(val_comparison) * 100) if val_comparison != 0 else 0
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
-            c3.metric("Selisih", Formatter.to_rupiah_short(diff), f"{pct:+.2f}%")
+            c3.metric(
+                "Total Kenaikan ⬆️", 
+                Formatter.to_rupiah_short(total_kenaikan),
+                help="Jumlah selisih positif (kenaikan)"
+            )
+            c4.metric(
+                "Total Penurunan ⬇️", 
+                Formatter.to_rupiah_short(abs(total_penurunan)),  # Show as positive for readability
+                help="Jumlah selisih negatif (penurunan)"
+            )
+            c5.metric(
+                "Net Selisih", 
+                Formatter.to_rupiah_short(net_selisih), 
+                f"{pct:+.2f}%",
+                help="Kenaikan - Penurunan"
+            )
     
     def _render_comparison_detail(
         self,
@@ -1183,21 +1263,35 @@ class MonitoringDashboard:
         comparison_label: str,
         formatter: DataFrameFormatter
     ) -> None:
-        """Render detailed comparison table (uses pre-filtered data)."""
+        """
+        Render detailed comparison table with conditional formatting.
+        
+        - Positive SELISIH: green font, light-green background (kenaikan)
+        - Negative SELISIH: red font, light-red background (penurunan)
+        - Zero: neutral color
+        """
         st.markdown("### 📋 Tabel Detail Perbandingan")
         
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
-            - `[kolom]_{primary_date}` = Nilai tanggal utama
-            - `[kolom]_{comparison_date}` = Nilai tanggal pembanding
+            - `[kolom]_{primary_date}` = Nilai tanggal utama ({primary_label})
+            - `[kolom]_{comparison_date}` = Nilai tanggal pembanding ({comparison_label})
             - `SELISIH_[kolom]` = Selisih (utama - pembanding)
+              - 🟢 **Hijau** = Kenaikan (nilai positif)
+              - 🔴 **Merah** = Penurunan (nilai negatif)
             - `%CHG_[kolom]` = Persentase perubahan
             """)
         
+        # Format the dataframe for display
         display_df = formatter.format_for_display(filtered_df)
-        st.dataframe(display_df, width="stretch", hide_index=True)
         
-        # Excel download
+        # Apply conditional styling to SELISIH columns
+        styled_df = DataFrameStyler.style_selisih_columns(display_df, numeric_cols)
+        
+        # Display styled dataframe
+        st.dataframe(styled_df, width="stretch", hide_index=True)
+        
+        # Excel download (uses unformatted data for accurate numbers)
         excel_data = ExcelExporter.to_excel_bytes(
             filtered_df, 
             sheet_name="Perbandingan"
@@ -1271,7 +1365,13 @@ class MonitoringDashboard:
                         )
         
         filtered_display = formatter.format_for_display(filtered_agg_with_diff)
-        st.dataframe(filtered_display, width="stretch", hide_index=True)
+        
+        # Apply conditional styling if there are SELISIH columns
+        if len(numeric_cols) > 1:
+            styled_df = DataFrameStyler.style_selisih_columns(filtered_display, numeric_cols)
+            st.dataframe(styled_df, width="stretch", hide_index=True)
+        else:
+            st.dataframe(filtered_display, width="stretch", hide_index=True)
         
         # Show column explanation if diff columns were added
         if len(numeric_cols) > 1:
@@ -1280,6 +1380,8 @@ class MonitoringDashboard:
                 st.markdown(f"""
                 - **Kolom Utama (Baseline)**: `{primary_col}`
                 - `SELISIH_[kolom]` = Nilai kolom - Nilai {primary_col}
+                  - 🟢 **Hijau** = Kenaikan (nilai positif)
+                  - 🔴 **Merah** = Penurunan (nilai negatif)
                 - `%CHG_[kolom]` = Persentase perubahan terhadap {primary_col}
                 """)
         
@@ -1298,8 +1400,7 @@ class MonitoringDashboard:
     
     def _render_column_summary(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """
-        Render summary metrics for numeric columns.
-        First column is primary (baseline), others show diff and %chg from primary.
+        Render summary metrics for numeric columns with kenaikan/penurunan breakdown.
         """
         st.markdown("### 📈 Ringkasan Perbandingan Metrik")
         
@@ -1317,33 +1418,47 @@ class MonitoringDashboard:
         st.markdown(f"**{primary_col} (Baseline)**")
         st.metric(label=primary_col, value=Formatter.to_rupiah_short(primary_value))
         
-        # Show comparison columns (2nd and onwards)
+        # Show comparison columns (2nd and onwards) with kenaikan/penurunan
         if len(numeric_cols) > 1:
             st.markdown("**Perbandingan dengan Metrik Lain:**")
             
-            comparison_cols = numeric_cols[1:]
-            cols_per_row = min(len(comparison_cols), self.config.metrics_per_row)
-            
-            for i in range(0, len(comparison_cols), cols_per_row):
-                chunk = comparison_cols[i:i + cols_per_row]
-                cols = st.columns(len(chunk))
+            for col in numeric_cols[1:]:
+                if col not in df.columns:
+                    continue
                 
-                for idx, col in enumerate(chunk):
-                    if col in df.columns:
-                        value = df[col].sum()
-                        diff = value - primary_value
-                        pct = (diff / abs(primary_value) * 100) if primary_value != 0 else 0
-                        
-                        cols[idx].metric(
-                            col, 
-                            Formatter.to_rupiah_short(value),
-                            f"{pct:+.2f}%"
-                        )
+                st.markdown(f"**{col}**")
+                c1, c2, c3, c4 = st.columns(4)
+                
+                value = df[col].sum()
+                diff = value - primary_value
+                pct = (diff / abs(primary_value) * 100) if primary_value != 0 else 0
+                
+                # Calculate row-level differences for kenaikan/penurunan
+                row_diffs = df[col] - df[primary_col]
+                total_kenaikan = row_diffs[row_diffs > 0].sum()
+                total_penurunan = row_diffs[row_diffs < 0].sum()
+                
+                c1.metric(col, Formatter.to_rupiah_short(value))
+                c2.metric(
+                    "Total Kenaikan ⬆️", 
+                    Formatter.to_rupiah_short(total_kenaikan),
+                    help="Jumlah selisih positif"
+                )
+                c3.metric(
+                    "Total Penurunan ⬇️", 
+                    Formatter.to_rupiah_short(abs(total_penurunan)),
+                    help="Jumlah selisih negatif"
+                )
+                c4.metric(
+                    "Net Selisih", 
+                    Formatter.to_rupiah_short(diff),
+                    f"{pct:+.2f}%",
+                    help="Kenaikan - Penurunan"
+                )
     
     def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """
-        Render comparison table for numeric columns.
-        Shows each column's stats with diff and %chg from primary (1st column).
+        Render comparison table for numeric columns with kenaikan/penurunan.
         """
         st.markdown("### 📊 Tabel Perbandingan Antar Metrik")
         
@@ -1357,8 +1472,6 @@ class MonitoringDashboard:
         
         primary_total = df[primary_col].sum()
         
-        diff_col_name = 'Selisih dengan Baseline'
-        
         summary_data = []
         for col in numeric_cols:
             if col not in df.columns:
@@ -1368,6 +1481,19 @@ class MonitoringDashboard:
             diff = total - primary_total
             pct = (diff / abs(primary_total) * 100) if primary_total != 0 else 0
             
+            # Calculate row-level kenaikan/penurunan
+            if col == primary_col:
+                kenaikan = '-'
+                penurunan = '-'
+                net_selisih = '-'
+                pct_str = '-'
+            else:
+                row_diffs = df[col] - df[primary_col]
+                kenaikan = row_diffs[row_diffs > 0].sum()
+                penurunan = abs(row_diffs[row_diffs < 0].sum())
+                net_selisih = diff
+                pct_str = pct
+            
             row_data = {
                 'Kolom': col,
                 'Total': total,
@@ -1375,15 +1501,11 @@ class MonitoringDashboard:
                 'Min': df[col].min(),
                 'Max': df[col].max(),
                 'Count': df[col].count(),
+                'Kenaikan ⬆️': kenaikan,
+                'Penurunan ⬇️': penurunan,
+                'Net Selisih': net_selisih,
+                '%Chg': pct_str,
             }
-            
-            # Add diff and %chg columns (except for primary column itself)
-            if col == primary_col:
-                row_data[diff_col_name] = '-'
-                row_data['%Chg'] = '-'
-            else:
-                row_data[diff_col_name] = diff
-                row_data['%Chg'] = pct
             
             summary_data.append(row_data)
         
@@ -1398,9 +1520,10 @@ class MonitoringDashboard:
             display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
         display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
         
-        display_df[diff_col_name] = display_df[diff_col_name].apply(
-            lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
-        )
+        for col in ['Kenaikan ⬆️', 'Penurunan ⬇️', 'Net Selisih']:
+            display_df[col] = display_df[col].apply(
+                lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
+            )
         display_df['%Chg'] = display_df['%Chg'].apply(
             lambda x: Formatter.to_percentage(x) if x != '-' else '-'
         )
@@ -1410,7 +1533,9 @@ class MonitoringDashboard:
         with st.expander("ℹ️ Keterangan", expanded=False):
             st.markdown(f"""
             - **Kolom Utama (Baseline)**: `{primary_col}`
-            - **Selisih dengan Baseline**: Nilai kolom - Nilai {primary_col}
+            - **Kenaikan ⬆️**: Jumlah selisih positif (nilai kolom > baseline)
+            - **Penurunan ⬇️**: Jumlah selisih negatif (nilai kolom < baseline)
+            - **Net Selisih**: Kenaikan - Penurunan
             - **%Chg**: Persentase perubahan terhadap {primary_col}
             """)
 
@@ -1427,9 +1552,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
