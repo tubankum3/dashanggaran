@@ -55,10 +55,6 @@ class AppConfig:
 # STYLING
 # =============================================================================
 
-# =============================================================================
-# CSS STYLING SECTION - COPY THIS ENTIRE BLOCK TO YOUR DASHBOARD
-# =============================================================================
-
 CSS_STYLES = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -990,4 +986,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
