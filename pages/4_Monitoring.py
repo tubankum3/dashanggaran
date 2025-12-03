@@ -1397,7 +1397,6 @@ class MonitoringDashboard:
             display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
         display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
         
-        # ✅ FIX: Use the same column name for formatting
         display_df[diff_col_name] = display_df[diff_col_name].apply(
             lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
         )
@@ -1427,6 +1426,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
