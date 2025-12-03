@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
-
+import re
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -329,38 +329,45 @@ class MetricsCalculator:
 # =============================================================================
 # LABEL SHORTENER
 # =============================================================================
+
 class LabelShortener:
-    """Creates shortened labels for chart legends based on column type."""
+    """Creates shortened labels for chart legends using regex patterns."""
     
-    SHORTENING_RULES = {
-        "SUMBER DANA": lambda v: v[:2],
-        "FUNGSI": lambda v: v[:2],
-        "JENIS BELANJA": lambda v: v[:2],
-        "SUB FUNGSI": lambda v: f"{v[:2]} {v[3:5]}" if len(v) >= 5 else v,
-        "PROGRAM": lambda v: f"{v[:2]} {v[3:5]}" if len(v) >= 5 else v,
-        "KEGIATAN": lambda v: v[:4],
-        "OUTPUT (KRO)": lambda v: f"{v[:4]} {v[5:8]}" if len(v) >= 8 else v,
-        "SUB OUTPUT (RO)": lambda v: f"{v[:4]} {v[5:8]} {v[9:12]}" if len(v) >= 12 else v,
-        "KOMPONEN": lambda v: (
-            v[:16] if len(v) >= 16 and v[:4].isdigit()
-            else v[:11] if len(v) >= 11
-            else v
-        ),
-        "AKUN 4 DIGIT": lambda v: v[:4],
+    # Regex patterns for each column type
+    SHORTENING_PATTERNS = {
+        "SUMBER DANA": r"^\d{2}",                          # 01
+        "FUNGSI": r"^\d{2}",                               # 01
+        "SUB FUNGSI": r"^\d{2}\s\d{2}",                    # 01 01
+        "PROGRAM": r"^\d{2}\s[A-Z]{2}",                    # 01 WA
+        "KEGIATAN": r"^\d{4}",                             # 1001
+        "OUTPUT (KRO)": r"^\d{4}\s[A-Z]{3}",               # 1001 EBA
+        "SUB OUTPUT (RO)": r"^\d{4}\s[A-Z]{3}\s\d{3}",     # 1001 EBA 960
+        "KOMPONEN": r"^(\d{4}\s)?[A-Z]{3}\s\d{3}\s\d{3}",  # EBA 960 051 or 7170 EBD 952 052
+        "JENIS BELANJA": r"^\d{2}",                        # 52
+        "AKUN 4 DIGIT": r"^\d{4}",                         # 5212
     }
     
     @classmethod
     def shorten(cls, value: Any, col_type: str) -> str:
-        """Create shortened label for legend display."""
-        value_str = str(value)
+        """
+        Create shortened label for legend display using regex.
         
-        rule = cls.SHORTENING_RULES.get(col_type)
-        if rule:
-            try:
-                return rule(value_str)
-            except (IndexError, TypeError):
-                pass
+        Args:
+            value: Original value
+            col_type: Column type to determine regex pattern
+            
+        Returns:
+            Shortened string label (code only, no description)
+        """
+        value_str = str(value).strip()
         
+        pattern = cls.SHORTENING_PATTERNS.get(col_type)
+        if pattern:
+            match = re.match(pattern, value_str)
+            if match:
+                return match.group(0)
+        
+        # Fallback: return first word
         return value_str.split(" ")[0]
         
 # =============================================================================
@@ -975,6 +982,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
