@@ -1125,9 +1125,17 @@ class SankeyControlPanel:
         
         with colC:
             year_options = sorted(df_filtered[self.config.YEAR_COLUMN].dropna().unique())
+            
+            # Get current year
+            current_year = datetime.date.today().year
+            
+            # Use current year if available, otherwise fall back to the last option
+            default_year = current_year if current_year in year_options else year_options[-1]
+            
             selected_year = st.selectbox(
                 "Tahun",
-                year_options if year_options else [2025],
+                year_options,
+                index=year_options.index(default_year),
                 key="year_sankey"
             )
         
@@ -1282,6 +1290,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
