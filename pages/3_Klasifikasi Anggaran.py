@@ -1,38 +1,125 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from streamlit_plotly_events import plotly_events
-import zipfile
+"""
+Klasifikasi Anggaran Dashboard
+==============================
+Dashboard drill-down interaktif untuk menganalisis klasifikasi anggaran Pemerintah.
+"""
+
+from __future__ import annotations
+
 import io
-import requests
+import textwrap
+import zipfile
+from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from io import BytesIO
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import requests
+import streamlit as st
+from streamlit_plotly_events import plotly_events
+
 
 # =============================================================================
-# Page Configuration
+# ENUMS & CONSTANTS
 # =============================================================================
-st.set_page_config(
-    page_title="Analisis Klasifikasi Anggaran",
-    page_icon=":material/category:",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        "Get Help": "https://www.kemenkeu.go.id",
-        "Report a bug": "https://github.com/tubankum3/dashanggaran/issues",
-        "About": "Dashboard Anggaran Bidang PMK"
-    }
-)
+
+class SortOrder(Enum):
+    """Sort order for data display."""
+    TOP = "Top"
+    BOTTOM = "Bottom"
+    
+    @property
+    def is_descending(self) -> bool:
+        """Returns True if sorting should be descending (largest first)."""
+        return self == SortOrder.TOP
+    
+    @property
+    def display_label(self) -> str:
+        """Human-readable label for UI."""
+        return "tertinggi" if self == SortOrder.TOP else "terendah"
+    
+    @property
+    def chart_color(self) -> str:
+        """Bar chart color based on sort order."""
+        return "#1a73e8" if self == SortOrder.TOP else "#dc3545"
+
+
+class HierarchyLevel(Enum):
+    """Budget classification hierarchy levels in order."""
+    FUNGSI = "FUNGSI"
+    SUB_FUNGSI = "SUB FUNGSI"
+    PROGRAM = "PROGRAM"
+    KEGIATAN = "KEGIATAN"
+    OUTPUT_KRO = "OUTPUT (KRO)"
+    SUB_OUTPUT_RO = "SUB OUTPUT (RO)"
+    KOMPONEN = "KOMPONEN"
+    
+    @classmethod
+    def ordered_columns(cls) -> List[str]:
+        """Return hierarchy columns in drill-down order."""
+        return [level.value for level in cls]
+
 
 # =============================================================================
-# Modern Dashboard Design CSS
+# CONFIGURATION
 # =============================================================================
-st.markdown("""
+
+@dataclass(frozen=True)
+class AppConfig:
+    """Application configuration constants."""
+    
+    # Data source
+    DATA_URL: str = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/df.csv.zip"
+    CSV_FILENAME: str = "df.csv"
+    REQUEST_TIMEOUT: int = 30
+    
+    # UI defaults
+    DEFAULT_YEAR: int = 2025
+    DEFAULT_TOP_N: int = 10
+    MIN_TOP_N: int = 1
+    MAX_TOP_N: int = 500
+    DEFAULT_METRIC: str = "REALISASI BELANJA KL (SAKTI)"
+    
+    # Chart settings
+    CHART_BASE_HEIGHT: int = 400
+    CHART_MIN_HEIGHT: int = 300
+    CHART_MAX_HEIGHT: int = 1200
+    CHART_HEIGHT_PER_EXTRA_ITEM: int = 5
+    CHART_HEIGHT_REDUCTION_PER_MISSING: int = 20
+    CHART_ITEMS_BASELINE: int = 10
+    LABEL_WRAP_WIDTH: int = 32
+    TARGET_TICK_COUNT: int = 6
+    
+    # Required columns
+    YEAR_COLUMN: str = "Tahun"
+    KL_COLUMN: str = "KEMENTERIAN/LEMBAGA"
+    
+    # Page configuration
+    PAGE_TITLE: str = "Analisis Klasifikasi Anggaran"
+    PAGE_ICON: str = ":material/category:"
+
+
+@dataclass
+class SessionKeys:
+    """Session state key names to avoid magic strings."""
+    DRILL_STATE: str = "drill"
+    LEVEL_INDEX: str = "level_index"
+    CLICK_KEY: str = "click_key"
+
+
+# =============================================================================
+# STYLING
+# =============================================================================
+
+CSS_STYLES = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Modern Color Palette */
     --primary: #0066FF;
     --primary-dark: #0052CC;
     --primary-light: #4D94FF;
@@ -40,8 +127,6 @@ st.markdown("""
     --warning: #F59E0B;
     --error: #EF4444;
     --success: #10B981;
-    
-    /* Neutral Colors */
     --gray-50: #F9FAFB;
     --gray-100: #F3F4F6;
     --gray-200: #E5E7EB;
@@ -52,50 +137,26 @@ st.markdown("""
     --gray-700: #374151;
     --gray-800: #1F2937;
     --gray-900: #111827;
-    
-    /* Surface & Background */
     --surface: #FFFFFF;
     --background: #F9FAFB;
-    --on-surface: #111827;
     --on-primary: #FFFFFF;
-    
-    /* Shadows - More subtle and modern */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    
-    /* Border Radius */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
-    --radius-xl: 16px;
     --radius-full: 9999px;
-    
-    /* Spacing */
-    --space-xs: 0.5rem;
     --space-sm: 0.75rem;
     --space-md: 1rem;
     --space-lg: 1.5rem;
     --space-xl: 2rem;
-    --space-2xl: 3rem;
-    
-    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Global Styles */
-* {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.stApp { background-color: var(--background); }
 
-.stApp {
-    background-color: var(--background);
-}
-
-/* Header - More modern gradient */
 .dashboard-header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     padding: var(--space-xl);
@@ -113,24 +174,6 @@ st.markdown("""
     letter-spacing: 0.025em;
 }
 
-/* Card System - Cleaner, more minimal */
-.material-card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: var(--space-xl);
-    margin-bottom: var(--space-lg);
-    transition: all var(--transition-base);
-    border: 1px solid var(--gray-200);
-}
-
-.material-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    border-color: var(--gray-300);
-}
-
-/* Typography - Modern scale */
 .dashboard-title {
     font-weight: 700;
     font-size: 2rem;
@@ -139,77 +182,21 @@ st.markdown("""
     letter-spacing: -0.025em;
 }
 
-.dashboard-subtitle {
-    font-weight: 400;
-    font-size: 1rem;
-    opacity: 0.9;
-    margin: var(--space-sm) 0 0 0;
-}
-
-.section-title {
-    font-weight: 600;
-    font-size: 1.125rem;
-    color: var(--gray-900);
-    margin-bottom: var(--space-lg);
-    padding-bottom: var(--space-md);
-    border-bottom: 2px solid var(--gray-200);
-}
-
-/* Metric Cards - More modern design */
-.metric-card {
+.material-card {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    padding: var(--space-lg);
     box-shadow: var(--shadow-sm);
-    transition: all var(--transition-base);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-lg);
     border: 1px solid var(--gray-200);
-    position: relative;
-    overflow: hidden;
+    transition: all var(--transition-fast);
 }
 
-.metric-card:hover {
+.material-card:hover {
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
-    border-color: var(--primary-light);
 }
 
-.metric-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin: var(--space-sm) 0;
-    line-height: 1;
-}
-
-.metric-label {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-.metric-trend {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-top: var(--space-sm);
-}
-
-.trend-positive {
-    background: #ECFDF5;
-    color: var(--success);
-}
-
-.trend-negative {
-    background: #FEF2F2;
-    color: var(--error);
-}
-
-/* Buttons - Modern, minimal */
 .stButton>button {
     background: var(--primary);
     color: var(--on-primary);
@@ -228,30 +215,9 @@ st.markdown("""
     transform: translateY(-1px);
 }
 
-.stButton>button:active {
-    transform: translateY(0);
-}
+.stSidebar { background: var(--surface); border-right: 1px solid var(--gray-200); }
 
-/* Sidebar - Cleaner */
-.stSidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--gray-200);
-}
-
-.sidebar-section {
-    background: var(--surface);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    margin-bottom: var(--space-md);
-    border: 1px solid var(--gray-200);
-}
-
-/* Tabs - Modern style */
-.stTabs [data-baseweb="tab-list"] {
-    gap: var(--space-sm);
-    border-bottom: 1px solid var(--gray-200);
-}
-
+.stTabs [data-baseweb="tab-list"] { gap: var(--space-sm); border-bottom: 1px solid var(--gray-200); }
 .stTabs [data-baseweb="tab"] {
     background: transparent;
     border: none;
@@ -261,678 +227,1043 @@ st.markdown("""
     font-weight: 500;
     transition: all var(--transition-fast);
 }
+.stTabs [data-baseweb="tab"]:hover { color: var(--gray-900); background: var(--gray-50); }
+.stTabs [aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); }
 
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--gray-900);
-    background: var(--gray-50);
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-
-.stTabs [aria-selected="true"] {
-    background: transparent;
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-}
-
-/* Input Fields */
-.stSelectbox, .stTextInput, .stNumberInput {
-    border-radius: var(--radius-md);
-}
-
-.stSelectbox > div > div,
-.stTextInput > div > div > input,
-.stNumberInput > div > div > input {
-    border-radius: var(--radius-md) !important;
-    border-color: var(--gray-300) !important;
-    transition: all var(--transition-fast);
-}
-
-.stSelectbox > div > div:focus-within,
-.stTextInput > div > div > input:focus,
-.stNumberInput > div > div > input:focus {
-    border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1) !important;
-}
-
-/* Slider */
-.stSlider > div > div > div {
-    background: var(--primary) !important;
-}
-
-/* Chart Container - Minimal */
-[data-testid="column"] > div {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    padding: var(--space-xl);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--gray-200);
-    transition: all var(--transition-base);
-}
-
-[data-testid="column"] > div:hover {
-    box-shadow: var(--shadow-md);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .dashboard-title {
-        font-size: 1.5rem;
-    }
-    
-    .material-card {
-        padding: var(--space-md);
-    }
-    
-    [data-testid="column"] > div {
-        padding: var(--space-lg);
-    }
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--gray-100);
-    border-radius: var(--radius-full);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--gray-400);
-    border-radius: var(--radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--gray-500);
-}
-
-/* Focus States - Accessibility */
-*:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-}
-
-/* Loading States */
-.loading-skeleton {
-    background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s ease-in-out infinite;
-    border-radius: var(--radius-md);
-}
-
-@keyframes loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-/* Utility Classes */
-.text-primary { color: var(--primary); }
-.text-secondary { color: var(--secondary); }
-.text-muted { color: var(--gray-600); }
-.bg-primary { background-color: var(--primary); }
-.bg-surface { background-color: var(--surface); }
-
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--gray-100); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb { background: var(--gray-400); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
 </style>
-""", unsafe_allow_html=True)
+"""
+
 
 # =============================================================================
-# Data Loading
+# FORMATTING UTILITIES
 # =============================================================================
-@st.cache_data(show_spinner="Memuat dataset anggaran...")
-def load_data():
-    url = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/df.csv.zip"
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-            with z.open("df.csv") as file:
-                df = pd.read_csv(file, low_memory=False)
-        if "Unnamed: 0" in df.columns:
-            df.drop(columns=["Unnamed: 0"], inplace=True)
-        if "Tahun" in df.columns:
-            df["Tahun"] = df["Tahun"].astype(str)
-        return df
-    except Exception as e:
-        st.error(f"Gagal memuat data: {e}")
-        return pd.DataFrame()
+
+class Formatter:
+    """Utility class for formatting values for display."""
+    
+    # Value thresholds for unit conversion
+    TRILLION = 1_000_000_000_000
+    BILLION = 1_000_000_000
+    MILLION = 1_000_000
+    
+    @classmethod
+    def to_rupiah_short(cls, value: float) -> str:
+        """
+        Format numeric value to abbreviated Rupiah string.
+        
+        Args:
+            value: Numeric value to format
+            
+        Returns:
+            Formatted string like "Rp 1.23 T" or "Rp 500 M"
+        """
+        if pd.isna(value) or value == 0:
+            return "Rp 0"
+        
+        abs_val = abs(value)
+        sign = "-" if value < 0 else ""
+        
+        if abs_val >= cls.TRILLION:
+            return f"{sign}Rp {abs_val / cls.TRILLION:.2f} T"
+        elif abs_val >= cls.BILLION:
+            return f"{sign}Rp {abs_val / cls.BILLION:.2f} M"
+        elif abs_val >= cls.MILLION:
+            return f"{sign}Rp {abs_val / cls.MILLION:.2f} Jt"
+        return f"{sign}Rp {abs_val:,.0f}"
+    
+    @classmethod
+    def to_rupiah_full(cls, value: Any) -> str:
+        """
+        Format numeric value to full Rupiah string with dot separators.
+        
+        Args:
+            value: Value to format (will attempt conversion to float)
+            
+        Returns:
+            Formatted string like "Rp 1.234.567.890"
+        """
+        try:
+            value = float(value)
+        except (ValueError, TypeError):
+            return str(value)
+        
+        if pd.isna(value):
+            return "-"
+        
+        return f"Rp {value:,.0f}".replace(",", ".")
+    
+    @staticmethod
+    def to_percentage(value: float, decimals: int = 2) -> str:
+        """Format value as percentage string."""
+        return f"{value:.{decimals}f}%"
+    
+    @staticmethod
+    def wrap_label(label: str, max_width: int = 32) -> str:
+        """
+        Wrap long labels for chart display using HTML line breaks.
+        
+        Args:
+            label: Text to wrap
+            max_width: Maximum characters per line
+            
+        Returns:
+            Label with <br> tags for line breaks
+        """
+        return "<br>".join(
+            textwrap.wrap(str(label), width=max_width, break_long_words=False)
+        )
+
 
 # =============================================================================
-# Utilities
+# DATA LAYER
 # =============================================================================
-def format_rupiah(value: float) -> str:
-    """Format numeric value to Rupiah string with units (T/M/Jt)"""
-    if pd.isna(value) or value == 0:
-        return "Rp 0"
-    abs_val = abs(value)
-    sign = "-" if value < 0 else ""
-    if abs_val >= 1_000_000_000_000:
-        return f"{sign}Rp {abs_val/1_000_000_000_000:.2f} T"
-    elif abs_val >= 1_000_000_000:
-        return f"{sign}Rp {abs_val/1_000_000_000:.2f} M"
-    elif abs_val >= 1_000_000:
-        return f"{sign}Rp {abs_val/1_000_000:.2f} Jt"
-    return f"{sign}Rp {abs_val:,.0f}"
 
-def rupiah_separator(x):
-    try:
-        x = float(x)
-    except:
-        return x
-    return f"Rp {x:,.0f}".replace(",", ".")
+class DataLoadError(Exception):
+    """Custom exception for data loading failures."""
+    pass
+
+
+class DataLoader:
+    """Handles loading and caching of budget data."""
     
-def aggregate_level(df, group_cols, metric, top_n=None, sort_order="Top"):
-    """
-    Aggregate data by grouping columns and return top N or bottom N
+    def __init__(self, config: AppConfig = AppConfig()):
+        self.config = config
     
-    Args:
-        df: DataFrame to aggregate
-        group_cols: List of columns to group by
-        metric: Numeric column to aggregate
-        top_n: Number of items to return
-        sort_order: "Top" for highest values, "Bottom" for lowest values
-    """
-    group_cols = [c for c in group_cols if c in df.columns]
-    if not group_cols:
-        return pd.DataFrame()
-    agg = df.groupby(group_cols, as_index=False)[metric].sum()
-    agg = agg.dropna(subset=[group_cols[-1]])
+    @staticmethod
+    @st.cache_data(show_spinner="Memuat dataset anggaran...")
+    def load_data(url: str, csv_filename: str, timeout: int) -> pd.DataFrame:
+        """
+        Load and cache budget data from remote ZIP file.
+        
+        Args:
+            url: URL to the ZIP file containing CSV data
+            csv_filename: Name of the CSV file inside the ZIP
+            timeout: Request timeout in seconds
+            
+        Returns:
+            DataFrame with budget data
+            
+        Raises:
+            DataLoadError: If data cannot be loaded
+        """
+        try:
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            
+            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+                with z.open(csv_filename) as file:
+                    df = pd.read_csv(file, low_memory=False)
+            
+            # Clean up unnamed columns
+            unnamed_cols = [c for c in df.columns if "Unnamed" in str(c)]
+            if unnamed_cols:
+                df = df.drop(columns=unnamed_cols)
+            
+            # Ensure Tahun is string for consistent filtering
+            if "Tahun" in df.columns:
+                df["Tahun"] = df["Tahun"].astype(str)
+            
+            return df
+            
+        except requests.exceptions.RequestException as e:
+            raise DataLoadError(f"Network error: {e}")
+        except zipfile.BadZipFile as e:
+            raise DataLoadError(f"Invalid ZIP file: {e}")
+        except Exception as e:
+            raise DataLoadError(f"Failed to load data: {e}")
     
-    if top_n:
-        if sort_order == "Top":
-            # Get top N (largest values)
-            top = agg.nlargest(top_n, metric)
+    def get_data(self) -> pd.DataFrame:
+        """Load data using configured settings."""
+        return self.load_data(
+            self.config.DATA_URL,
+            self.config.CSV_FILENAME,
+            self.config.REQUEST_TIMEOUT
+        )
+
+
+class DataAggregator:
+    """Handles data aggregation for drill-down views."""
+    
+    @staticmethod
+    def aggregate_by_level(
+        df: pd.DataFrame,
+        group_cols: List[str],
+        metric: str,
+        top_n: Optional[int] = None,
+        sort_order: SortOrder = SortOrder.TOP
+    ) -> pd.DataFrame:
+        """
+        Aggregate data by grouping columns and optionally limit to top/bottom N.
+        
+        Args:
+            df: Source DataFrame
+            group_cols: Columns to group by
+            metric: Numeric column to aggregate (sum)
+            top_n: Number of rows to return (None for all)
+            sort_order: Whether to get top or bottom values
+            
+        Returns:
+            Aggregated DataFrame
+        """
+        # Filter to valid columns
+        valid_cols = [c for c in group_cols if c in df.columns]
+        if not valid_cols or metric not in df.columns:
+            return pd.DataFrame()
+        
+        # Perform aggregation
+        agg = df.groupby(valid_cols, as_index=False)[metric].sum()
+        agg = agg.dropna(subset=[valid_cols[-1]])
+        
+        # Apply top/bottom N filter
+        if top_n and len(agg) > 0:
+            if sort_order == SortOrder.TOP:
+                selected = agg.nlargest(top_n, metric)
+            else:
+                selected = agg.nsmallest(top_n, metric)
+            agg = agg[agg[valid_cols[-1]].isin(selected[valid_cols[-1]])]
+        
+        return agg
+    
+    @staticmethod
+    def filter_by_ancestors(
+        df: pd.DataFrame,
+        hierarchy: List[str],
+        current_level: int,
+        drill_state: Dict[str, Optional[str]]
+    ) -> pd.DataFrame:
+        """
+        Filter DataFrame by ancestor selections in drill-down hierarchy.
+        
+        Args:
+            df: Source DataFrame
+            hierarchy: Ordered list of hierarchy column names
+            current_level: Current drill-down level index
+            drill_state: Dictionary of level -> selected value
+            
+        Returns:
+            Filtered DataFrame
+        """
+        df_filtered = df.copy()
+        
+        for i in range(current_level):
+            col = hierarchy[i]
+            selected_value = drill_state.get(col)
+            if selected_value is not None and col in df_filtered.columns:
+                df_filtered = df_filtered[df_filtered[col] == selected_value]
+        
+        return df_filtered
+
+
+# =============================================================================
+# CHART BUILDER
+# =============================================================================
+
+class ChartBuilder:
+    """Builds Plotly charts for budget visualization."""
+    
+    def __init__(self, config: AppConfig = AppConfig()):
+        self.config = config
+    
+    def create_horizontal_bar_chart(
+        self,
+        df: pd.DataFrame,
+        metric: str,
+        category_col: str,
+        title: str = "",
+        sort_order: SortOrder = SortOrder.TOP,
+        max_height: Optional[int] = None
+    ) -> go.Figure:
+        """
+        Create a horizontal bar chart with percentage labels and Rupiah formatting.
+        
+        Args:
+            df: Data to plot
+            metric: Numeric column for bar values
+            category_col: Column for category labels (y-axis)
+            title: Chart title
+            sort_order: Determines bar color and sorting
+            max_height: Override automatic height calculation
+            
+        Returns:
+            Plotly Figure object
+        """
+        if df.empty or metric not in df.columns or category_col not in df.columns:
+            return self._create_empty_chart("No data available")
+        
+        # Prepare data
+        plot_df = self._prepare_plot_data(df, metric, category_col, sort_order)
+        
+        # Calculate axis configuration
+        axis_config = self._calculate_axis_config(plot_df[metric])
+        
+        # Build figure
+        fig = self._build_figure(plot_df, metric, category_col, sort_order)
+        
+        # Apply layout
+        chart_height = max_height or self._calculate_dynamic_height(plot_df[category_col].nunique())
+        self._apply_layout(fig, title, chart_height, axis_config)
+        
+        return fig
+    
+    def _prepare_plot_data(
+        self,
+        df: pd.DataFrame,
+        metric: str,
+        category_col: str,
+        sort_order: SortOrder
+    ) -> pd.DataFrame:
+        """Prepare DataFrame for plotting with calculated fields."""
+        plot_df = df.copy()
+        
+        # Ensure numeric
+        plot_df[metric] = pd.to_numeric(plot_df[metric], errors="coerce").fillna(0.0)
+        
+        # Calculate percentages
+        total = plot_df[metric].sum()
+        plot_df["_pct"] = (plot_df[metric] / total * 100).round(2) if total > 0 else 0.0
+        plot_df["_pct_label"] = plot_df["_pct"].apply(lambda x: f"{x:.2f}%")
+        plot_df["_rupiah_fmt"] = plot_df[metric].apply(Formatter.to_rupiah_short)
+        plot_df["_wrapped_label"] = plot_df[category_col].apply(
+            lambda x: Formatter.wrap_label(x, self.config.LABEL_WRAP_WIDTH)
+        )
+        
+        # Sort for display (ascending puts largest at top in horizontal bar)
+        ascending = sort_order == SortOrder.TOP
+        plot_df = plot_df.sort_values(metric, ascending=ascending).reset_index(drop=True)
+        
+        return plot_df
+    
+    def _calculate_axis_config(self, values: pd.Series) -> Dict[str, Any]:
+        """Calculate x-axis tick values and labels."""
+        x_max = float(values.max()) if len(values) > 0 and values.max() > 0 else 100.0
+        
+        # Determine scale and unit
+        if x_max >= Formatter.TRILLION:
+            scale, unit = Formatter.TRILLION, "T"
+        elif x_max >= Formatter.BILLION:
+            scale, unit = Formatter.BILLION, "M"
+        elif x_max >= Formatter.MILLION:
+            scale, unit = Formatter.MILLION, "Jt"
         else:
-            # Get bottom N (smallest values)
-            top = agg.nsmallest(top_n, metric)
-        agg = agg[agg[group_cols[-1]].isin(top[group_cols[-1]])]
+            scale, unit = 1, ""
+        
+        # Calculate nice tick intervals
+        if x_max > 0:
+            raw_interval = x_max / self.config.TARGET_TICK_COUNT
+            magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
+            nice_interval = np.ceil(raw_interval / magnitude) * magnitude
+            last_tick = np.ceil(x_max / nice_interval) * nice_interval
+            tick_vals = list(np.arange(0, last_tick + nice_interval, nice_interval))
+        else:
+            tick_vals = [0, 50, 100]
+            last_tick = 100
+        
+        # Format tick labels
+        if unit:
+            tick_texts = [f"Rp {v/scale:.0f} {unit}" for v in tick_vals]
+        else:
+            tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
+        
+        return {
+            "tick_vals": tick_vals,
+            "tick_texts": tick_texts,
+            "last_tick": last_tick
+        }
     
-    return agg
-
-def create_bar_chart(df, metric, y_col, color_col=None, title="", stacked=False, max_height=None, sort_order="Top"):
-    """
-    Create horizontal bar chart with:
-    - X-axis: numeric/continuous float metric values (Rupiah)
-    - Bar labels: percentage of total
-    - Hover: both percentage and Rupiah value
-    - Dynamic height scaling based on number of bars
-    - Sort order: ascending for Top (largest at top), descending for Bottom (smallest at top)
-    """
-    df_plot = df.copy()
+    def _build_figure(
+        self,
+        plot_df: pd.DataFrame,
+        metric: str,
+        category_col: str,
+        sort_order: SortOrder
+    ) -> go.Figure:
+        """Build the Plotly figure with traces."""
+        fig = go.Figure()
+        
+        for _, row in plot_df.iterrows():
+            fig.add_trace(go.Bar(
+                x=[row[metric]],
+                y=[row[category_col]],
+                orientation='h',
+                text=row["_pct_label"],
+                textposition="outside",
+                textfont=dict(size=11, color="#333"),
+                marker=dict(color=sort_order.chart_color),
+                hovertemplate=(
+                    f"{row[category_col]}<br>"
+                    f"Jumlah: {row['_rupiah_fmt']}<br>"
+                    f"Persentase: {row['_pct_label']}<extra></extra>"
+                ),
+                showlegend=False,
+            ))
+        
+        return fig
     
-    # Validate columns exist
-    if metric not in df_plot.columns or y_col not in df_plot.columns:
-        st.error(f"Column '{metric}' or '{y_col}' not found in data")
-        return go.Figure()
+    def _calculate_dynamic_height(self, n_items: int) -> int:
+        """Calculate chart height based on number of items."""
+        config = self.config
+        
+        if n_items > config.CHART_ITEMS_BASELINE:
+            height = config.CHART_BASE_HEIGHT + (n_items - config.CHART_ITEMS_BASELINE) * config.CHART_HEIGHT_PER_EXTRA_ITEM
+        elif n_items < config.CHART_ITEMS_BASELINE:
+            height = config.CHART_BASE_HEIGHT - (config.CHART_ITEMS_BASELINE - n_items) * config.CHART_HEIGHT_REDUCTION_PER_MISSING
+        else:
+            height = config.CHART_BASE_HEIGHT
+        
+        return max(config.CHART_MIN_HEIGHT, min(height, config.CHART_MAX_HEIGHT))
     
-    # Ensure metric is numeric
-    df_plot[metric] = pd.to_numeric(df_plot[metric], errors="coerce").fillna(0.0).astype(float)
-    
-    # Compute total and percentages
-    total = float(df_plot[metric].sum())
-    if total > 0:
-        df_plot["__percentage"] = (df_plot[metric] / total * 100).round(1)
-    else:
-        df_plot["__percentage"] = 0.0
-    
-    # Format display strings
-    df_plot["__pct_label"] = df_plot["__percentage"].apply(lambda x: f"{x:.2f}%")
-    df_plot["__rupiah_formatted"] = df_plot[metric].apply(format_rupiah)
-    
-    # Sort based on sort_order
-    # For horizontal bar chart: ascending=True puts largest at top (for "Top")
-    # ascending=False puts smallest at top (for "Bottom")
-    if sort_order == "Top":
-        df_plot = df_plot.sort_values(metric, ascending=True).reset_index(drop=True)
-    else:
-        df_plot = df_plot.sort_values(metric, ascending=False).reset_index(drop=True)
-    
-    # Wrap long y-axis labels (wrap at spaces)
-    import textwrap
-    max_chars = 32
-    df_plot["__wrapped_label"] = df_plot[y_col].astype(str).apply(
-        lambda lbl: "<br>".join(textwrap.wrap(lbl, width=max_chars, break_long_words=False))
-    )
-
-    
-    # Get X-axis limits
-    x_min = 0.0
-    x_max = float(df_plot[metric].max()) if len(df_plot) > 0 and df_plot[metric].max() > 0 else 100.0
-    
-    # Determine display scale & unit
-    if x_max >= 1e12:
-        scale, unit = 1e12, "T"   # Triliun
-    elif x_max >= 1e9:
-        scale, unit = 1e9, "M"   # Miliar
-    elif x_max >= 1e6:
-        scale, unit = 1e6, "Jt"    # Juta
-    else:
-        scale, unit = 1, ""
-    
-    # Compute tick values (nice intervals)
-    if x_max > 0:
-        target_ticks = 6
-        raw_interval = x_max / target_ticks
-        magnitude = 10 ** int(np.floor(np.log10(raw_interval)))
-        nice_interval = np.ceil(raw_interval / magnitude) * magnitude
-        last_tick = np.ceil(x_max / nice_interval) * nice_interval
-        tick_vals = list(np.arange(0, last_tick + nice_interval, nice_interval))
-    else:
-        tick_vals = [0, 50, 100]
-        last_tick = 100
-    
-    # Format tick labels
-    if unit:
-        tick_texts = [f"Rp {v/scale:.0f} {unit}" for v in tick_vals]
-    else:
-        tick_texts = [f"Rp {v:,.0f}" for v in tick_vals]
-    
-    # Choose bar color based on sort_order
-    bar_color = "#1a73e8" if sort_order == "Top" else "#dc3545"  # Blue for Top, Red for Bottom
-    
-    # Create figure
-    fig = go.Figure()
-    
-    for _, row in df_plot.iterrows():
-        fig.add_trace(go.Bar(
-            x=[row[metric]],
-            y=[row[y_col]],
-            orientation='h',
-            text=row["__pct_label"],
-            textposition="outside",
-            textfont=dict(size=11, color="#333"),
-            marker=dict(color=bar_color),
-            hovertemplate=(
-                f"{row[y_col]}<br>"
-                f"Jumlah: {row['__rupiah_formatted']}<br>"
-                f"Persentase: {row['__pct_label']}<extra></extra>"
-            ),
+    def _apply_layout(
+        self,
+        fig: go.Figure,
+        title: str,
+        height: int,
+        axis_config: Dict[str, Any]
+    ) -> None:
+        """Apply layout settings to figure."""
+        fig.update_layout(
+            title=title,
             showlegend=False,
-        ))
+            barmode="relative",
+            margin=dict(t=70, l=250, r=80, b=50),
+            height=height,
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            xaxis_title="",
+            yaxis_title="",
+            hovermode="closest",
+        )
+        
+        fig.update_traces(
+            hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
+        )
+        
+        fig.update_xaxes(
+            type="linear",
+            tickmode="array",
+            tickvals=axis_config["tick_vals"],
+            ticktext=axis_config["tick_texts"],
+            range=[0, axis_config["last_tick"] * 1.1],
+            showgrid=True,
+            gridcolor="rgba(200,200,200,0.3)",
+            zeroline=True,
+            zerolinecolor="rgba(150,150,150,0.5)",
+        )
+        
+        fig.update_yaxes(
+            categoryorder="trace",
+            automargin=True,
+        )
     
-    # ✅ Dynamic height adjustment
-    n_groups = df_plot[y_col].nunique()
-    base_height = 400
-    extra_height_per_line = 5
-    minus_height_per_line = 20
-    
-    if n_groups > 10:
-        height = base_height + (n_groups - 10) * extra_height_per_line
-    elif n_groups < 10:
-        height = base_height - (10 - n_groups) * minus_height_per_line
-    else:
-        height = base_height
-    
-    # Bound height
-    height = max(300, min(height, 1200))
-    
-    # Allow manual override
-    final_height = int(max_height) if max_height is not None else height
-    
-    # Layout
-    fig.update_layout(
-        title=title,
-        showlegend=False,
-        barmode="relative",
-        margin=dict(t=70, l=250, r=80, b=50),
-        height=final_height,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        xaxis_title="",
-        yaxis_title="",
-        hovermode="closest",
-    )
-    fig.update_traces(
-        hoverlabel=dict(align="left", bgcolor="white", font_size=10, font_color="#333"),
-        hoverinfo="text",
-    )
-    fig.update_layout(
-        hovermode="closest",  # or "y unified" if you prefer static hover line
-    )
+    def _create_empty_chart(self, message: str) -> go.Figure:
+        """Create an empty chart with a message."""
+        fig = go.Figure()
+        fig.add_annotation(
+            text=message,
+            xref="paper", yref="paper",
+            x=0.5, y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#666")
+        )
+        fig.update_layout(
+            height=300,
+            plot_bgcolor="white",
+            paper_bgcolor="white"
+        )
+        return fig
 
-    # Axis styling
-    fig.update_xaxes(
-        type="linear",
-        tickmode="array",
-        tickvals=tick_vals,
-        ticktext=tick_texts,
-        range=[0, last_tick * 1.1],
-        showgrid=True,
-        gridcolor="rgba(200,200,200,0.3)",
-        zeroline=True,
-        zerolinecolor="rgba(150,150,150,0.5)",
-    )
-    fig.update_yaxes(
-        tickvals=df_plot[y_col],
-        ticktext=df_plot["__wrapped_label"],
-        categoryorder="trace",
-        automargin=True,
-    )
-    
-    return fig
 
 # =============================================================================
-# Hierarchy and session helpers
+# SESSION STATE MANAGEMENT
 # =============================================================================
-HIERARCHY = [
-    ("FUNGSI", "FUNGSI"),
-    ("SUB FUNGSI", "SUB FUNGSI"),
-    ("PROGRAM", "PROGRAM"),
-    ("KEGIATAN", "KEGIATAN"),
-    ("OUTPUT (KRO)", "OUTPUT (KRO)"),
-    ("SUB OUTPUT (RO)", "SUB OUTPUT (RO)"),
-    ("KOMPONEN", "KOMPONEN")
-]
 
-def init_session_state():
-    if "drill" not in st.session_state:
-        st.session_state.drill = {lvl: None for _, lvl in HIERARCHY}
-    if "level_index" not in st.session_state:
-        st.session_state.level_index = 0
-    if "click_key" not in st.session_state:
-        st.session_state.click_key = 0
+class DrillDownState:
+    """Manages drill-down navigation state in Streamlit session."""
+    
+    def __init__(self, hierarchy: List[str]):
+        self.hierarchy = hierarchy
+        self._keys = SessionKeys()
+        self._initialize()
+    
+    def _initialize(self) -> None:
+        """Initialize session state if not exists."""
+        if self._keys.DRILL_STATE not in st.session_state:
+            st.session_state[self._keys.DRILL_STATE] = {col: None for col in self.hierarchy}
+        if self._keys.LEVEL_INDEX not in st.session_state:
+            st.session_state[self._keys.LEVEL_INDEX] = 0
+        if self._keys.CLICK_KEY not in st.session_state:
+            st.session_state[self._keys.CLICK_KEY] = 0
+    
+    @property
+    def drill_selections(self) -> Dict[str, Optional[str]]:
+        """Get current drill-down selections."""
+        return st.session_state[self._keys.DRILL_STATE]
+    
+    @property
+    def current_level(self) -> int:
+        """Get current drill-down level index."""
+        return st.session_state[self._keys.LEVEL_INDEX]
+    
+    @current_level.setter
+    def current_level(self, value: int) -> None:
+        """Set current drill-down level index."""
+        st.session_state[self._keys.LEVEL_INDEX] = min(value, len(self.hierarchy) - 1)
+    
+    @property
+    def click_key(self) -> int:
+        """Get unique key for chart interactions."""
+        return st.session_state[self._keys.CLICK_KEY]
+    
+    def select_value(self, level: str, value: str) -> None:
+        """Record a selection at the given hierarchy level."""
+        st.session_state[self._keys.DRILL_STATE][level] = value
+    
+    def clear_from_level(self, level_index: int) -> None:
+        """Clear selections from the given level onwards."""
+        for i in range(level_index, len(self.hierarchy)):
+            col = self.hierarchy[i]
+            st.session_state[self._keys.DRILL_STATE][col] = None
+    
+    def go_back(self) -> bool:
+        """Go back one level. Returns True if successful."""
+        if self.current_level > 0:
+            new_level = self.current_level - 1
+            self.clear_from_level(new_level)
+            self.current_level = new_level
+            self._increment_click_key()
+            return True
+        return False
+    
+    def reset(self) -> None:
+        """Reset to initial state."""
+        for col in self.hierarchy:
+            st.session_state[self._keys.DRILL_STATE][col] = None
+        st.session_state[self._keys.LEVEL_INDEX] = 0
+        self._increment_click_key()
+    
+    def advance_level(self) -> None:
+        """Move to next drill-down level if available."""
+        if self.current_level + 1 < len(self.hierarchy):
+            self.current_level = self.current_level + 1
+        self._increment_click_key()
+    
+    def _increment_click_key(self) -> None:
+        """Increment click key to force chart re-render."""
+        st.session_state[self._keys.CLICK_KEY] += 1
+    
+    def get_active_breadcrumbs(self) -> List[Tuple[int, str, str]]:
+        """Get list of (level_index, column_name, selected_value) for active selections."""
+        return [
+            (i, col, self.drill_selections[col])
+            for i, col in enumerate(self.hierarchy)
+            if self.drill_selections.get(col) is not None
+        ]
 
-def reset_drill():
-    for k in st.session_state.drill.keys():
-        st.session_state.drill[k] = None
-    st.session_state.level_index = 0
-    st.session_state.click_key += 1
 
 # =============================================================================
-# Header / Sidebar
+# UI COMPONENTS
 # =============================================================================
-def header(selected_year: str | None = None, selected_metric: str | None = None, selected_kls: list | None = None):
-    year_text = selected_year if selected_year else "OVERVIEW"
-    metric_text = f" {selected_metric}" if selected_metric else "KLASIFIKASI"
-    kl_text = ", ".join(selected_kls) if selected_kls else "KEMENTERIAN/LEMBAGA"
-    st.markdown(f"""
-    <div class="dashboard-header" role="banner" aria-label="Header Dashboard Klasifikasi Anggaran">
-        <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
-        <h1 class="dashboard-title">Analisis Klasifikasi Anggaran</h1>
-    </div>
-    """, unsafe_allow_html=True)
 
-def sidebar(df):
-    with st.sidebar:
-        st.markdown("### ⚙️ Filter Data")
-        if "Tahun" not in df.columns:
-            st.error("Kolom 'Tahun' tidak ditemukan di dataset.")
-            st.stop()
-        df_year = df[df["Tahun"].notna()].copy()
-        df_year["Tahun"] = df_year["Tahun"].astype(str).str.extract(r"(\d{4})")[0]
-        years = sorted(df_year["Tahun"].dropna().astype(int).unique().tolist())
-        if len(years) == 0:
+class UIComponents:
+    """Reusable UI component generators."""
+    
+    @staticmethod
+    def render_header(
+        year: Optional[str] = None,
+        metric: Optional[str] = None,
+        kl_list: Optional[List[str]] = None
+    ) -> None:
+        """Render the main dashboard header."""
+        year_text = year or "OVERVIEW"
+        metric_text = f" {metric}" if metric else "KLASIFIKASI"
+        kl_text = ", ".join(kl_list) if kl_list else "KEMENTERIAN/LEMBAGA"
+        
+        st.markdown(f"""
+        <div class="dashboard-header" role="banner">
+            <div class="breadcrumb">DASHBOARD / KLASIFIKASI {metric_text} / {kl_text} / TAHUN {year_text}</div>
+            <h1 class="dashboard-title">Analisis Klasifikasi Anggaran</h1>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    @staticmethod
+    def render_footer() -> None:
+        """Render page footer."""
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
+        with col2:
+            st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
+    
+    @staticmethod
+    def apply_styles() -> None:
+        """Apply CSS styles to the page."""
+        st.markdown(CSS_STYLES, unsafe_allow_html=True)
+
+
+class SidebarController:
+    """Manages sidebar filter controls."""
+    
+    def __init__(self, df: pd.DataFrame, config: AppConfig = AppConfig()):
+        self.df = df
+        self.config = config
+    
+    def render(self) -> Tuple[int, List[str], int, str, SortOrder]:
+        """
+        Render sidebar controls and return selected values.
+        
+        Returns:
+            Tuple of (year, kl_list, top_n, metric, sort_order)
+        """
+        with st.sidebar:
+            st.markdown("### ⚙️ Filter Data")
+            
+            year = self._render_year_selector()
+            sort_order = self._render_sort_order_selector()
+            top_n = self._render_top_n_input(sort_order)
+            metric = self._render_metric_selector()
+            kl_list = self._render_kl_selector()
+            
+            return year, kl_list, top_n, metric, sort_order
+    
+    def _render_year_selector(self) -> int:
+        """Render year selection dropdown."""
+        self._validate_column_exists(self.config.YEAR_COLUMN)
+        
+        # Extract valid years
+        df_year = self.df[self.df[self.config.YEAR_COLUMN].notna()].copy()
+        df_year[self.config.YEAR_COLUMN] = (
+            df_year[self.config.YEAR_COLUMN]
+            .astype(str)
+            .str.extract(r"(\d{4})")[0]
+        )
+        years = sorted(df_year[self.config.YEAR_COLUMN].dropna().astype(int).unique().tolist())
+        
+        if not years:
             st.error("Tidak ada data tahun yang valid di dataset.")
             st.stop()
-        default_year_index = years.index(2025) if 2025 in years else len(years) - 1
-        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_index)
-
-        # ✅ NEW: Top/Bottom selector
-        sort_order = st.radio(
+        
+        default_idx = years.index(self.config.DEFAULT_YEAR) if self.config.DEFAULT_YEAR in years else len(years) - 1
+        
+        return st.selectbox("Pilih Tahun", years, index=default_idx)
+    
+    def _render_sort_order_selector(self) -> SortOrder:
+        """Render Top/Bottom radio selector."""
+        selection = st.radio(
             "Tampilkan Data",
-            options=["Top", "Bottom"],
+            options=[SortOrder.TOP.value, SortOrder.BOTTOM.value],
             index=0,
             horizontal=True,
             help="Top: Data tertinggi | Bottom: Data terendah"
         )
-        
-        # ✅ UPDATED: Dynamic label based on sort_order
-        top_n = st.number_input(
-            f"Tampilkan {sort_order}-N Data",
-            min_value=1,
-            max_value=500,
-            value=10,
+        return SortOrder(selection)
+    
+    def _render_top_n_input(self, sort_order: SortOrder) -> int:
+        """Render top N input field."""
+        return st.number_input(
+            f"Tampilkan {sort_order.value}-N Data",
+            min_value=self.config.MIN_TOP_N,
+            max_value=self.config.MAX_TOP_N,
+            value=self.config.DEFAULT_TOP_N,
             step=1,
-            help=f"Jumlah Data {'tertinggi' if sort_order == 'Top' else 'terendah'} yang ditampilkan pada grafik berdasarkan Metrik yang dipilih."
+            help=f"Jumlah data {sort_order.display_label} yang ditampilkan"
         )
-
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+    
+    def _render_metric_selector(self) -> str:
+        """Render metric selection dropdown."""
+        numeric_cols = self.df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        
         if not numeric_cols:
             st.error("Tidak ada kolom numerik yang dapat dipilih sebagai metrik.")
             st.stop()
-        selected_metric = st.selectbox(
-            "Metrik Anggaran",
-            options=numeric_cols,
-            index=numeric_cols.index("REALISASI BELANJA KL (SAKTI)") if "REALISASI BELANJA KL (SAKTI)" in numeric_cols else 0,
+        
+        default_idx = (
+            numeric_cols.index(self.config.DEFAULT_METRIC)
+            if self.config.DEFAULT_METRIC in numeric_cols
+            else 0
         )
-
-        if "KEMENTERIAN/LEMBAGA" not in df.columns:
-            st.error("Kolom 'KEMENTERIAN/LEMBAGA' tidak ditemukan di dataset.")
-            st.stop()
-        kl_list = sorted(df["KEMENTERIAN/LEMBAGA"].dropna().unique().tolist())
-        selected_kls = st.multiselect("Pilih Kementerian/Lembaga (opsional)", options=["Semua"] + kl_list, default=["Semua"])
-        if "Semua" in selected_kls:
-            selected_kls = []
-
-    # ✅ Return sort_order as well
-    return selected_year, selected_kls, top_n, selected_metric, sort_order
-
-# =============================================================================
-# Drill-down UI
-# =============================================================================
-def general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order="Top"):
-    """
-    Main drill-down interface with breadcrumb navigation and interactive chart
+        
+        return st.selectbox("Metrik Anggaran", options=numeric_cols, index=default_idx)
     
-    Args:
-        df_filtered: Pre-filtered dataframe by year and K/L
-        available_levels: List of hierarchy column names available in data
-        selected_metric: The numeric metric column to aggregate and display
-        selected_year: Selected year for display
-        top_n: Number of top/bottom items to show
-        sort_order: "Top" or "Bottom" to determine sorting
-    """
-    placeholder = st.empty()
-    with placeholder.container():
-        # === Breadcrumb navigation ===
-        active_drills = [
-            (i, lvl, st.session_state.drill.get(lvl))
-            for i, lvl in enumerate(available_levels)
-            if st.session_state.drill.get(lvl)
-        ]
+    def _render_kl_selector(self) -> List[str]:
+        """Render K/L multiselect."""
+        self._validate_column_exists(self.config.KL_COLUMN)
         
-        st.markdown(f"##### KLASIFIKASI {selected_metric} TAHUN {selected_year}")
-        if active_drills:
-            st.markdown("BERDASARKAN:")
-            for idx, (i, lvl, val) in enumerate(active_drills):
-                row = st.columns([1, 5])
-                with row[0]:
-                    st.markdown(f"<div class='drill-label'>{lvl}</div>", unsafe_allow_html=True)
-                with row[1]:
-                    if st.button(f"{val}", key=f"crumb-{lvl}-{val}-{st.session_state.click_key}", use_container_width=True):
-                        for j in range(i + 1, len(available_levels)):
-                            st.session_state.drill[available_levels[j]] = None
-                        st.session_state.level_index = i + 1 if i + 1 < len(available_levels) else i
-                        st.session_state.click_key += 1
-                        st.rerun()
+        kl_list = sorted(self.df[self.config.KL_COLUMN].dropna().unique().tolist())
+        selected = st.multiselect(
+            "Pilih Kementerian/Lembaga (opsional)",
+            options=["Semua"] + kl_list,
+            default=["Semua"]
+        )
         
-        # === Back / Reset row ===
-        left_col, mid_col, right_col = st.columns([1, 10, 1])
+        return [] if "Semua" in selected else selected
+    
+    def _validate_column_exists(self, column: str) -> None:
+        """Validate that a required column exists in the DataFrame."""
+        if column not in self.df.columns:
+            st.error(f"Kolom '{column}' tidak ditemukan di dataset.")
+            st.stop()
+
+
+class ExcelExporter:
+    """Handles Excel file export functionality."""
+    
+    @staticmethod
+    def export_to_excel(
+        df: pd.DataFrame,
+        metric: str,
+        formatter_func: callable = Formatter.to_rupiah_full
+    ) -> bytes:
+        """
+        Export DataFrame to Excel bytes with formatted and numeric columns.
         
-        # Back button
+        Args:
+            df: DataFrame to export
+            metric: Metric column name
+            formatter_func: Function to format numeric values
+            
+        Returns:
+            Excel file as bytes
+        """
+        export_df = df.copy()
+        
+        # Add hidden numeric column for calculations
+        numeric_col = f"{metric} (numeric)"
+        export_df[numeric_col] = pd.to_numeric(export_df[metric], errors="coerce").fillna(0)
+        
+        # Format display column
+        export_df[metric] = export_df[numeric_col].apply(formatter_func)
+        
+        # Write to buffer
+        buffer = BytesIO()
+        export_df.to_excel(buffer, index=False, sheet_name="Data")
+        buffer.seek(0)
+        
+        return buffer.getvalue()
+
+
+# =============================================================================
+# DRILL-DOWN INTERFACE
+# =============================================================================
+
+class DrillDownView:
+    """Main drill-down visualization interface."""
+    
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        hierarchy: List[str],
+        metric: str,
+        year: int,
+        top_n: int,
+        sort_order: SortOrder,
+        config: AppConfig = AppConfig()
+    ):
+        self.df = df
+        self.hierarchy = hierarchy
+        self.metric = metric
+        self.year = year
+        self.top_n = top_n
+        self.sort_order = sort_order
+        self.config = config
+        
+        self.state = DrillDownState(hierarchy)
+        self.chart_builder = ChartBuilder(config)
+        self.aggregator = DataAggregator()
+    
+    def render(self) -> None:
+        """Render the complete drill-down interface."""
+        # Ensure metric is numeric
+        self.df[self.metric] = pd.to_numeric(self.df[self.metric], errors="coerce").fillna(0.0)
+        
+        # Render components
+        self._render_title()
+        self._render_breadcrumbs()
+        self._render_navigation_buttons()
+        self._render_chart_and_handle_clicks()
+        self._render_detail_table()
+    
+    def _render_title(self) -> None:
+        """Render section title."""
+        st.markdown(f"##### KLASIFIKASI {self.metric} TAHUN {self.year}")
+    
+    def _render_breadcrumbs(self) -> None:
+        """Render breadcrumb navigation for active drill-down selections."""
+        breadcrumbs = self.state.get_active_breadcrumbs()
+        
+        if not breadcrumbs:
+            return
+        
+        st.markdown("BERDASARKAN:")
+        
+        for level_idx, col, value in breadcrumbs:
+            row = st.columns([1, 5])
+            with row[0]:
+                st.markdown(f"<div class='drill-label'>{col}</div>", unsafe_allow_html=True)
+            with row[1]:
+                if st.button(
+                    f"{value}",
+                    key=f"crumb-{col}-{value}-{self.state.click_key}",
+                    use_container_width=True
+                ):
+                    # Clear selections after this level and go to next
+                    self.state.clear_from_level(level_idx + 1)
+                    self.state.current_level = min(level_idx + 1, len(self.hierarchy) - 1)
+                    self.state._increment_click_key()
+                    st.rerun()
+    
+    def _render_navigation_buttons(self) -> None:
+        """Render back and reset navigation buttons."""
+        left_col, _, right_col = st.columns([1, 10, 1])
+        
         with left_col:
             if st.button(":arrow_backward:", help="Kembali satu tingkat"):
-                if st.session_state.level_index > 0:
-                    prev_idx = max(0, st.session_state.level_index - 1)
-                    prev_col = HIERARCHY[prev_idx][1]
-                    st.session_state.drill[prev_col] = None
-                    st.session_state.level_index = prev_idx
-                    st.session_state.click_key += 1
+                if self.state.go_back():
                     st.rerun()
         
-        # Reset button
         with right_col:
             if st.button(":arrows_counterclockwise:", help="Kembali ke tampilan awal"):
-                reset_drill()
+                self.state.reset()
                 st.rerun()
-
-        # === Determine current view level ===
-        view_idx = min(st.session_state.level_index, len(available_levels) - 1)
-        view_row = available_levels[view_idx]
-
-        # === Filter data by ancestor selections ===
-        df_view = df_filtered.copy()
+    
+    def _render_chart_and_handle_clicks(self) -> None:
+        """Render the chart and handle click events for drill-down."""
+        # Get current view data
+        current_col = self.hierarchy[self.state.current_level]
+        filtered_df = self.aggregator.filter_by_ancestors(
+            self.df, self.hierarchy, self.state.current_level, self.state.drill_selections
+        )
         
-        # === Ensure selected_metric is numeric in the filtered dataframe ===
-        if selected_metric in df_view.columns:
-            df_view[selected_metric] = pd.to_numeric(df_view[selected_metric], errors="coerce").fillna(0.0)
-        else:
-            st.error(f"Metric column '{selected_metric}' not found in data")
-            return
+        # Aggregate for current level
+        agg_df = self.aggregator.aggregate_by_level(
+            filtered_df, [current_col], self.metric, self.top_n, self.sort_order
+        )
         
-        for j in range(view_idx):
-            anc_row = available_levels[j]
-            anc_val = st.session_state.drill.get(anc_row)
-            if anc_val is not None:
-                df_view = df_view[df_view[anc_row] == anc_val]
-
-        # === Aggregate data for current level (with sort_order) ===
-        agg = aggregate_level(df_view, [view_row], selected_metric, top_n, sort_order)
-        
-        if agg.empty:
+        if agg_df.empty:
             st.info("Tidak ada data untuk level ini.")
             return
-
-        # === Create and display chart (with sort_order in title and chart) ===
-        title = f"{sort_order.upper()} {top_n} {view_row} (Level {view_idx + 1} dari {len(available_levels)})"
-        fig = create_bar_chart(agg, selected_metric, view_row, title=title, max_height=600, sort_order=sort_order)
-
-        # ✅ Show chart and capture click events
-        events = plotly_events(fig, click_event=True, key=f"drill-{st.session_state.click_key}", override_height=600)
-
-        # === Display Detailed Table with Grand Total & Rupiah Formatting ===
-        with st.expander(f"Tabel Rincian Data {view_row}"):
-            display_cols = ["KEMENTERIAN/LEMBAGA", "Tahun"] + available_levels + [selected_metric]
-            display_cols = [c for c in display_cols if c in df_view.columns]
         
-            df_table = df_view[display_cols].copy()
+        # Build and display chart
+        title = (
+            f"{self.sort_order.value.upper()} {self.top_n} {current_col} "
+            f"(Level {self.state.current_level + 1} dari {len(self.hierarchy)})"
+        )
+        fig = self.chart_builder.create_horizontal_bar_chart(
+            agg_df, self.metric, current_col,
+            title=title, sort_order=self.sort_order, max_height=600
+        )
         
-            # Ensure numeric
-            df_table[selected_metric] = pd.to_numeric(df_table[selected_metric], errors="coerce").fillna(0)
+        # Display with click events
+        events = plotly_events(
+            fig, click_event=True,
+            key=f"drill-{self.state.click_key}",
+            override_height=600
+        )
         
-            # Sort based on sort_order
-            df_table = df_table.sort_values(
-                by=selected_metric, 
-                ascending=(sort_order == "Bottom")
-            ).reset_index(drop=True)
+        # Handle clicks
+        if events:
+            clicked_value = self._extract_clicked_value(events[0])
+            if clicked_value:
+                self.state.select_value(current_col, clicked_value)
+                self.state.advance_level()
+                st.rerun()
+    
+    def _extract_clicked_value(self, event: Dict[str, Any]) -> Optional[str]:
+        """Extract the clicked category value from a Plotly event."""
+        # Try y-axis value first
+        clicked = event.get("y") or event.get("label")
         
-            # Hidden numeric column for export
-            hidden_numeric_col = f"_numeric_{selected_metric}"
-            df_table[hidden_numeric_col] = df_table[selected_metric]
+        # Fallback to customdata
+        if not clicked and event.get("customdata"):
+            cd = event.get("customdata")
+            if isinstance(cd, list) and len(cd) > 0:
+                clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
         
-            # Convert visible metric to Rupiah display strings
-            df_table[selected_metric] = df_table[selected_metric].apply(rupiah_separator)
+        return clicked
+    
+    def _render_detail_table(self) -> None:
+        """Render the expandable detail table with export."""
+        current_col = self.hierarchy[self.state.current_level]
         
-            # —— ADD GRAND TOTAL ROW ——
-            grand_total = df_table[hidden_numeric_col].sum()
-        
-            total_row = {col: "" for col in df_table.columns}
-            label_col = next((col for col in available_levels if col in df_table.columns), "KEMENTERIAN/LEMBAGA")
-            total_row[label_col] = "TOTAL"
-            total_row[hidden_numeric_col] = grand_total
-            total_row[selected_metric] = rupiah_separator(grand_total)
-        
-            df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
-        
-            # Display table (drop hidden numeric column)
-            df_display = df_table.drop(columns=[hidden_numeric_col])
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-        
-            # —— EXCEL DOWNLOAD ——
-            buffer = BytesIO()
-            df_table.rename(columns={hidden_numeric_col: f"{selected_metric} (numeric)"}).to_excel(
-                buffer,
-                index=False,
-                sheet_name="Data"
+        with st.expander(f"Tabel Rincian Data {current_col}"):
+            # Get filtered data
+            filtered_df = self.aggregator.filter_by_ancestors(
+                self.df, self.hierarchy, self.state.current_level, self.state.drill_selections
             )
-            buffer.seek(0)
-        
+            
+            # Prepare display columns
+            display_cols = [self.config.KL_COLUMN, self.config.YEAR_COLUMN] + self.hierarchy + [self.metric]
+            display_cols = [c for c in display_cols if c in filtered_df.columns]
+            
+            table_df = filtered_df[display_cols].copy()
+            table_df[self.metric] = pd.to_numeric(table_df[self.metric], errors="coerce").fillna(0)
+            
+            # Sort based on sort order
+            table_df = table_df.sort_values(
+                by=self.metric,
+                ascending=(self.sort_order == SortOrder.BOTTOM)
+            ).reset_index(drop=True)
+            
+            # Add grand total row
+            grand_total = table_df[self.metric].sum()
+            total_row = {col: "" for col in table_df.columns}
+            label_col = next((c for c in self.hierarchy if c in table_df.columns), self.config.KL_COLUMN)
+            total_row[label_col] = "TOTAL"
+            total_row[self.metric] = grand_total
+            
+            # Format for display
+            display_df = table_df.copy()
+            display_df[self.metric] = display_df[self.metric].apply(Formatter.to_rupiah_full)
+            total_row_formatted = total_row.copy()
+            total_row_formatted[self.metric] = Formatter.to_rupiah_full(grand_total)
+            
+            display_df = pd.concat([display_df, pd.DataFrame([total_row_formatted])], ignore_index=True)
+            
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            
+            # Export button
+            export_df = pd.concat([table_df, pd.DataFrame([total_row])], ignore_index=True)
+            excel_data = ExcelExporter.export_to_excel(export_df, self.metric)
+            
             st.download_button(
-                label="Download Excel",
-                data=buffer,
-                file_name=f"drill_view_{sort_order}_{top_n}_{selected_metric}_{selected_year}.xlsx",
+                label="📥 Download Excel",
+                data=excel_data,
+                file_name=f"drill_{self.sort_order.value}_{self.top_n}_{self.metric}_{self.year}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-        # === Handle click events for drill-down ===
-        if events:
-            ev = events[0]
-            # Try to get clicked value from y-axis (category name)
-            clicked = ev.get("y") or ev.get("label")
-            
-            # Fallback: try customdata
-            if not clicked and ev.get("customdata"):
-                cd = ev.get("customdata")
-                if isinstance(cd, list) and len(cd) > 0:
-                    clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
-            
-            if clicked:
-                # Store the clicked value in session state
-                st.session_state.drill[view_row] = clicked
-                
-                # Move to next level if available
-                if view_idx + 1 < len(available_levels):
-                    st.session_state.level_index = view_idx + 1
-                
-                st.session_state.click_key += 1
-                st.rerun()
 
 # =============================================================================
-# Main
+# MAIN APPLICATION
 # =============================================================================
-def main():
-    init_session_state()
-    df = load_data()
-    if df.empty:
-        st.warning("Data tidak tersedia.")
-        return
 
-    if "Tahun" not in df.columns or "KEMENTERIAN/LEMBAGA" not in df.columns:
-        st.error("Kolom 'Tahun' atau 'KEMENTERIAN/LEMBAGA' tidak ditemukan.")
-        return
+class BudgetClassificationApp:
+    """Main application controller."""
+    
+    def __init__(self):
+        self.config = AppConfig()
+        self.data_loader = DataLoader(self.config)
+    
+    def run(self) -> None:
+        """Run the application."""
+        self._configure_page()
+        UIComponents.apply_styles()
+        
+        # Load data
+        try:
+            df = self.data_loader.get_data()
+        except DataLoadError as e:
+            st.error(f"Gagal memuat data: {e}")
+            return
+        
+        if df.empty:
+            st.warning("Data tidak tersedia.")
+            return
+        
+        # Validate required columns
+        if not self._validate_required_columns(df):
+            return
+        
+        # Render sidebar and get selections
+        sidebar = SidebarController(df, self.config)
+        year, kl_list, top_n, metric, sort_order = sidebar.render()
+        
+        # Render header
+        UIComponents.render_header(str(year), metric, kl_list)
+        
+        # Filter data
+        df_filtered = self._apply_base_filters(df, year, kl_list)
+        
+        # Determine available hierarchy levels
+        available_hierarchy = [
+            col for col in HierarchyLevel.ordered_columns()
+            if col in df_filtered.columns
+        ]
+        
+        if not available_hierarchy:
+            st.error("Kolom hierarki tidak ditemukan di dataset.")
+            return
+        
+        # Render drill-down view
+        drill_view = DrillDownView(
+            df_filtered, available_hierarchy, metric, year, top_n, sort_order, self.config
+        )
+        drill_view.render()
+        
+        # Render sidebar info and footer
+        self._render_sidebar_info(sort_order, top_n, kl_list)
+        UIComponents.render_footer()
+    
+    def _configure_page(self) -> None:
+        """Configure Streamlit page settings."""
+        st.set_page_config(
+            page_title=self.config.PAGE_TITLE,
+            page_icon=self.config.PAGE_ICON,
+            layout="wide",
+            initial_sidebar_state="expanded",
+            menu_items={
+                "Get Help": "https://www.kemenkeu.go.id",
+                "Report a bug": "https://github.com/tubankum3/dashanggaran/issues",
+                "About": "Dashboard Anggaran Bidang PMK"
+            }
+        )
+    
+    def _validate_required_columns(self, df: pd.DataFrame) -> bool:
+        """Validate that required columns exist in the DataFrame."""
+        required = [self.config.YEAR_COLUMN, self.config.KL_COLUMN]
+        missing = [col for col in required if col not in df.columns]
+        
+        if missing:
+            st.error(f"Kolom berikut tidak ditemukan: {', '.join(missing)}")
+            return False
+        return True
+    
+    def _apply_base_filters(
+        self,
+        df: pd.DataFrame,
+        year: int,
+        kl_list: List[str]
+    ) -> pd.DataFrame:
+        """Apply year and K/L filters to the DataFrame."""
+        filtered = df[df[self.config.YEAR_COLUMN] == str(year)].copy()
+        
+        if kl_list:
+            filtered = filtered[filtered[self.config.KL_COLUMN].isin(kl_list)]
+        
+        return filtered
+    
+    def _render_sidebar_info(
+        self,
+        sort_order: SortOrder,
+        top_n: int,
+        kl_list: List[str]
+    ) -> None:
+        """Render additional sidebar information."""
+        st.sidebar.markdown("---")
+        st.sidebar.markdown(f"**Mode:** {sort_order.value} {top_n}")
+        
+        if kl_list:
+            st.sidebar.write("**K/L:**")
+            for kl in kl_list:
+                st.sidebar.write(f"- {kl}")
 
-    # ✅ Get sort_order from sidebar
-    selected_year, selected_kls, top_n, selected_metric, sort_order = sidebar(df)
-    header(selected_year, selected_metric, selected_kls)
-
-    # Filter base data by year + K/L
-    df_filtered = df[df["Tahun"] == str(selected_year)].copy()
-    if selected_kls:
-        df_filtered = df_filtered[df_filtered["KEMENTERIAN/LEMBAGA"].isin(selected_kls)]
-
-    # Determine available hierarchy columns in order
-    available_levels = [col for _, col in HIERARCHY if col in df_filtered.columns]
-    if not available_levels:
-        st.error("Kolom hierarki tidak ditemukan di dataset.")
-        return
-
-    # ✅ Pass sort_order to drill-down
-    general_drill_down(df_filtered, available_levels, selected_metric, selected_year, top_n, sort_order)
-
-    # Sidebar: current filters and drill state
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(f"**Mode:** {sort_order} {top_n}")
-    if selected_kls:
-        st.sidebar.write("**K/L:**")
-        for k in selected_kls:
-            st.sidebar.write(f"- {k}")
-
-    # Footer
-    st.markdown("---")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.caption("📊 Sumber Data: bidja.kemenkeu.go.id")
-    with col2:
-        st.caption(f"🕐 Diperbarui: {datetime.now().strftime('%d %B %Y %H:%M')}")
 
 # =============================================================================
-# Entry
+# ENTRY POINT
 # =============================================================================
-if __name__ == "__main__":
+
+def main() -> None:
+    """Application entry point."""
     try:
-        init_session_state()
-        main()
+        app = BudgetClassificationApp()
+        app.run()
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam aplikasi: {str(e)}")
         st.info("Silakan refresh halaman atau hubungi administrator.")
+
+
+if __name__ == "__main__":
+    main()
