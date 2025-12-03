@@ -1124,7 +1124,7 @@ class SankeyControlPanel:
         colC, colD = st.columns(2)
         
         with colC:
-            year_options = sorted(df_filtered[self.config.YEAR_COLUMN].dropna().unique())
+            year_options = sorted(int(y) for y in df_filtered[self.config.YEAR_COLUMN].dropna().unique())
             
             # Get current year
             current_year = datetime.date.today().year
@@ -1290,6 +1290,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
