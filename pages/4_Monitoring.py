@@ -782,12 +782,22 @@ class DatasetComparator:
             comparison[f"SELISIH_{col}"] = (
                 comparison[col_primary] - comparison[col_comparison]
             )
-            
-            comparison[f"%CHG_{col}"] = np.where(
-                comparison[col_comparison] != 0,
-                (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100,
-                np.nan
-            )
+            comparison[f"%CHG_{col}"] = np.select(
+                [
+                    # Case 1: B = 0 dan A = 0 → tidak ada perubahan
+                    (comparison[col_comparison] == 0) & (comparison[col_primary] == 0),
+                    
+                    # Case 2: B = 0 tapi A ≠ 0 → tidak bisa hitung persen
+                    (comparison[col_comparison] == 0) & (comparison[col_primary] != 0),
+                    
+                    # Case 3: normal → hitung persen
+                    (comparison[col_comparison] != 0)
+                ],
+                [
+                    0,  # hasil untuk A=0 dan B=0
+                    np.nan,  # B=0 tapi A tidak → undefined
+                    (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100
+                ]
         
         return comparison
 
@@ -1680,5 +1690,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
