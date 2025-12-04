@@ -798,6 +798,7 @@ class DatasetComparator:
                     np.nan,  # B=0 tapi A tidak → undefined
                     (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100
                 ]
+            )
         
         return comparison
 
@@ -1690,6 +1691,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
