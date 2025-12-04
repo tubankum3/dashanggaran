@@ -981,8 +981,9 @@ class SidebarController:
         if available_years:
             # Get current year as default if available, otherwise use all years
             current_year = datetime.now().year
+            next_year = current_year + 1
             year_options = [int(y) for y in available_years]
-            default_years = [current_year] if current_year in year_options else year_options
+            default_years = [next_year] if next_year in year_options else current_year
             
             selected_years = st.sidebar.multiselect(
                 "Tahun Anggaran",
@@ -1691,6 +1692,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
