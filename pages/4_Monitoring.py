@@ -68,7 +68,7 @@ class ColumnConfig:
     
     # Potential columns - actual columns determined from data
     POTENTIAL_STRING_COLUMNS: Tuple[str, ...] = (
-        'KEMENTERIAN/LEMBAGA', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
+        'KEMENTERIAN/LEMBAGA', 'UNIT/ESELON I', 'SATKER', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
         'PROGRAM', 'KEGIATAN', 'OUTPUT (KRO)', 'SUB OUTPUT (RO)',
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
@@ -1718,3 +1718,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
