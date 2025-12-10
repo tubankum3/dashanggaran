@@ -65,13 +65,13 @@ class ColumnConfig:
     
     # Potential columns - actual columns determined from data
     POTENTIAL_STRING_COLUMNS: Tuple[str, ...] = (
-        'KEMENTERIAN/LEMBAGA', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
+        'KEMENTERIAN/LEMBAGA', 'UNIT/ESELON I', 'SATKER', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
         'PROGRAM', 'KEGIATAN', 'OUTPUT (KRO)', 'SUB OUTPUT (RO)',
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
     POTENTIAL_NUMERIC_COLUMNS: Tuple[str, ...] = (
         'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI', 'PAGU DIPA AWAL',
-        'BLOKIR DIPA AWAL', 'PAGU HIMPUNAN', 'BLOKIR HIMPUNAN', 'Tahun',
+        'BLOKIR DIPA AWAL', 'PAGU HIMPUNAN', 'BLOKIR HIMPUNAN',
         'PAGU PERPRES', 'BLOKIR PERPRES', 'PAGU DIPA AWAL EFEKTIF',
         'PAGU DIPA REVISI EFEKTIF', 'PAGU HIMPUNAN EFEKTIF','PAGU PERPRES EFEKTIF'
     )
@@ -1692,6 +1692,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
