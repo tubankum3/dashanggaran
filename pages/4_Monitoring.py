@@ -18,6 +18,9 @@ import pandas as pd
 import requests
 import streamlit as st
 
+# Increase Pandas Styler max elements for large DataFrames
+pd.set_option("styler.render.max_elements", 1_500_000)
+
 # =============================================================================
 # CONSTANTS & CONFIGURATION
 # =============================================================================
@@ -65,13 +68,13 @@ class ColumnConfig:
     
     # Potential columns - actual columns determined from data
     POTENTIAL_STRING_COLUMNS: Tuple[str, ...] = (
-        'KEMENTERIAN/LEMBAGA', 'UNIT/ESELON I', 'SATKER', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
+        'KEMENTERIAN/LEMBAGA', 'SUMBER DANA', 'FUNGSI', 'SUB FUNGSI',
         'PROGRAM', 'KEGIATAN', 'OUTPUT (KRO)', 'SUB OUTPUT (RO)',
         'KOMPONEN', 'JENIS BELANJA', 'AKUN 4 DIGIT', 'Tahun'
     )
     POTENTIAL_NUMERIC_COLUMNS: Tuple[str, ...] = (
         'REALISASI BELANJA KL (SAKTI)', 'PAGU DIPA REVISI', 'BLOKIR DIPA REVISI', 'PAGU DIPA AWAL',
-        'BLOKIR DIPA AWAL', 'PAGU HIMPUNAN', 'BLOKIR HIMPUNAN',
+        'BLOKIR DIPA AWAL', 'PAGU HIMPUNAN', 'BLOKIR HIMPUNAN', 'Tahun',
         'PAGU PERPRES', 'BLOKIR PERPRES', 'PAGU DIPA AWAL EFEKTIF',
         'PAGU DIPA REVISI EFEKTIF', 'PAGU HIMPUNAN EFEKTIF','PAGU PERPRES EFEKTIF'
     )
@@ -366,6 +369,15 @@ class DataFrameFormatter:
 class DataFrameStyler:
     """Applies conditional styling to DataFrames."""
     
+    # Maximum cells to apply styling (prevent performance issues)
+    MAX_STYLE_CELLS: int = 1_500_000
+    
+    @classmethod
+    def _is_too_large(cls, df: pd.DataFrame) -> bool:
+        """Check if DataFrame exceeds styling limit."""
+        total_cells = df.shape[0] * df.shape[1]
+        return total_cells > cls.MAX_STYLE_CELLS
+    
     @staticmethod
     def style_selisih_columns(df: pd.DataFrame, numeric_columns: List[str]) -> pd.io.formats.style.Styler:
         """
@@ -375,6 +387,10 @@ class DataFrameStyler:
         - Negative (<0): red font, light-red background (penurunan)
         - Zero (=0): neutral color (default)
         """
+        # Skip styling for very large DataFrames
+        if DataFrameStyler._is_too_large(df):
+            return df.style
+        
         # Get SELISIH columns
         selisih_cols = [col for col in df.columns if col.startswith('SELISIH_')]
         
@@ -413,6 +429,14 @@ class DataFrameStyler:
         Returns:
             Styled DataFrame
         """
+        # Skip styling for very large DataFrames
+        if DataFrameStyler._is_too_large(df):
+            # Return basic styler with just percentage formatting
+            pct_cols = [col for col in df.columns if col.startswith('%CHG_')]
+            if pct_cols:
+                return df.style.format('{:+.2f}%', subset=pct_cols, na_rep='-')
+            return df.style
+        
         selisih_cols = [col for col in df.columns if col.startswith('SELISIH_')]
         pct_cols = [col for col in df.columns if col.startswith('%CHG_')]
         
@@ -782,22 +806,11 @@ class DatasetComparator:
             comparison[f"SELISIH_{col}"] = (
                 comparison[col_primary] - comparison[col_comparison]
             )
-            comparison[f"%CHG_{col}"] = np.select(
-                [
-                    # Case 1: B = 0 dan A = 0 → tidak ada perubahan
-                    (comparison[col_comparison] == 0) & (comparison[col_primary] == 0),
-                    
-                    # Case 2: B = 0 tapi A ≠ 0 → tidak bisa hitung persen
-                    (comparison[col_comparison] == 0) & (comparison[col_primary] != 0),
-                    
-                    # Case 3: normal → hitung persen
-                    (comparison[col_comparison] != 0)
-                ],
-                [
-                    0,  # hasil untuk A=0 dan B=0
-                    np.nan,  # B=0 tapi A tidak → undefined
-                    (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100
-                ]
+            
+            comparison[f"%CHG_{col}"] = np.where(
+                comparison[col_comparison] != 0,
+                (comparison[f"SELISIH_{col}"] / comparison[col_comparison].abs()) * 100,
+                np.nan
             )
         
         return comparison
@@ -981,9 +994,8 @@ class SidebarController:
         if available_years:
             # Get current year as default if available, otherwise use all years
             current_year = datetime.now().year
-            next_year = current_year + 1
             year_options = [int(y) for y in available_years]
-            default_years = [next_year] if next_year in year_options else current_year
+            default_years = [current_year] if current_year in year_options else year_options
             
             selected_years = st.sidebar.multiselect(
                 "Tahun Anggaran",
@@ -1343,14 +1355,9 @@ class MonitoringDashboard:
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
-            c3.metric(
-                "Net Selisih", 
-                Formatter.to_rupiah_short(net_selisih), 
-                f"{pct:+.2f}%",
-                help="Kenaikan - Penurunan"
-            )
+            
             # Custom colored metric for Total Kenaikan (GREEN)
-            with c4:
+            with c3:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Kenaikan ⬆️</div>
@@ -1361,7 +1368,7 @@ class MonitoringDashboard:
                 """, unsafe_allow_html=True)
             
             # Custom colored metric for Total Penurunan (RED)
-            with c5:
+            with c4:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Penurunan ⬇️</div>
@@ -1370,6 +1377,13 @@ class MonitoringDashboard:
                     <div class="metric-sublabel">Jumlah selisih negatif</div>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            c5.metric(
+                "Net Selisih", 
+                Formatter.to_rupiah_short(net_selisih), 
+                f"{pct:+.2f}%",
+                help="Kenaikan - Penurunan"
+            )
     
     def _render_comparison_detail(
         self,
@@ -1405,6 +1419,11 @@ class MonitoringDashboard:
         
         # Format the dataframe for display, but keep %CHG columns numeric for bar styling
         display_df = formatter.format_for_display(filtered_df, keep_pct_numeric=True)
+        
+        # Check if DataFrame is too large for full styling
+        total_cells = display_df.shape[0] * display_df.shape[1]
+        if total_cells > DataFrameStyler.MAX_STYLE_CELLS:
+            st.warning(f"⚠️ Data terlalu besar ({total_cells:,} sel). Styling dikurangi untuk performa.")
         
         # Apply comprehensive styling (SELISIH text color + %CHG progress bars)
         styled_df = DataFrameStyler.style_comparison_table(display_df, numeric_cols)
@@ -1489,6 +1508,11 @@ class MonitoringDashboard:
         
         # Apply conditional styling if there are SELISIH columns
         if len(numeric_cols) > 1:
+            # Check if DataFrame is too large for full styling
+            total_cells = filtered_display.shape[0] * filtered_display.shape[1]
+            if total_cells > DataFrameStyler.MAX_STYLE_CELLS:
+                st.warning(f"⚠️ Data terlalu besar ({total_cells:,} sel). Styling dikurangi untuk performa.")
+            
             styled_df = DataFrameStyler.style_comparison_table(filtered_display, numeric_cols)
             st.dataframe(styled_df, width="stretch", hide_index=True)
         else:
@@ -1565,14 +1589,9 @@ class MonitoringDashboard:
                 total_penurunan = row_diffs[row_diffs < 0].sum()
                 
                 c1.metric(col, Formatter.to_rupiah_short(value))
-                c2.metric(
-                    "Net Selisih", 
-                    Formatter.to_rupiah_short(diff),
-                    f"{pct:+.2f}%",
-                    help="Kenaikan - Penurunan"
-                )
+                
                 # Custom colored metric for Total Kenaikan (GREEN)
-                with c3:
+                with c2:
                     st.markdown("""
                     <div class="metric-card" style="padding: 1rem;">
                         <div class="metric-label">Total Kenaikan ⬆️</div>
@@ -1583,7 +1602,7 @@ class MonitoringDashboard:
                     """, unsafe_allow_html=True)
                 
                 # Custom colored metric for Total Penurunan (RED)
-                with c4:
+                with c3:
                     st.markdown("""
                     <div class="metric-card" style="padding: 1rem;">
                         <div class="metric-label">Total Penurunan ⬇️</div>
@@ -1592,6 +1611,13 @@ class MonitoringDashboard:
                         <div class="metric-sublabel">Jumlah selisih negatif</div>
                     </div>
                     """, unsafe_allow_html=True)
+                
+                c4.metric(
+                    "Net Selisih", 
+                    Formatter.to_rupiah_short(diff),
+                    f"{pct:+.2f}%",
+                    help="Kenaikan - Penurunan"
+                )
     
     def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """
@@ -1692,9 +1718,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
