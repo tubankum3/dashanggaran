@@ -1355,9 +1355,14 @@ class MonitoringDashboard:
             
             c1.metric(primary_label, Formatter.to_rupiah_short(val_primary))
             c2.metric(comparison_label, Formatter.to_rupiah_short(val_comparison))
-            
+            c3.metric(
+                "Net Selisih", 
+                Formatter.to_rupiah_short(net_selisih), 
+                f"{pct:+.2f}%",
+                help="Kenaikan - Penurunan"
+            )
             # Custom colored metric for Total Kenaikan (GREEN)
-            with c3:
+            with c4:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Kenaikan ⬆️</div>
@@ -1368,7 +1373,7 @@ class MonitoringDashboard:
                 """, unsafe_allow_html=True)
             
             # Custom colored metric for Total Penurunan (RED)
-            with c4:
+            with c5:
                 st.markdown("""
                 <div class="metric-card" style="padding: 1rem;">
                     <div class="metric-label">Total Penurunan ⬇️</div>
@@ -1377,13 +1382,6 @@ class MonitoringDashboard:
                     <div class="metric-sublabel">Jumlah selisih negatif</div>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            c5.metric(
-                "Net Selisih", 
-                Formatter.to_rupiah_short(net_selisih), 
-                f"{pct:+.2f}%",
-                help="Kenaikan - Penurunan"
-            )
     
     def _render_comparison_detail(
         self,
@@ -1589,9 +1587,14 @@ class MonitoringDashboard:
                 total_penurunan = row_diffs[row_diffs < 0].sum()
                 
                 c1.metric(col, Formatter.to_rupiah_short(value))
-                
+                c2.metric(
+                    "Net Selisih", 
+                    Formatter.to_rupiah_short(diff),
+                    f"{pct:+.2f}%",
+                    help="Kenaikan - Penurunan"
+                )
                 # Custom colored metric for Total Kenaikan (GREEN)
-                with c2:
+                with c3:
                     st.markdown("""
                     <div class="metric-card" style="padding: 1rem;">
                         <div class="metric-label">Total Kenaikan ⬆️</div>
@@ -1602,7 +1605,7 @@ class MonitoringDashboard:
                     """, unsafe_allow_html=True)
                 
                 # Custom colored metric for Total Penurunan (RED)
-                with c3:
+                with c4:
                     st.markdown("""
                     <div class="metric-card" style="padding: 1rem;">
                         <div class="metric-label">Total Penurunan ⬇️</div>
@@ -1612,12 +1615,7 @@ class MonitoringDashboard:
                     </div>
                     """, unsafe_allow_html=True)
                 
-                c4.metric(
-                    "Net Selisih", 
-                    Formatter.to_rupiah_short(diff),
-                    f"{pct:+.2f}%",
-                    help="Kenaikan - Penurunan"
-                )
+                
     
     def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
         """
@@ -1718,4 +1716,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
