@@ -1,6 +1,6 @@
 # Dashboard Analisis Anggaran & Realisasi Belanja Negara
 
-A simple Streamlit app template for you to modify!
+Dashboard interaktif untuk menganalisis alokasi anggaran dan realisasi belanja Pemerintah.
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://dashanggaran.streamlit.app/)
 
