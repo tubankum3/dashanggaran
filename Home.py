@@ -397,8 +397,8 @@ class TimeSeriesChartBuilder:
             self.config.YEAR_COLUMN, as_index=False
         )[[ts_config.secondary_metric, ts_config.primary_metric]].sum()
         
-        # Calculate realization percentage
-        agg["Persentase Realisasi"] = np.where(
+        # Calculate percentage
+        agg["Persentase"] = np.where(
             agg[ts_config.primary_metric] > 0,
             (agg[ts_config.secondary_metric] / agg[ts_config.primary_metric] * 100),
             0
@@ -428,7 +428,7 @@ class TimeSeriesChartBuilder:
                 text=agg[metric].apply(Formatter.to_rupiah_short),
                 textposition="outside",
                 textfont=dict(size=11),
-                hovertemplate=f"Pagu: %{{y:,.0f}}<extra></extra>"
+                hovertemplate=f"{metric}: %{{y:,.0f}}<extra></extra>"
             ),
             secondary_y=False
         )
@@ -444,7 +444,7 @@ class TimeSeriesChartBuilder:
         display_name = metric.replace("REALISASI BELANJA KL (SAKTI)", "Realisasi Belanja")
         
         # Create percentage labels
-        scatter_texts = [f"({pct:.1f}%)" for pct in agg["Persentase Realisasi"]]
+        scatter_texts = [f"({pct:.1f}%)" for pct in agg["Persentase"]]
         
         fig.add_trace(
             go.Scatter(
@@ -461,8 +461,8 @@ class TimeSeriesChartBuilder:
                 text=scatter_texts,
                 textposition="bottom center",
                 textfont=dict(size=10, color="lightgrey"),
-                customdata=agg["Persentase Realisasi"],
-                hovertemplate=f"Realisasi: %{{y:,.0f}} (%{{customdata:.2f}}%)<extra></extra>"
+                customdata=agg["Persentase"],
+                hovertemplate=f"{metric}: %{{y:,.0f}} (%{{customdata:.2f}}%)<extra></extra>"
             ),
             secondary_y=True
         )
@@ -1288,6 +1288,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
