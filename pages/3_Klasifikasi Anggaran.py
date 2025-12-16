@@ -20,6 +20,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+from streamlit_plotly_events import plotly_events
 
 
 # =============================================================================
@@ -1015,7 +1016,7 @@ class DrillDownView:
                 st.rerun()
     
     def _render_chart_and_handle_clicks(self) -> None:
-        """Render the chart and handle drill-down via selectbox."""
+        """Render the chart and handle click events for drill-down."""
         # Get current view data
         current_col = self.hierarchy[self.state.current_level]
         filtered_df = self.aggregator.filter_by_ancestors(
@@ -1041,26 +1042,33 @@ class DrillDownView:
             title=title, sort_order=self.sort_order, max_height=600
         )
         
-        # Display chart
-        st.plotly_chart(fig, use_container_width=True)
+        # Display with click events
+        events = plotly_events(
+            fig, click_event=True,
+            key=f"drill-{self.state.click_key}",
+            override_height=600
+        )
         
-        # Check if we can drill down further
-        can_drill = self.state.current_level + 1 < len(self.hierarchy)
-        
-        # Add selectbox for drill-down if we can drill further
-        if can_drill:
-            next_level = self.hierarchy[self.state.current_level + 1]
-            options = ["-- Pilih untuk drill-down ke " + next_level + " --"] + agg_df[current_col].tolist()
-            selected = st.selectbox(
-                f"Pilih {current_col} untuk drill-down:",
-                options=options,
-                key=f"select-{current_col}-{self.state.click_key}"
-            )
-            
-            if selected != options[0]:
-                self.state.select_value(current_col, selected)
+        # Handle clicks
+        if events:
+            clicked_value = self._extract_clicked_value(events[0])
+            if clicked_value:
+                self.state.select_value(current_col, clicked_value)
                 self.state.advance_level()
                 st.rerun()
+    
+    def _extract_clicked_value(self, event: Dict[str, Any]) -> Optional[str]:
+        """Extract the clicked category value from a Plotly event."""
+        # Try y-axis value first
+        clicked = event.get("y") or event.get("label")
+        
+        # Fallback to customdata
+        if not clicked and event.get("customdata"):
+            cd = event.get("customdata")
+            if isinstance(cd, list) and len(cd) > 0:
+                clicked = cd[0][0] if isinstance(cd[0], (list, tuple)) else cd[0]
+        
+        return clicked
     
     def _render_detail_table(self) -> None:
         """Render the expandable detail table with export."""
