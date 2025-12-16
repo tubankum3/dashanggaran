@@ -934,8 +934,8 @@ class SidebarController:
         with st.sidebar:
             year = self._render_year_selector()
             sort_order = self._render_sort_order_selector()
-            top_n = self._render_top_n_input(sort_order, sort_column)
             sort_column = self._render_sort_column_selector()
+            top_n = self._render_top_n_input(sort_order, sort_column)
             category = self._render_category_selector()
             kl_list = self._render_kl_selector()
             
@@ -1294,6 +1294,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
