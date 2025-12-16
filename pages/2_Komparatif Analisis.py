@@ -45,7 +45,7 @@ class SortColumn(Enum):
     """Available columns for sorting."""
     REALISASI = "Realisasi Belanja"
     ALOKASI_AWAL = "Alokasi Awal"
-    ALOKASI_AKHIR = "ALokasi Akhir"
+    ALOKASI_AKHIR = "Alokasi Akhir"
     VARIANS = "Varians"
     PERSEN_REALISASI = "% Realisasi"
     
@@ -1294,6 +1294,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
