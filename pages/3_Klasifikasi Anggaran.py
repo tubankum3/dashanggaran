@@ -100,7 +100,7 @@ class AppConfig:
     
     # Page configuration
     PAGE_TITLE: str = "Analisis Klasifikasi Anggaran"
-    PAGE_ICON: str = ":material/category:"
+    PAGE_ICON: str = "📊"
 
 
 @dataclass
@@ -993,7 +993,7 @@ class DrillDownView:
                 if st.button(
                     f"{value}",
                     key=f"crumb-{col}-{value}-{self.state.click_key}",
-                    use_container_width=True
+                    width="stretch"  # Changed from use_container_width=True
                 ):
                     # Clear selections after this level and go to next
                     self.state.clear_from_level(level_idx + 1)
@@ -1108,7 +1108,8 @@ class DrillDownView:
             
             display_df = pd.concat([display_df, pd.DataFrame([total_row_formatted])], ignore_index=True)
             
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            # Changed from use_container_width=True to width="stretch"
+            st.dataframe(display_df, width="stretch", hide_index=True)
             
             # Export button
             export_df = pd.concat([table_df, pd.DataFrame([total_row])], ignore_index=True)
@@ -1253,6 +1254,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
