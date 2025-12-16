@@ -487,17 +487,17 @@ class TrendChartBuilder:
             font=dict(family="Inter, Google Sans, Roboto, Arial"),
         )
         
-        # Custom hover template with original category values
-        fig.update_traces(
-            hovertemplate=(
-                f"<b>%{{customdata}}</b><br>"
-                "Tahun: %{x}<br>"
-                "Rp %{y:,.0f}<extra></extra>"
-            ),
-            customdata=df_grouped[category_col],
-            line=dict(width=2.5),
-            marker=dict(size=7)
-        )
+        # # Custom hover template with original category values
+        # fig.update_traces(
+        #     hovertemplate=(
+        #         f"<b>%{{customdata}}</b><br>"
+        #         "Tahun: %{x}<br>"
+        #         "Rp %{y:,.0f}<extra></extra>"
+        #     ),
+        #     customdata=df_grouped[category_col],
+        #     line=dict(width=2.5),
+        #     marker=dict(size=7)
+        # )
 
 
 # =============================================================================
@@ -996,3 +996,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
