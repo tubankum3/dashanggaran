@@ -450,6 +450,7 @@ class TrendChartBuilder:
                 x="Tahun",
                 y=value_col,
                 color="short_label",
+                custom_data=[category_col],  # Include full category for hover
                 markers=True,
                 title=f"📈 {selected_metric} BERDASARKAN {category_col} — {selected_kl}",
                 labels={
@@ -461,8 +462,8 @@ class TrendChartBuilder:
                 height=height,
             )
             
-            # Apply layout
-            self._apply_layout(fig, df_grouped, category_col)
+            # Apply layout and hover template
+            self._apply_layout(fig, category_col)
             
             return fig, df_grouped
             
@@ -473,7 +474,6 @@ class TrendChartBuilder:
     def _apply_layout(
         self,
         fig: go.Figure,
-        df_grouped: pd.DataFrame,
         category_col: str
     ) -> None:
         """Apply layout settings to figure."""
@@ -487,17 +487,16 @@ class TrendChartBuilder:
             font=dict(family="Inter, Google Sans, Roboto, Arial"),
         )
         
-        # # Custom hover template with original category values
-        # fig.update_traces(
-        #     hovertemplate=(
-        #         f"<b>%{{customdata}}</b><br>"
-        #         "Tahun: %{x}<br>"
-        #         "Rp %{y:,.0f}<extra></extra>"
-        #     ),
-        #     customdata=df_grouped[category_col],
-        #     line=dict(width=2.5),
-        #     marker=dict(size=7)
-        # )
+        # Custom hover template using customdata[0] which contains full category name
+        fig.update_traces(
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Tahun: %{x}<br>"
+                "Rp %{y:,.0f}<extra></extra>"
+            ),
+            line=dict(width=2.5),
+            marker=dict(size=7)
+        )
 
 
 # =============================================================================
@@ -996,4 +995,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
