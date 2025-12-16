@@ -44,8 +44,8 @@ class SortOrder(Enum):
 class SortColumn(Enum):
     """Available columns for sorting."""
     REALISASI = "Realisasi Belanja"
-    PAGU_AWAL = "Pagu Awal"
-    PAGU_AKHIR = "Pagu Akhir"
+    ALOKASI_AWAL = "Alokasi Awal"
+    ALOKASI_AKHIR = "ALokasi Akhir"
     VARIANS = "Varians"
     PERSEN_REALISASI = "% Realisasi"
     
@@ -436,8 +436,8 @@ class DataAggregator:
         """
         mapping = {
             SortColumn.REALISASI: BudgetColumn.REALISASI.value,
-            SortColumn.PAGU_AWAL: col_start,
-            SortColumn.PAGU_AKHIR: col_end,
+            SortColumn.ALOKASI_AWAL: col_start,
+            SortColumn.ALOKASI_AKHIR: col_end,
             SortColumn.VARIANS: "VARIANS",
             SortColumn.PERSEN_REALISASI: "PERSEN_REALISASI",
         }
@@ -1294,5 +1294,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
