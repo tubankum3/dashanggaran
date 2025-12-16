@@ -1102,7 +1102,7 @@ class ComparisonTabView:
         # Build title
         title = (
             f"Perbandingan Realisasi Belanja {cfg.title_suffix}<br>"
-            f"Tahun {sel.year} berdasarkan {sel.sort_order.value}-{sel.top_n.value} {sel.sort_column.display_name}"
+            f"Tahun {sel.year} berdasarkan {sel.sort_order.value}-{sel.top_n} {sel.sort_column.display_name}"
         )
         
         fig = self.chart_builder.create_comparison_chart(
@@ -1141,7 +1141,7 @@ class ComparisonTabView:
         kl_text = "K/L Terpilih" if sel.kl_list else "Seluruh K/L"
         title = (
             f"Perbandingan Realisasi Belanja berdasarkan {sel.category}<br>"
-            f"Tahun {sel.year} untuk {kl_text} berdasarkan {sel.sort_order.value}-{sel.top_n.value} {sel.sort_column.display_name}"
+            f"Tahun {sel.year} untuk {kl_text} berdasarkan {sel.sort_order.value}-{sel.top_n} {sel.sort_column.display_name}"
         )
         
         fig = self.chart_builder.create_comparison_chart(
@@ -1294,4 +1294,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
