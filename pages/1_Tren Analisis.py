@@ -48,7 +48,7 @@ class AppConfig:
     
     # Page configuration
     PAGE_TITLE: str = "Analisis Tren Anggaran dan Realisasi Belanja Negara"
-    PAGE_ICON: str = ":material/line_axis:"
+    PAGE_ICON: str = "📈"
 
 
 # =============================================================================
@@ -391,6 +391,9 @@ class TrendChartBuilder:
         """
         Create a line chart showing trends by category.
         
+        IMPORTANT: The chart and data table use the SAME grouped DataFrame
+        to ensure consistency between visualization and table data.
+        
         Args:
             df: Source DataFrame
             category_col: Column to use for line grouping
@@ -414,31 +417,34 @@ class TrendChartBuilder:
         try:
             # Prepare data
             df_work = df.copy()
-            df_work["short_label"] = df_work[category_col].apply(
-                lambda x: LabelShortener.shorten(x, category_col)
-            )
             
-            # Group data
+            # STEP 1: First aggregate by category_col (full label) and Tahun
+            # This is the SINGLE SOURCE OF TRUTH for both chart and table
             df_grouped = (
                 df_work
-                .groupby(["Tahun", category_col, "short_label"], as_index=False)[value_col]
+                .groupby(["Tahun", category_col], as_index=False)[value_col]
                 .sum()
             )
             
             if df_grouped.empty:
                 return None, None
             
+            # STEP 2: Add short_label AFTER aggregation (for legend display only)
+            df_grouped["short_label"] = df_grouped[category_col].apply(
+                lambda x: LabelShortener.shorten(x, category_col)
+            )
+            
             # Ensure proper sorting
             df_grouped["Tahun"] = df_grouped["Tahun"].astype(str)
             df_grouped = df_grouped.sort_values("Tahun")
             
             # Calculate dynamic height
-            n_groups = df_grouped["short_label"].nunique()
+            n_groups = df_grouped[category_col].nunique()
             height = self.config.CHART_BASE_HEIGHT
             if n_groups > self.config.CHART_GROUP_THRESHOLD:
                 height += n_groups * self.config.CHART_HEIGHT_PER_EXTRA_LINE
             
-            # Create chart
+            # Create chart using short_label for legend, but data is grouped by category_col
             fig = px.line(
                 df_grouped,
                 x="Tahun",
@@ -778,6 +784,7 @@ class CategoryTabView:
         
         try:
             # Create and display chart
+            # grouped_df is the SINGLE SOURCE for both chart and table
             fig, grouped_df = self.chart_builder.create_line_chart(
                 self.df,
                 self.category_col,
@@ -787,6 +794,7 @@ class CategoryTabView:
             
             if fig is not None:
                 st.plotly_chart(fig, use_container_width=True)
+                # Pass the SAME grouped_df to the data table
                 self._render_data_table(grouped_df)
             else:
                 st.warning(f"Tidak dapat membuat chart untuk {self.category_col}")
@@ -797,13 +805,19 @@ class CategoryTabView:
                 st.write(f"Sample values:", self.df[self.category_col].head(10).tolist())
     
     def _render_data_table(self, grouped_df: Optional[pd.DataFrame]) -> None:
-        """Render expandable data table with Excel export."""
+        """
+        Render expandable data table with Excel export.
+        
+        IMPORTANT: Uses the SAME grouped_df that was used to create the chart,
+        ensuring data consistency between visualization and table.
+        """
         with st.expander("📋 Data Tabel", expanded=True):
             if grouped_df is None or grouped_df.empty:
                 st.info("Tidak ada data untuk ditampilkan dalam tabel")
                 return
             
-            # Prepare display dataframe
+            # Use the same grouped_df that was used for the chart
+            # The grouped_df contains: [Tahun, category_col, Nilai, short_label]
             df_display = grouped_df[["Tahun", self.category_col, "Nilai"]].copy()
             
             # Pivot for wide format
@@ -982,8 +996,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
