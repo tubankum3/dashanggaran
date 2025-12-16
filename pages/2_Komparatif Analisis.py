@@ -973,6 +973,17 @@ class SidebarController:
         )
         return SortOrder(selection)
     
+    def _render_top_n_input(self, sort_order: SortOrder, sort_column: SortColumn) -> int:
+        """Render top N input field."""
+        return st.number_input(
+            f"Tampilkan {sort_order.value}-N Data",
+            min_value=self.config.MIN_TOP_N,
+            max_value=self.config.MAX_TOP_N,
+            value=self.config.DEFAULT_TOP_N,
+            step=1,
+            help=f"Jumlah data {sort_order.display_label} berdasarkan {sort_column.display_name}"
+        )
+        
     def _render_sort_column_selector(self) -> SortColumn:
         """Render sort column dropdown."""
         sort_options = [col for col in SortColumn]
@@ -988,17 +999,6 @@ class SidebarController:
         # Convert display name back to enum
         selected_idx = sort_display.index(selected_display)
         return sort_options[selected_idx]
-    
-    def _render_top_n_input(self, sort_order: SortOrder, sort_column: SortColumn) -> int:
-        """Render top N input field."""
-        return st.number_input(
-            f"Tampilkan {sort_order.value}-N Data",
-            min_value=self.config.MIN_TOP_N,
-            max_value=self.config.MAX_TOP_N,
-            value=self.config.DEFAULT_TOP_N,
-            step=1,
-            help=f"Jumlah data {sort_order.display_label} berdasarkan {sort_column.display_name}"
-        )
     
     def _render_category_selector(self) -> str:
         """Render category/classification selector."""
@@ -1294,6 +1294,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
