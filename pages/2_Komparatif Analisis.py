@@ -41,6 +41,20 @@ class SortOrder(Enum):
         return "tertinggi" if self == SortOrder.TOP else "terendah"
 
 
+class SortColumn(Enum):
+    """Available columns for sorting."""
+    REALISASI = "Realisasi Belanja"
+    PAGU_AWAL = "Pagu Awal"
+    PAGU_AKHIR = "Pagu Akhir"
+    VARIANS = "Varians"
+    PERSEN_REALISASI = "% Realisasi"
+    
+    @property
+    def display_name(self) -> str:
+        """Human-readable name for UI."""
+        return self.value
+
+
 class BudgetColumn(Enum):
     """Standard budget column names in the dataset."""
     REALISASI = "REALISASI BELANJA KL (SAKTI)"
@@ -138,7 +152,7 @@ class AppConfig:
     
     # Page configuration
     PAGE_TITLE: str = "Analisis Komparasi Realisasi vs Pagu DIPA"
-    PAGE_ICON: str = ":material/split_scene:"
+    PAGE_ICON: str = "📊"
 
 
 # =============================================================================
@@ -403,6 +417,32 @@ class DataAggregator:
     def __init__(self, config: AppConfig = AppConfig()):
         self.config = config
     
+    def get_sort_column_name(
+        self,
+        sort_column: SortColumn,
+        col_start: str,
+        col_end: str
+    ) -> str:
+        """
+        Get the actual DataFrame column name for sorting.
+        
+        Args:
+            sort_column: Selected sort column enum
+            col_start: Start range column name
+            col_end: End range column name
+            
+        Returns:
+            Actual column name in the DataFrame
+        """
+        mapping = {
+            SortColumn.REALISASI: BudgetColumn.REALISASI.value,
+            SortColumn.PAGU_AWAL: col_start,
+            SortColumn.PAGU_AKHIR: col_end,
+            SortColumn.VARIANS: "VARIANS",
+            SortColumn.PERSEN_REALISASI: "PERSEN_REALISASI",
+        }
+        return mapping.get(sort_column, BudgetColumn.REALISASI.value)
+    
     def aggregate_for_chart(
         self,
         df: pd.DataFrame,
@@ -412,6 +452,7 @@ class DataAggregator:
         col_end: str,
         top_n: int,
         sort_order: SortOrder,
+        sort_column: SortColumn,
         selected_kls: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """
@@ -425,6 +466,7 @@ class DataAggregator:
             col_end: End range column (e.g., Pagu Revisi)
             top_n: Number of rows to return
             sort_order: Top or Bottom N
+            sort_column: Column to sort by
             selected_kls: Optional K/L filter
             
         Returns:
@@ -454,19 +496,24 @@ class DataAggregator:
         
         agg = df_filtered.groupby(group_col, as_index=False)[available_cols].sum()
         
-        # Sort and limit
-        agg = agg.sort_values(
-            realisasi_col, 
-            ascending=sort_order.is_ascending
-        ).head(top_n).reset_index(drop=True)
-        
-        # Calculate derived columns
+        # Calculate derived columns BEFORE sorting
         agg["VARIANS"] = agg[col_end] - agg[realisasi_col]
         agg["PERSEN_REALISASI"] = np.where(
             agg[col_end] == 0,
             np.nan,
             (agg[realisasi_col] / agg[col_end]) * 100
         )
+        
+        # Get actual column name for sorting
+        sort_col_name = self.get_sort_column_name(sort_column, col_start, col_end)
+        
+        # Sort and limit
+        # Handle NaN values in sort column (put them at the end)
+        agg = agg.sort_values(
+            sort_col_name, 
+            ascending=sort_order.is_ascending,
+            na_position='last'
+        ).head(top_n).reset_index(drop=True)
         
         return agg
     
@@ -477,6 +524,8 @@ class DataAggregator:
         group_col: str,
         col_start: str,
         col_end: str,
+        sort_order: SortOrder,
+        sort_column: SortColumn,
         selected_kls: Optional[List[str]] = None
     ) -> AggregatedData:
         """
@@ -488,6 +537,8 @@ class DataAggregator:
             group_col: Column to group by
             col_start: Start column
             col_end: End column
+            sort_order: Sort order (Top/Bottom)
+            sort_column: Column to sort by
             selected_kls: Optional K/L filter
             
         Returns:
@@ -514,6 +565,16 @@ class DataAggregator:
             np.nan,
             (agg[realisasi_col] / agg[col_end]) * 100
         )
+        
+        # Get actual column name for sorting
+        sort_col_name = self.get_sort_column_name(sort_column, col_start, col_end)
+        
+        # Sort table by selected column
+        agg = agg.sort_values(
+            sort_col_name,
+            ascending=sort_order.is_ascending,
+            na_position='last'
+        ).reset_index(drop=True)
         
         # Create display version
         display_df = agg.copy()
@@ -845,6 +906,17 @@ class UIComponents:
         st.markdown(CSS_TABS_UNDERLINE, unsafe_allow_html=True)
 
 
+@dataclass
+class SidebarSelections:
+    """Container for all sidebar selections."""
+    year: int
+    kl_list: List[str]
+    top_n: int
+    category: str
+    sort_order: SortOrder
+    sort_column: SortColumn
+
+
 class SidebarController:
     """Manages sidebar filter controls."""
     
@@ -852,21 +924,29 @@ class SidebarController:
         self.df = df
         self.config = config
     
-    def render(self) -> Tuple[int, List[str], int, str, SortOrder]:
+    def render(self) -> SidebarSelections:
         """
         Render sidebar controls and return selected values.
         
         Returns:
-            Tuple of (year, kl_list, top_n, category_metric, sort_order)
+            SidebarSelections with all selected values
         """
         with st.sidebar:
             year = self._render_year_selector()
             sort_order = self._render_sort_order_selector()
-            top_n = self._render_top_n_input(sort_order)
+            sort_column = self._render_sort_column_selector()
+            top_n = self._render_top_n_input(sort_order, sort_column)
             category = self._render_category_selector()
             kl_list = self._render_kl_selector()
             
-            return year, kl_list, top_n, category, sort_order
+            return SidebarSelections(
+                year=year,
+                kl_list=kl_list,
+                top_n=top_n,
+                category=category,
+                sort_order=sort_order,
+                sort_column=sort_column
+            )
     
     def _render_year_selector(self) -> int:
         """Render year selection dropdown."""
@@ -893,7 +973,23 @@ class SidebarController:
         )
         return SortOrder(selection)
     
-    def _render_top_n_input(self, sort_order: SortOrder) -> int:
+    def _render_sort_column_selector(self) -> SortColumn:
+        """Render sort column dropdown."""
+        sort_options = [col for col in SortColumn]
+        sort_display = [col.display_name for col in sort_options]
+        
+        selected_display = st.selectbox(
+            "Urutkan Berdasarkan",
+            options=sort_display,
+            index=0,  # Default to Realisasi Belanja
+            help="Pilih kolom untuk mengurutkan data"
+        )
+        
+        # Convert display name back to enum
+        selected_idx = sort_display.index(selected_display)
+        return sort_options[selected_idx]
+    
+    def _render_top_n_input(self, sort_order: SortOrder, sort_column: SortColumn) -> int:
         """Render top N input field."""
         return st.number_input(
             f"Tampilkan {sort_order.value}-N Data",
@@ -901,7 +997,7 @@ class SidebarController:
             max_value=self.config.MAX_TOP_N,
             value=self.config.DEFAULT_TOP_N,
             step=1,
-            help=f"Jumlah data {sort_order.display_label} berdasarkan Realisasi Belanja"
+            help=f"Jumlah data {sort_order.display_label} berdasarkan {sort_column.display_name}"
         )
     
     def _render_category_selector(self) -> str:
@@ -947,20 +1043,12 @@ class ComparisonTabView:
     def __init__(
         self,
         df: pd.DataFrame,
-        year: int,
-        top_n: int,
-        sort_order: SortOrder,
-        selected_kls: List[str],
-        selected_metric: str,
+        selections: SidebarSelections,
         comparison_config: ComparisonConfig,
         config: AppConfig = AppConfig()
     ):
         self.df = df
-        self.year = year
-        self.top_n = top_n
-        self.sort_order = sort_order
-        self.selected_kls = selected_kls
-        self.selected_metric = selected_metric
+        self.selections = selections
         self.comparison_config = comparison_config
         self.config = config
         
@@ -975,12 +1063,13 @@ class ComparisonTabView:
             tab_key: Unique key for download button
         """
         cfg = self.comparison_config
+        sel = self.selections
         
         # Main K/L comparison chart
         self._render_kl_chart(cfg)
         
         # Category breakdown chart (if not K/L)
-        if self.selected_metric != BudgetColumn.KL.value:
+        if sel.category != BudgetColumn.KL.value:
             self._render_category_chart(cfg)
         
         # Captions
@@ -991,26 +1080,29 @@ class ComparisonTabView:
     
     def _render_kl_chart(self, cfg: ComparisonConfig) -> None:
         """Render the main K/L comparison chart."""
+        sel = self.selections
+        
         # Aggregate data
         agg = self.aggregator.aggregate_for_chart(
             df=self.df,
-            year=self.year,
+            year=sel.year,
             group_col=BudgetColumn.KL.value,
             col_start=cfg.col_start,
             col_end=cfg.col_end,
-            top_n=self.top_n,
-            sort_order=self.sort_order,
-            selected_kls=self.selected_kls if self.selected_kls else None
+            top_n=sel.top_n,
+            sort_order=sel.sort_order,
+            sort_column=sel.sort_column,
+            selected_kls=sel.kl_list if sel.kl_list else None
         )
         
         if agg.empty:
-            st.warning(f"Tidak ada data untuk tahun {self.year}")
+            st.warning(f"Tidak ada data untuk tahun {sel.year}")
             return
         
         # Build title
         title = (
             f"Perbandingan Realisasi Belanja {cfg.title_suffix}<br>"
-            f"Tahun {self.year}"
+            f"Tahun {sel.year} | Diurutkan: {sel.sort_column.display_name} ({sel.sort_order.value})"
         )
         
         fig = self.chart_builder.create_comparison_chart(
@@ -1027,31 +1119,34 @@ class ComparisonTabView:
     
     def _render_category_chart(self, cfg: ComparisonConfig) -> None:
         """Render the category breakdown chart."""
+        sel = self.selections
+        
         agg = self.aggregator.aggregate_for_chart(
             df=self.df,
-            year=self.year,
-            group_col=self.selected_metric,
+            year=sel.year,
+            group_col=sel.category,
             col_start=cfg.col_start,
             col_end=cfg.col_end,
-            top_n=self.top_n,
-            sort_order=self.sort_order,
-            selected_kls=self.selected_kls if self.selected_kls else None
+            top_n=sel.top_n,
+            sort_order=sel.sort_order,
+            sort_column=sel.sort_column,
+            selected_kls=sel.kl_list if sel.kl_list else None
         )
         
         if agg.empty:
-            st.warning(f"Tidak ada data untuk kategori '{self.selected_metric}'")
+            st.warning(f"Tidak ada data untuk kategori '{sel.category}'")
             return
         
         # Build title
-        kl_text = "K/L Terpilih" if self.selected_kls else "Seluruh K/L"
+        kl_text = "K/L Terpilih" if sel.kl_list else "Seluruh K/L"
         title = (
-            f"Perbandingan Realisasi Belanja berdasarkan {self.selected_metric}<br>"
-            f"Tahun {self.year} untuk {kl_text}"
+            f"Perbandingan Realisasi Belanja berdasarkan {sel.category}<br>"
+            f"Tahun {sel.year} untuk {kl_text} | Diurutkan: {sel.sort_column.display_name} ({sel.sort_order.value})"
         )
         
         fig = self.chart_builder.create_comparison_chart(
             agg=agg,
-            group_col=self.selected_metric,
+            group_col=sel.category,
             col_start=cfg.col_start,
             col_end=cfg.col_end,
             title=title,
@@ -1063,14 +1158,18 @@ class ComparisonTabView:
     
     def _render_detail_table(self, cfg: ComparisonConfig, tab_key: str) -> None:
         """Render the expandable detail table with Excel export."""
+        sel = self.selections
+        
         with st.expander("Tabel Rincian Data"):
             table_data = self.aggregator.generate_table(
                 df=self.df,
-                year=self.year,
-                group_col=self.selected_metric,
+                year=sel.year,
+                group_col=sel.category,
                 col_start=cfg.col_start,
                 col_end=cfg.col_end,
-                selected_kls=self.selected_kls if self.selected_kls else None
+                sort_order=sel.sort_order,
+                sort_column=sel.sort_column,
+                selected_kls=sel.kl_list if sel.kl_list else None
             )
             
             st.dataframe(
@@ -1084,9 +1183,9 @@ class ComparisonTabView:
             st.download_button(
                 label="📥 Download Excel",
                 data=excel_data,
-                file_name=f"Tabel_Realisasi_vs_Pagu_{self.year}_{tab_key}.xlsx",
+                file_name=f"Tabel_Realisasi_vs_Pagu_{sel.year}_{tab_key}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"download_{tab_key}_{self.year}_{self.selected_metric}"
+                key=f"download_{tab_key}_{sel.year}_{sel.category}"
             )
 
 
@@ -1119,20 +1218,20 @@ class BudgetComparisonApp:
         
         # Render sidebar and get selections
         sidebar = SidebarController(df, self.config)
-        year, kl_list, top_n, category, sort_order = sidebar.render()
+        selections = sidebar.render()
         
         # Render header
-        UIComponents.render_header(str(year), category, kl_list)
+        UIComponents.render_header(str(selections.year), selections.category, selections.kl_list)
         
         # Filter data by K/L if selected
         df_filtered = df.copy()
-        if kl_list:
+        if selections.kl_list:
             df_filtered = df_filtered[
-                df_filtered[BudgetColumn.KL.value].isin(kl_list)
+                df_filtered[BudgetColumn.KL.value].isin(selections.kl_list)
             ]
         
         # Render tabs
-        self._render_tabs(df_filtered, year, top_n, sort_order, kl_list, category)
+        self._render_tabs(df_filtered, selections)
     
     def _configure_page(self) -> None:
         """Configure Streamlit page settings."""
@@ -1151,11 +1250,7 @@ class BudgetComparisonApp:
     def _render_tabs(
         self,
         df: pd.DataFrame,
-        year: int,
-        top_n: int,
-        sort_order: SortOrder,
-        kl_list: List[str],
-        category: str
+        selections: SidebarSelections
     ) -> None:
         """Render the comparison tabs."""
         tab_labels = [
@@ -1176,11 +1271,7 @@ class BudgetComparisonApp:
             with tab:
                 view = ComparisonTabView(
                     df=df,
-                    year=year,
-                    top_n=top_n,
-                    sort_order=sort_order,
-                    selected_kls=kl_list,
-                    selected_metric=category,
+                    selections=selections,
                     comparison_config=COMPARISON_CONFIGS[config_key],
                     config=self.config
                 )
@@ -1203,5 +1294,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
