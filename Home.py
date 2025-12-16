@@ -60,7 +60,7 @@ class AppConfig:
     
     # Page configuration
     PAGE_TITLE: str = "Dashboard Analisis Anggaran dan Realisasi Belanja Negara"
-    PAGE_ICON: str = ":analytics:"
+    PAGE_ICON: str = "📊"
 
 
 @dataclass
@@ -80,6 +80,13 @@ class SankeyConfig:
     parent_col: str
     child_col: str
     selected_kl: str
+
+
+@dataclass
+class SidebarSelections:
+    """Container for all sidebar selections."""
+    selected_kl: str
+    advanced_filters: Dict[str, List[str]]
 
 
 # =============================================================================
@@ -183,6 +190,16 @@ CSS_STYLES = """
 ::-webkit-scrollbar-track { background: var(--gray-100); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb { background: var(--gray-400); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
+
+.filter-badge {
+    display: inline-block;
+    background: var(--primary-light);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    margin-left: 8px;
+}
 </style>
 """
 
@@ -326,6 +343,58 @@ class DataLoader:
         )
 
 
+class DataFilterer:
+    """Handles data filtering operations."""
+    
+    def __init__(self, config: AppConfig = AppConfig()):
+        self.config = config
+    
+    def apply_filters(
+        self,
+        df: pd.DataFrame,
+        selected_kl: str,
+        advanced_filters: Dict[str, List[str]]
+    ) -> pd.DataFrame:
+        """
+        Apply all filters to the DataFrame.
+        
+        Args:
+            df: Source DataFrame
+            selected_kl: Selected K/L or "Semua"
+            advanced_filters: Dictionary of column -> selected values
+            
+        Returns:
+            Filtered DataFrame
+        """
+        df_filtered = df.copy()
+        
+        # Apply K/L filter
+        if selected_kl != "Semua":
+            df_filtered = df_filtered[
+                df_filtered[self.config.KL_COLUMN] == selected_kl
+            ]
+        
+        # Apply advanced categorical filters
+        for col, selected_values in advanced_filters.items():
+            if col in df_filtered.columns and selected_values:
+                # Only filter if not all values are selected
+                all_values = df_filtered[col].dropna().unique().tolist()
+                if set(selected_values) != set(all_values):
+                    df_filtered = df_filtered[df_filtered[col].isin(selected_values)]
+        
+        return df_filtered
+    
+    def count_active_filters(self, df: pd.DataFrame, advanced_filters: Dict[str, List[str]]) -> int:
+        """Count how many filters are actively filtering data."""
+        count = 0
+        for col, selected_values in advanced_filters.items():
+            if col in df.columns:
+                all_values = df[col].dropna().unique().tolist()
+                if set(selected_values) != set(all_values):
+                    count += 1
+        return count
+
+
 # =============================================================================
 # TIME SERIES CHART BUILDER
 # =============================================================================
@@ -383,7 +452,7 @@ class TimeSeriesChartBuilder:
             (filtered_df[self.config.YEAR_COLUMN] <= ts_config.year_range[1])
         ]
         
-        # K/L filter
+        # K/L filter (already applied in main, but keep for standalone use)
         if ts_config.selected_kl != "Semua":
             filtered_df = filtered_df[
                 filtered_df[self.config.KL_COLUMN] == ts_config.selected_kl
@@ -600,7 +669,7 @@ class SankeyChartBuilder:
         """Filter data by K/L and year."""
         df_filtered = df.copy()
         
-        # K/L filter
+        # K/L filter (already applied in main, but keep for standalone use)
         if sankey_config.selected_kl != "Semua":
             df_filtered = df_filtered[
                 df_filtered[self.config.KL_COLUMN] == sankey_config.selected_kl
@@ -960,13 +1029,14 @@ class UIComponents:
     """Reusable UI component generators."""
     
     @staticmethod
-    def render_header(selected_kl: Optional[str]) -> None:
+    def render_header(selected_kl: Optional[str], active_filter_count: int = 0) -> None:
         """Render the main dashboard header."""
         kl_text = "Semua K/L" if selected_kl == "Semua" else (selected_kl or "—")
+        filter_badge = f'<span class="filter-badge">{active_filter_count} filter aktif</span>' if active_filter_count > 0 else ""
         
         st.markdown(f"""
         <div class="dashboard-header" role="banner">
-            <div class="breadcrumb">DASHBOARD / ANALISIS / {kl_text}</div>
+            <div class="breadcrumb">DASHBOARD / ANALISIS / {kl_text} {filter_badge}</div>
             <h1 class="dashboard-title">📊 Dashboard Analisis Anggaran & Realisasi Belanja Negara</h1>
         </div>
         """, unsafe_allow_html=True)
@@ -994,8 +1064,8 @@ class SidebarController:
         self.df = df
         self.config = config
     
-    def render(self) -> str:
-        """Render sidebar and return selected K/L."""
+    def render(self) -> SidebarSelections:
+        """Render sidebar and return all selections."""
         with st.sidebar:
             st.markdown("""
             <div class="sidebar-section">
@@ -1004,17 +1074,82 @@ class SidebarController:
             """, unsafe_allow_html=True)
             
             # K/L selector
-            kl_list = sorted(self.df[self.config.KL_COLUMN].dropna().unique())
-            kl_list.insert(0, "Semua")
+            selected_kl = self._render_kl_selector()
             
-            selected_kl = st.selectbox(
-                "Pilih Kementerian/Lembaga",
-                kl_list,
-                key="ministry_select",
-                help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
-            )
+            # Advanced filters
+            advanced_filters = self._render_advanced_filters(self.df)
+        
+        return SidebarSelections(
+            selected_kl=selected_kl,
+            advanced_filters=advanced_filters
+        )
+    
+    def _render_kl_selector(self) -> str:
+        """Render K/L selection dropdown."""
+        kl_list = sorted(self.df[self.config.KL_COLUMN].dropna().unique())
+        kl_list.insert(0, "Semua")
+        
+        selected_kl = st.selectbox(
+            "Pilih Kementerian/Lembaga",
+            kl_list,
+            key="ministry_select",
+            help="Pilih kementerian/lembaga untuk melihat analisis anggaran"
+        )
         
         return selected_kl
+    
+    def _render_advanced_filters(self, df: pd.DataFrame) -> Dict[str, List[str]]:
+        """Render advanced categorical filters."""
+        active_filters = {}
+        
+        with st.expander("⚙️ Filter Lanjutan"):
+            st.markdown("##### Filter Berdasarkan Kategori")
+            
+            # Get categorical columns excluding K/L and Year
+            cat_cols = [
+                col for col in df.select_dtypes(include=["object"]).columns
+                if col not in [self.config.KL_COLUMN, self.config.YEAR_COLUMN]
+            ]
+            
+            if not cat_cols:
+                st.info("Tidak ada kolom kategorikal untuk difilter")
+                return active_filters
+            
+            # Create filters for each categorical column
+            for cat_col in cat_cols:
+                options = sorted(df[cat_col].dropna().unique().tolist())
+                
+                if len(options) > 0:
+                    # Use "Pilih Semua" checkbox pattern
+                    col_key = f"filter__{cat_col}"
+                    
+                    selected_values = st.multiselect(
+                        f"{cat_col.replace('_', ' ').title()}",
+                        options=options,
+                        default=options,  # Default to all selected
+                        key=col_key,
+                        help=f"Pilih nilai {cat_col} yang ingin ditampilkan"
+                    )
+                    
+                    active_filters[cat_col] = selected_values
+            
+            # Show filter summary
+            filterer = DataFilterer(self.config)
+            active_count = filterer.count_active_filters(df, active_filters)
+            
+            if active_count > 0:
+                st.markdown(f"**{active_count} filter aktif**")
+                
+                # Reset button
+                if st.button("🔄 Reset Semua Filter", key="reset_filters"):
+                    # Clear all filter session states
+                    for cat_col in cat_cols:
+                        col_key = f"filter__{cat_col}"
+                        if col_key in st.session_state:
+                            del st.session_state[col_key]
+                    st.rerun()
+        
+        return active_filters
 
 
 # =============================================================================
@@ -1030,20 +1165,13 @@ class TimeSeriesControlPanel:
     
     def render(self, selected_kl: str) -> TimeSeriesConfig:
         """Render controls and return configuration."""
-        # Filter by K/L for year options
-        df_filtered = self.df.copy()
-        if selected_kl != "Semua":
-            df_filtered = df_filtered[
-                df_filtered[self.config.KL_COLUMN] == selected_kl
-            ]
-        
         # Get numeric columns
-        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
+        numeric_cols = self.df.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
         if self.config.YEAR_COLUMN in numeric_cols:
             numeric_cols.remove(self.config.YEAR_COLUMN)
         
         # Year range slider
-        year_options = sorted(df_filtered[self.config.YEAR_COLUMN].dropna().unique())
+        year_options = sorted(self.df[self.config.YEAR_COLUMN].dropna().unique())
         
         if len(year_options) >= 2:
             year_range = st.slider(
@@ -1105,19 +1233,12 @@ class SankeyControlPanel:
     
     def render(self, selected_kl: str) -> SankeyConfig:
         """Render controls and return configuration."""
-        # Filter by K/L
-        df_filtered = self.df.copy()
-        if selected_kl != "Semua":
-            df_filtered = df_filtered[
-                df_filtered[self.config.KL_COLUMN] == selected_kl
-            ]
-        
         # Get column options
-        numeric_cols = df_filtered.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
+        numeric_cols = self.df.select_dtypes(include=["int64", "float64", "Int64"]).columns.tolist()
         if self.config.YEAR_COLUMN in numeric_cols:
             numeric_cols.remove(self.config.YEAR_COLUMN)
         
-        categorical_cols = df_filtered.select_dtypes(include=['object']).columns.tolist()
+        categorical_cols = self.df.select_dtypes(include=['object']).columns.tolist()
         exclude_cols = [self.config.KL_COLUMN, self.config.YEAR_COLUMN]
         categorical_cols = [col for col in categorical_cols if col not in exclude_cols]
         
@@ -1125,7 +1246,7 @@ class SankeyControlPanel:
         colC, colD = st.columns(2)
         
         with colC:
-            year_options = sorted(int(y) for y in df_filtered[self.config.YEAR_COLUMN].dropna().unique())
+            year_options = sorted(int(y) for y in self.df[self.config.YEAR_COLUMN].dropna().unique())
             if not year_options:
                 year_options = [date.today().year]
                 
@@ -1200,6 +1321,7 @@ class BudgetAnalysisDashboard:
     def __init__(self):
         self.config = AppConfig()
         self.data_loader = DataLoader(self.config)
+        self.data_filterer = DataFilterer(self.config)
     
     def run(self) -> None:
         """Run the application."""
@@ -1217,12 +1339,41 @@ class BudgetAnalysisDashboard:
             st.warning("⚠️ Tidak ada data untuk ditampilkan")
             return
         
-        # Sidebar
+        # Sidebar - get all selections
         sidebar = SidebarController(df, self.config)
-        selected_kl = sidebar.render()
+        selections = sidebar.render()
         
-        # Header
-        UIComponents.render_header(selected_kl)
+        # Apply filters to get filtered DataFrame
+        df_filtered = self.data_filterer.apply_filters(
+            df,
+            selections.selected_kl,
+            selections.advanced_filters
+        )
+        
+        # Count active filters for header badge
+        active_filter_count = self.data_filterer.count_active_filters(
+            df, selections.advanced_filters
+        )
+        
+        # Header with filter badge
+        UIComponents.render_header(selections.selected_kl, active_filter_count)
+        
+        # Show data summary after filtering
+        if df_filtered.empty:
+            st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih")
+            return
+        
+        # Show filter summary
+        if active_filter_count > 0:
+            with st.expander("📊 Ringkasan Data Terfilter", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Baris", f"{len(df_filtered):,}")
+                with col2:
+                    st.metric("Baris Asli", f"{len(df):,}")
+                with col3:
+                    pct = (len(df_filtered) / len(df) * 100) if len(df) > 0 else 0
+                    st.metric("Persentase", f"{pct:.1f}%")
         
         # Main content - two columns
         col1, col2 = st.columns(2)
@@ -1231,11 +1382,11 @@ class BudgetAnalysisDashboard:
         with col1:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             
-            ts_panel = TimeSeriesControlPanel(df, self.config)
-            ts_config = ts_panel.render(selected_kl)
+            ts_panel = TimeSeriesControlPanel(df_filtered, self.config)
+            ts_config = ts_panel.render(selections.selected_kl)
             
             ts_builder = TimeSeriesChartBuilder(self.config)
-            fig_ts = ts_builder.create_chart(df, ts_config)
+            fig_ts = ts_builder.create_chart(df_filtered, ts_config)
             st.plotly_chart(fig_ts, use_container_width=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1244,11 +1395,11 @@ class BudgetAnalysisDashboard:
         with col2:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             
-            sankey_panel = SankeyControlPanel(df, self.config)
-            sankey_config = sankey_panel.render(selected_kl)
+            sankey_panel = SankeyControlPanel(df_filtered, self.config)
+            sankey_config = sankey_panel.render(selections.selected_kl)
             
             sankey_builder = SankeyChartBuilder(self.config)
-            fig_sankey = sankey_builder.create_chart(df, sankey_config)
+            fig_sankey = sankey_builder.create_chart(df_filtered, sankey_config)
             
             with st.container(height=self.config.SANKEY_CONTAINER_HEIGHT, border=False):
                 st.plotly_chart(fig_sankey, use_container_width=True)
@@ -1288,11 +1439,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
