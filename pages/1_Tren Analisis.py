@@ -956,17 +956,6 @@ class TrendAnalysisApp:
             st.warning("Kolom metrik tidak ditemukan di dataset untuk K/L ini.")
             return
         
-        # # Show filter summary if filters are active
-        # if active_filter_count > 0:
-        #     with st.expander("📊 Ringkasan Data Terfilter", expanded=False):
-        #         col1, col2 = st.columns(2)
-        #         with col1:
-        #             st.metric("Total Baris Terfilter", f"{len(selections.df_filtered):,}")
-        #         with col2:
-        #             # Show which filters are active
-        #             for col, values in selections.active_filters.items():
-        #                 st.write(f"**{col}:** {len(values)} nilai dipilih")
-        
         # Check if filtered data is empty
         if selections.df_filtered.empty:
             st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih")
@@ -1067,4 +1056,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
