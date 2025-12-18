@@ -927,7 +927,7 @@ class TrendAnalysisApp:
         
         # Load data
         try:
-            with st.spinner("Memuat data anggaran..."):
+            with st.spinner("Memuat data..."):
                 df = self.data_loader.get_data()
         except DataLoadError as e:
             st.error(f"Gagal memuat data: {e}")
@@ -1056,3 +1056,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
