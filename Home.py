@@ -1203,7 +1203,8 @@ class TimeSeriesControlPanel:
                 "Pilih metrik pertama",
                 numeric_cols,
                 index=primary_idx,
-                key="primary_metric"
+                key="primary_metric",
+                help="Nilai ditampilkan dalam Rupiah"
             )
         
         with colB:
@@ -1216,7 +1217,8 @@ class TimeSeriesControlPanel:
                 "Pilih metrik kedua",
                 numeric_cols,
                 index=secondary_idx,
-                key="secondary_metric"
+                key="secondary_metric",
+                help="Nilai ditampilkan sebagai persentase dari Metrik Pertama"
             )
         
         return TimeSeriesConfig(
@@ -1443,4 +1445,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
