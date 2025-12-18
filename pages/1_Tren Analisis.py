@@ -507,14 +507,19 @@ class UIComponents:
     """Reusable UI component generators."""
     
     @staticmethod
-    def render_header(selected_kl: Optional[str], selected_metric: Optional[str]) -> None:
+    def render_header(
+        selected_kl: Optional[str],
+        selected_metric: Optional[str],
+        active_filter_count: int = 0
+    ) -> None:
         """Render the main dashboard header."""
         kl_text = "Semua K/L" if selected_kl == "Semua" else (selected_kl or "—")
         metric_text = f" {selected_metric}" if selected_metric else ""
+        filter_badge = f'<span style="background:#4D94FF;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:8px;">{active_filter_count} filter aktif</span>' if active_filter_count > 0 else ""
         
         st.markdown(f"""
         <div class="dashboard-header" role="banner">
-            <div class="breadcrumb">DASHBOARD / ANALISIS{metric_text} / {kl_text}</div>
+            <div class="breadcrumb">DASHBOARD / ANALISIS{metric_text} / {kl_text} {filter_badge}</div>
             <h1 class="dashboard-title">Analisis Tren Anggaran & Realisasi Belanja Negara</h1>
         </div>
         """, unsafe_allow_html=True)
@@ -628,7 +633,7 @@ class SidebarController:
             # Year range selector
             selected_years = self._render_year_selector(df_filtered)
             
-            # Advanced filters
+            # Advanced filters (TWO-STEP APPROACH)
             active_filters = self._render_advanced_filters(df_filtered)
             
             st.markdown("</div>", unsafe_allow_html=True)
@@ -702,26 +707,70 @@ class SidebarController:
         )
     
     def _render_advanced_filters(self, df: pd.DataFrame) -> Dict[str, List[str]]:
-        """Render advanced categorical filters."""
+        """
+        Render advanced categorical filters using TWO-STEP approach.
+        
+        Step 1: User selects which columns to filter
+        Step 2: User selects values for those columns
+        """
         active_filters = {}
         
         with st.expander("⚙️ Filter Lanjutan"):
-            st.markdown("### Filter Berdasarkan Nilai Kategorikal")
+            st.markdown("##### Filter Berdasarkan Kategori")
             
+            # Get categorical columns excluding K/L and Year
             cat_cols = [
                 col for col in df.select_dtypes(include=["object"]).columns
                 if col not in [self.config.KL_COLUMN, self.config.YEAR_COLUMN]
             ]
             
-            for cat_col in cat_cols:
-                options = sorted(df[cat_col].dropna().unique())
+            if not cat_cols:
+                st.info("Tidak ada kolom kategorikal untuk difilter")
+                return active_filters
+            
+            # Show all columns with their unique value count
+            col_info = [(col, df[col].nunique()) for col in cat_cols]
+            col_options = [f"{col} ({n} nilai)" for col, n in col_info]
+            col_mapping = {f"{col} ({n} nilai)": col for col, n in col_info}
+            
+            # Step 1: User selects which columns to filter
+            selected_filter_cols = st.multiselect(
+                "Pilih kolom untuk difilter:",
+                options=col_options,
+                default=[],
+                key="selected_filter_columns",
+                help="Pilih kolom kategorikal yang ingin difilter"
+            )
+            
+            # Step 2: Create filters only for selected columns
+            for col_display in selected_filter_cols:
+                col = col_mapping[col_display]
+                options = sorted(df[col].dropna().unique().tolist())
+                
+                col_key = f"filter__{col}"
+                
                 selected_values = st.multiselect(
-                    f"Pilih {cat_col.replace('_', ' ').title()}",
+                    f"{col.replace('_', ' ').title()}",
                     options=options,
-                    default=options,
-                    key=f"filter__{cat_col}"
+                    default=[],  # Empty default = show all
+                    key=col_key,
+                    help=f"Pilih nilai {col} yang ingin ditampilkan (kosong = semua)"
                 )
-                active_filters[cat_col] = selected_values
+                
+                # Only add to filters if user selected something
+                if selected_values:
+                    active_filters[col] = selected_values
+            
+            # Show filter summary
+            if active_filters:
+                st.markdown(f"**{len(active_filters)} filter aktif**")
+                
+                # Reset button
+                if st.button("🔄 Reset Filter", key="reset_filters"):
+                    for key in list(st.session_state.keys()):
+                        if key.startswith("filter__") or key == "selected_filter_columns":
+                            del st.session_state[key]
+                    st.rerun()
         
         return active_filters
     
@@ -739,7 +788,7 @@ class SidebarController:
                 (df["Tahun"] <= years[1])
             ]
         
-        # Categorical filters
+        # Categorical filters (only apply if user selected values)
         for col, values in filters.items():
             if values and col in df.columns:
                 df = df[df[col].isin(values)]
@@ -892,12 +941,35 @@ class TrendAnalysisApp:
         sidebar = SidebarController(df, self.config)
         selections = sidebar.render()
         
-        # Render header
-        UIComponents.render_header(selections.selected_kl, selections.selected_metric)
+        # Count active filters for header badge
+        active_filter_count = len(selections.active_filters)
+        
+        # Render header with filter badge
+        UIComponents.render_header(
+            selections.selected_kl,
+            selections.selected_metric,
+            active_filter_count
+        )
         
         # Validate metric
         if selections.selected_metric not in selections.df_filtered.columns:
             st.warning("Kolom metrik tidak ditemukan di dataset untuk K/L ini.")
+            return
+        
+        # Show filter summary if filters are active
+        if active_filter_count > 0:
+            with st.expander("📊 Ringkasan Data Terfilter", expanded=False):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Baris Terfilter", f"{len(selections.df_filtered):,}")
+                with col2:
+                    # Show which filters are active
+                    for col, values in selections.active_filters.items():
+                        st.write(f"**{col}:** {len(values)} nilai dipilih")
+        
+        # Check if filtered data is empty
+        if selections.df_filtered.empty:
+            st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih")
             return
         
         # Rename metric column for processing
