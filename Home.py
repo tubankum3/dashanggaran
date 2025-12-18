@@ -1333,7 +1333,8 @@ class BudgetAnalysisDashboard:
         
         # Load data
         try:
-            df = self.data_loader.get_data()
+            with st.spinner("Memuat data anggaran..."):
+                df = self.data_loader.get_data()
         except DataLoadError as e:
             st.error(f"Gagal memuat data: {e}")
             return
@@ -1442,3 +1443,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
