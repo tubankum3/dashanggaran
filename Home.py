@@ -1364,22 +1364,10 @@ class BudgetAnalysisDashboard:
         # Header with filter badge
         UIComponents.render_header(selections.selected_kl, active_filter_count)
         
-        # # Show data summary after filtering
-        # if df_filtered.empty:
-        #     st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih")
-        #     return
-        
-        # # Show filter summary
-        # if active_filter_count > 0:
-        #     with st.expander("📊 Ringkasan Data Terfilter", expanded=False):
-        #         col1, col2, col3 = st.columns(3)
-        #         with col1:
-        #             st.metric("Total Baris Difilter", f"{len(df_filtered):,}")
-        #         with col2:
-        #             st.metric("Total Baris Data", f"{len(df):,}")
-        #         with col3:
-        #             pct = ((len(df_filtered) / len(df)) * 100) if len(df) > 0 else 0
-        #             st.metric("Persentase", f"{pct:.1f}%")
+        # Show data summary after filtering
+        if df_filtered.empty:
+            st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih")
+            return
         
         # Main content - two columns
         col1, col2 = st.columns(2)
@@ -1445,8 +1433,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
