@@ -361,7 +361,7 @@ class DataFilterer:
         Args:
             df: Source DataFrame
             selected_kl: Selected K/L or "Semua"
-            advanced_filters: Dictionary of column -> selected values
+            advanced_filters: Dictionary of column -> selected values (empty = no filter)
             
         Returns:
             Filtered DataFrame
@@ -375,24 +375,17 @@ class DataFilterer:
             ]
         
         # Apply advanced categorical filters
+        # Only filter if user selected specific values (non-empty)
         for col, selected_values in advanced_filters.items():
             if col in df_filtered.columns and selected_values:
-                # Only filter if not all values are selected
-                all_values = df_filtered[col].dropna().unique().tolist()
-                if set(selected_values) != set(all_values):
-                    df_filtered = df_filtered[df_filtered[col].isin(selected_values)]
+                df_filtered = df_filtered[df_filtered[col].isin(selected_values)]
         
         return df_filtered
     
     def count_active_filters(self, df: pd.DataFrame, advanced_filters: Dict[str, List[str]]) -> int:
         """Count how many filters are actively filtering data."""
-        count = 0
-        for col, selected_values in advanced_filters.items():
-            if col in df.columns:
-                all_values = df[col].dropna().unique().tolist()
-                if set(selected_values) != set(all_values):
-                    count += 1
-        return count
+        # Count filters that have selections (non-empty)
+        return sum(1 for values in advanced_filters.values() if values)
 
 
 # =============================================================================
@@ -1115,38 +1108,48 @@ class SidebarController:
                 st.info("Tidak ada kolom kategorikal untuk difilter")
                 return active_filters
             
-            # Create filters for each categorical column
-            for cat_col in cat_cols:
-                options = sorted(df[cat_col].dropna().unique().tolist())
+            # Show all columns with their unique value count
+            col_info = [(col, df[col].nunique()) for col in cat_cols]
+            col_options = [f"{col} ({n} nilai)" for col, n in col_info]
+            col_mapping = {f"{col} ({n} nilai)": col for col, n in col_info}
+            
+            # Step 1: User selects which columns to filter
+            selected_filter_cols = st.multiselect(
+                "Pilih kolom untuk difilter:",
+                options=col_options,
+                default=[],
+                key="selected_filter_columns",
+                help="Pilih kolom kategorikal yang ingin difilter"
+            )
+            
+            # Step 2: Create filters only for selected columns
+            for col_display in selected_filter_cols:
+                col = col_mapping[col_display]
+                options = sorted(df[col].dropna().unique().tolist())
                 
-                if len(options) > 0:
-                    # Use "Pilih Semua" checkbox pattern
-                    col_key = f"filter__{cat_col}"
-                    
-                    selected_values = st.multiselect(
-                        f"{cat_col.replace('_', ' ').title()}",
-                        options=options,
-                        default=options,  # Default to all selected
-                        key=col_key,
-                        help=f"Pilih nilai {cat_col} yang ingin ditampilkan"
-                    )
-                    
-                    active_filters[cat_col] = selected_values
+                col_key = f"filter__{col}"
+                
+                selected_values = st.multiselect(
+                    f"{col.replace('_', ' ').title()}",
+                    options=options,
+                    default=[],  # Empty default = show all
+                    key=col_key,
+                    help=f"Pilih nilai {col} yang ingin ditampilkan (kosong = semua)"
+                )
+                
+                # Only add to filters if user selected something
+                if selected_values:
+                    active_filters[col] = selected_values
             
             # Show filter summary
-            filterer = DataFilterer(self.config)
-            active_count = filterer.count_active_filters(df, active_filters)
-            
-            if active_count > 0:
-                st.markdown(f"**{active_count} filter aktif**")
+            if active_filters:
+                st.markdown(f"**{len(active_filters)} filter aktif**")
                 
                 # Reset button
-                if st.button("🔄 Reset Semua Filter", key="reset_filters"):
-                    # Clear all filter session states
-                    for cat_col in cat_cols:
-                        col_key = f"filter__{cat_col}"
-                        if col_key in st.session_state:
-                            del st.session_state[col_key]
+                if st.button("🔄 Reset Filter", key="reset_filters"):
+                    for key in list(st.session_state.keys()):
+                        if key.startswith("filter__") or key == "selected_filter_columns":
+                            del st.session_state[key]
                     st.rerun()
         
         return active_filters
@@ -1327,11 +1330,10 @@ class BudgetAnalysisDashboard:
         """Run the application."""
         self._configure_page()
         UIComponents.apply_styles()
-
+        
         # Load data
         try:
-            with st.spinner("Memuat data anggaran..."):
-                df = self.data_loader.get_data()
+            df = self.data_loader.get_data()
         except DataLoadError as e:
             st.error(f"Gagal memuat data: {e}")
             return
@@ -1440,4 +1442,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
