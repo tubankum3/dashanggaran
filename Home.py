@@ -1356,13 +1356,13 @@ class BudgetAnalysisDashboard:
             selections.advanced_filters
         )
         
-        # # Count active filters for header badge
-        # active_filter_count = self.data_filterer.count_active_filters(
-        #     df, selections.advanced_filters
-        # )
+        # Count active filters for header badge
+        active_filter_count = self.data_filterer.count_active_filters(
+            df, selections.advanced_filters
+        )
         
-        # # Header with filter badge
-        # UIComponents.render_header(selections.selected_kl, active_filter_count)
+        # Header with filter badge
+        UIComponents.render_header(selections.selected_kl, active_filter_count)
         
         # # Show data summary after filtering
         # if df_filtered.empty:
@@ -1445,6 +1445,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
