@@ -1378,7 +1378,7 @@ class BudgetAnalysisDashboard:
                 with col2:
                     st.metric("Baris Asli", f"{len(df):,}")
                 with col3:
-                    pct = (len(df_filtered) / len(df) * 100) if len(df) > 0 else 0
+                    pct = ((len(df_filtered) / len(df)) * 100) if len(df) > 0 else 0
                     st.metric("Persentase", f"{pct:.1f}%")
         
         # Main content - two columns
@@ -1445,5 +1445,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
