@@ -133,7 +133,7 @@ INDONESIAN_MONTHS: Dict[int, str] = {
     9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
 }
 
-AVAILABLE_DATES: List[str] = ["27 Oktober 2025", "11 November 2025", "3 Desember 2025"]
+AVAILABLE_DATES: List[str] = ["27 Oktober 2025", "11 November 2025", "3 Desember 2025", "4 Desember 2025", "10 Desember 2025", "18 Desember 2025"]
 
 # =============================================================================
 # STYLING
@@ -1716,5 +1716,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
