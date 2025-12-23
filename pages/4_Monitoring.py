@@ -1266,7 +1266,7 @@ class MonitoringDashboard:
         primary_dt = datetime.strptime(primary_date, "%Y-%m-%d").date()
         primary_label = Formatter.to_indonesian_date(primary_dt)
         
-        st.markdown("### 🔄 Detail Perbandingan Data")
+        st.markdown("### 🔄 Perbandingan Antar Data")
         UIComponents.render_comparison_header(primary_label, comparison_label)
         
         # Render filters - affects both summary and detail
@@ -1321,7 +1321,7 @@ class MonitoringDashboard:
         - Total Penurunan (sum of negative SELISIH) - RED text
         - Net Selisih (kenaikan - penurunan)
         """
-        st.markdown("### 📈 Ringkasan Perbandingan Antar Data")
+        st.markdown("### 📈 Summary Perbandingan Antar Data")
         
         for col in numeric_cols:
             col_primary = f"{col}_{primary_date}"
@@ -1401,7 +1401,7 @@ class MonitoringDashboard:
         - Negative SELISIH: red font, light-red background (penurunan)
         - %CHG columns: progress bar (green for positive, red for negative)
         """
-        st.markdown("### 📋 Tabel Detail Perbandingan")
+        st.markdown("### 📋 Tabel Perbandingan Antar Data")
         
         with st.expander("ℹ️ Keterangan Kolom", expanded=False):
             st.markdown(f"""
@@ -1481,7 +1481,7 @@ class MonitoringDashboard:
             st.divider()
         
         # Render data table with diff and %chg columns
-        st.markdown("### 📋 Tabel Data Perbandingan Metrik")
+        st.markdown("### 📋 Tabel Data Perbandingan Antar Metrik")
         
         # Add diff and %chg columns if more than 1 numeric column
         filtered_agg_with_diff = filtered_agg.copy()
@@ -1548,7 +1548,7 @@ class MonitoringDashboard:
         Render summary metrics for numeric columns with kenaikan/penurunan breakdown.
         Uses colored text: GREEN for kenaikan, RED for penurunan.
         """
-        st.markdown("### 📈 Ringkasan Perbandingan Metrik")
+        st.markdown("### 📈 Summary")
         
         if len(numeric_cols) < 1:
             return
@@ -1621,7 +1621,7 @@ class MonitoringDashboard:
         """
         Render comparison table for numeric columns with kenaikan/penurunan.
         """
-        st.markdown("### 📊 Tabel Perbandingan Antar Metrik")
+        st.markdown("#### 📊 Rincian Summary")
         
         if len(numeric_cols) < 1:
             return
@@ -1716,6 +1716,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
