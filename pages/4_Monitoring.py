@@ -1476,8 +1476,8 @@ class MonitoringDashboard:
         if len(numeric_cols) > 1:
             self._render_column_summary(df_filtered, numeric_cols)
             st.divider()
-            self._render_column_comparison_table(df_filtered, numeric_cols)
-            st.divider()
+            # self._render_column_comparison_table(df_filtered, numeric_cols)
+            # st.divider()
         
         # Render data table with diff and %chg columns
         st.markdown("### 📋 Tabel Data Perbandingan Antar Metrik")
@@ -1715,6 +1715,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
