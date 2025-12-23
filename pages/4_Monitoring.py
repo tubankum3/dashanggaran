@@ -1616,91 +1616,91 @@ class MonitoringDashboard:
                 
                 
     
-    def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
-        """
-        Render comparison table for numeric columns with kenaikan/penurunan.
-        """
-        # st.markdown("#### 📊 Rincian Summary")
+    # def _render_column_comparison_table(self, df: pd.DataFrame, numeric_cols: List[str]) -> None:
+    #     """
+    #     Render comparison table for numeric columns with kenaikan/penurunan.
+    #     """
+    #     st.markdown("#### 📊 Rincian Summary")
         
-        # if len(numeric_cols) < 1:
-        #     return
+    #     if len(numeric_cols) < 1:
+    #         return
         
-        # # First column is the primary (baseline)
-        # primary_col = numeric_cols[0]
-        # if primary_col not in df.columns:
-        #     return
+    #     # First column is the primary (baseline)
+    #     primary_col = numeric_cols[0]
+    #     if primary_col not in df.columns:
+    #         return
         
-        # # Fill NaN with 0 for calculations
-        # primary_total = df[primary_col].fillna(0).sum()
+    #     # Fill NaN with 0 for calculations
+    #     primary_total = df[primary_col].fillna(0).sum()
         
-        # summary_data = []
-        # for col in numeric_cols:
-        #     if col not in df.columns:
-        #         continue
+    #     summary_data = []
+    #     for col in numeric_cols:
+    #         if col not in df.columns:
+    #             continue
             
-        #     # Fill NaN with 0 for calculations
-        #     col_data = df[col].fillna(0)
-        #     total = col_data.sum()
-        #     diff = total - primary_total
-        #     pct = (diff / abs(primary_total) * 100) if primary_total != 0 else 0
+    #         # Fill NaN with 0 for calculations
+    #         col_data = df[col].fillna(0)
+    #         total = col_data.sum()
+    #         diff = total - primary_total
+    #         pct = (diff / abs(primary_total) * 100) if primary_total != 0 else 0
             
-        #     # Calculate row-level kenaikan/penurunan (with fillna)
-        #     if col == primary_col:
-        #         kenaikan = '-'
-        #         penurunan = '-'
-        #         net_selisih = '-'
-        #         pct_str = '-'
-        #     else:
-        #         row_diffs = col_data - df[primary_col].fillna(0)
-        #         kenaikan = row_diffs[row_diffs > 0].sum()
-        #         penurunan = abs(row_diffs[row_diffs < 0].sum())
-        #         net_selisih = diff
-        #         pct_str = pct
+    #         # Calculate row-level kenaikan/penurunan (with fillna)
+    #         if col == primary_col:
+    #             kenaikan = '-'
+    #             penurunan = '-'
+    #             net_selisih = '-'
+    #             pct_str = '-'
+    #         else:
+    #             row_diffs = col_data - df[primary_col].fillna(0)
+    #             kenaikan = row_diffs[row_diffs > 0].sum()
+    #             penurunan = abs(row_diffs[row_diffs < 0].sum())
+    #             net_selisih = diff
+    #             pct_str = pct
             
-        #     row_data = {
-        #         'Kolom': col,
-        #         'Total': total,
-        #         'Rata-rata': col_data.mean(),
-        #         'Min': col_data.min(),
-        #         'Max': col_data.max(),
-        #         'Count': col_data.count(),
-        #         'Kenaikan ⬆️': kenaikan,
-        #         'Penurunan ⬇️': penurunan,
-        #         'Net Selisih': net_selisih,
-        #         '%Chg': pct_str,
-        #     }
+    #         row_data = {
+    #             'Kolom': col,
+    #             'Total': total,
+    #             'Rata-rata': col_data.mean(),
+    #             'Min': col_data.min(),
+    #             'Max': col_data.max(),
+    #             'Count': col_data.count(),
+    #             'Kenaikan ⬆️': kenaikan,
+    #             'Penurunan ⬇️': penurunan,
+    #             'Net Selisih': net_selisih,
+    #             '%Chg': pct_str,
+    #         }
             
-        #     summary_data.append(row_data)
+    #         summary_data.append(row_data)
         
-        # if not summary_data:
-        #     return
+    #     if not summary_data:
+    #         return
         
-        # summary_df = pd.DataFrame(summary_data)
+    #     summary_df = pd.DataFrame(summary_data)
         
-        # Format display
-        display_df = summary_df.copy()
-        for col in ['Total', 'Rata-rata', 'Min', 'Max']:
-            display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
-        display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
+    #     # Format display
+    #     display_df = summary_df.copy()
+    #     for col in ['Total', 'Rata-rata', 'Min', 'Max']:
+    #         display_df[col] = display_df[col].apply(Formatter.to_rupiah_full)
+    #     display_df['Count'] = display_df['Count'].apply(Formatter.to_number_with_separator)
         
-        for col in ['Kenaikan ⬆️', 'Penurunan ⬇️', 'Net Selisih']:
-            display_df[col] = display_df[col].apply(
-                lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
-            )
-        display_df['%Chg'] = display_df['%Chg'].apply(
-            lambda x: Formatter.to_percentage(x) if x != '-' else '-'
-        )
+    #     for col in ['Kenaikan ⬆️', 'Penurunan ⬇️', 'Net Selisih']:
+    #         display_df[col] = display_df[col].apply(
+    #             lambda x: Formatter.to_rupiah_full(x) if x != '-' else '-'
+    #         )
+    #     display_df['%Chg'] = display_df['%Chg'].apply(
+    #         lambda x: Formatter.to_percentage(x) if x != '-' else '-'
+    #     )
         
-        st.dataframe(display_df, width="stretch", hide_index=True)
+    #     st.dataframe(display_df, width="stretch", hide_index=True)
         
-        with st.expander("ℹ️ Keterangan", expanded=False):
-            st.markdown(f"""
-            - **Kolom Utama (Baseline)**: `{primary_col}`
-            - **Kenaikan ⬆️**: Jumlah selisih positif (nilai kolom > baseline)
-            - **Penurunan ⬇️**: Jumlah selisih negatif (nilai kolom < baseline)
-            - **Net Selisih**: Kenaikan - Penurunan
-            - **%Chg**: Persentase perubahan terhadap {primary_col}
-            """)
+    #     with st.expander("ℹ️ Keterangan", expanded=False):
+    #         st.markdown(f"""
+    #         - **Kolom Utama (Baseline)**: `{primary_col}`
+    #         - **Kenaikan ⬆️**: Jumlah selisih positif (nilai kolom > baseline)
+    #         - **Penurunan ⬇️**: Jumlah selisih negatif (nilai kolom < baseline)
+    #         - **Net Selisih**: Kenaikan - Penurunan
+    #         - **%Chg**: Persentase perubahan terhadap {primary_col}
+    #         """)
 
 
 # =============================================================================
@@ -1715,6 +1715,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
