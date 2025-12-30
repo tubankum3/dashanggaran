@@ -94,7 +94,7 @@ class AppConfig:
     
     # UI defaults
     DEFAULT_YEAR: int = 2025
-    DEFAULT_TOP_N: int = 11
+    DEFAULT_TOP_N: int = 10
     MIN_TOP_N: int = 1
     MAX_TOP_N: int = 500
     DEFAULT_METRIC: str = "REALISASI BELANJA KL (SAKTI)"
