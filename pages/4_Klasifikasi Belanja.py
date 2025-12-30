@@ -714,7 +714,7 @@ class UIComponents:
         st.markdown(f"""
         <div class="dashboard-header" role="banner">
             <div class="breadcrumb">DASHBOARD / KLASIFIKASI BELANJA {metric_text} / {kl_text} / TAHUN {year_text}</div>
-            <h1 class="dashboard-title">💰 Analisis Klasifikasi Jenis Belanja</h1>
+            <h1 class="dashboard-title">Analisis Klasifikasi Jenis Belanja</h1>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1003,7 +1003,6 @@ class DrillDownView:
         else:
             # Last level - just display chart without click events
             st.plotly_chart(fig, use_container_width=True)
-            st.info("📍 Level terakhir tercapai. Klik ⬅️ untuk kembali.")
     
     def _extract_clicked_value(self, event: Dict[str, Any]) -> Optional[str]:
         """Extract the clicked category value from a Plotly event."""
