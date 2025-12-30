@@ -93,11 +93,11 @@ class AppConfig:
     REQUEST_TIMEOUT: int = 30
     
     # UI defaults
-    DEFAULT_YEAR: int = 2025
+    DEFAULT_YEAR: int = 2026
     DEFAULT_TOP_N: int = 10
     MIN_TOP_N: int = 1
     MAX_TOP_N: int = 500
-    DEFAULT_METRIC: str = "REALISASI BELANJA KL (SAKTI)"
+    DEFAULT_METRIC: str = "PAGU DIPA REVISI"
     
     # Chart settings
     CHART_BASE_HEIGHT: int = 400
@@ -114,7 +114,7 @@ class AppConfig:
     KL_COLUMN: str = "KEMENTERIAN/LEMBAGA"
     
     # Page configuration
-    PAGE_TITLE: str = "Analisis Klasifikasi Akun Anggaran"
+    PAGE_TITLE: str = "Analisis Klasifikasi Akun Jenis Belanja"
     PAGE_ICON: str = "💰"
 
 
