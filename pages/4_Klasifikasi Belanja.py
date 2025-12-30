@@ -1,7 +1,7 @@
 """
-Klasifikasi Akun Dashboard
+Dashboard Klasifikasi Belanja 
 ==========================
-Dashboard drill-down interaktif untuk menganalisis klasifikasi akun anggaran Pemerintah.
+Dashboard drill-down interaktif untuk menganalisis klasifikasi akun Jenis Belanja Pemerintah.
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ AVAILABLE_METRICS: List[str] = [
 class AppConfig:
     """Application configuration constants."""
     
-    # Data source - using jb.csv (regular CSV, not zipped)
+    # Data source - using jb.csv
     DATA_URL: str = "https://raw.githubusercontent.com/tubankum3/dashanggaran/main/jb.csv"
     REQUEST_TIMEOUT: int = 30
     
@@ -713,9 +713,8 @@ class UIComponents:
         
         st.markdown(f"""
         <div class="dashboard-header" role="banner">
-            <div class="breadcrumb">DASHBOARD / KLASIFIKASI AKUN {metric_text} / {kl_text} / TAHUN {year_text}</div>
-            <h1 class="dashboard-title">💰 Analisis Klasifikasi Akun Anggaran</h1>
-            <p class="dashboard-subtitle">Drill-down 6 level: AKUN 1 DIGIT → AKUN 2 DIGIT → ... → AKUN 6 DIGIT</p>
+            <div class="breadcrumb">DASHBOARD / KLASIFIKASI BELANJA {metric_text} / {kl_text} / TAHUN {year_text}</div>
+            <h1 class="dashboard-title">💰 Analisis Klasifikasi Jenis Belanja</h1>
         </div>
         """, unsafe_allow_html=True)
     
@@ -915,7 +914,7 @@ class DrillDownView:
     
     def _render_title(self) -> None:
         """Render section title."""
-        st.markdown(f"##### KLASIFIKASI AKUN {self.metric} TAHUN {self.year}")
+        st.markdown(f"##### KLASIFIKASI BELANJA {self.metric} TAHUN {self.year}")
     
     def _render_breadcrumbs(self) -> None:
         """Render breadcrumb navigation for active drill-down selections."""
@@ -1119,7 +1118,7 @@ class AkunClassificationApp:
         ]
         
         if not available_hierarchy:
-            st.error("Kolom hierarki AKUN tidak ditemukan di dataset.")
+            st.error("Kolom hierarki Jenis Belanja tidak ditemukan di dataset.")
             st.info("Kolom yang diharapkan: " + ", ".join(HierarchyLevel.ordered_columns()))
             with st.expander("🔍 Kolom yang tersedia di dataset"):
                 st.write(df_filtered.columns.tolist())
@@ -1148,7 +1147,7 @@ class AkunClassificationApp:
             menu_items={
                 "Get Help": "https://www.kemenkeu.go.id",
                 "Report a bug": "https://github.com/tubankum3/dashanggaran/issues",
-                "About": "Dashboard Klasifikasi Akun Anggaran"
+                "About": "Dashboard Klasifikasi Belanja"
             }
         )
     
